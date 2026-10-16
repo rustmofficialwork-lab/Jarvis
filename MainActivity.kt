@@ -1,4 +1,4 @@
-package com.maxassistant.app
+package com.jarvisassistant.app // 🟢 Changed package name
 
 import android.Manifest
 import android.app.admin.DevicePolicyManager
@@ -108,6 +108,10 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
+// 🟢 NOTE: Aapko apni baaki files me bhi "Maxx*" classes ko "Jarvis*" me rename karna hoga.
+// Example: MaxxSecurity -> JarvisSecurity, MaxxVoiceEngine -> JarvisVoiceEngine, etc.
+// Is file me sirf UI aur MainActivity ka rebranding kiya gaya hai.
+
 private val Bg = Color(0xFF030303)
 private val Panel = Color(0xFF101010)
 private val Gold = Color(0xFFFFA91F)
@@ -116,26 +120,31 @@ private val Cyber = Color(0xFF4DE6D2)
 private val TextMain = Color(0xFFF4F4F4)
 private val TextMuted = Color(0xFF9B9B9B)
 
-enum class MaxState { IDLE, LISTENING, THINKING, SPEAKING, SERIOUS, CYBERSECURITY, ERROR, OFFLINE }
+// 🟢 Changed enum name
+enum class JarvisState { IDLE, LISTENING, THINKING, SPEAKING, SERIOUS, CYBERSECURITY, ERROR, OFFLINE }
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
-    private val prefs by lazy { getSharedPreferences("maxx", Context.MODE_PRIVATE) }
+    // 🟢 Changed SharedPreferences name
+    private val prefs by lazy { getSharedPreferences("jarvis", Context.MODE_PRIVATE) }
     private val historyStore by lazy { HistoryStore(this) }
-    private val longMemory by lazy { MaxxMemoryManager(this) }
+    
+    // 🟢 NOTE: In classes ko aapko apni files me rename karna hoga
+    private val longMemory by lazy { MaxxMemoryManager(this) } 
     private val taskStore by lazy { MaxxTaskStore(this) }
     private val recoveryStore by lazy { MaxxRecoveryStore(this) }
+    
     private var tts: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var mediaPlayer: MediaPlayer? = null
     private var torchOn = false
     private var lastTranscript by mutableStateOf("")
     private var responseText by mutableStateOf("")
-    private var state by mutableStateOf(MaxState.IDLE)
+    private var state by mutableStateOf(JarvisState.IDLE) // 🟢 Changed
     private var apiKey by mutableStateOf("")
     private var endpoint by mutableStateOf("https://api.openai.com/v1/chat/completions")
     private var model by mutableStateOf("gpt-4o-mini")
     private var speechLocale by mutableStateOf("en-US")
-    private var wakeWord by mutableStateOf("MAXX")
+    private var wakeWord by mutableStateOf("JARVIS") // 🟢 Changed default wake word
     private var speechRate by mutableStateOf(0.90f)
     private var memory by mutableStateOf("")
     private var memoryEnabled by mutableStateOf(true)
@@ -158,17 +167,18 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var activeTask: Future<*>? = null
     private var requestGeneration = 0L
     private var continuousConversation = false
+    
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             lastTranscript = intent?.getStringExtra("phrase").orEmpty()
-            state = MaxState.LISTENING
+            state = JarvisState.LISTENING
             startListening()
         }
     }
 
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startListening() else {
-            state = MaxState.ERROR
+            state = JarvisState.ERROR
             responseText = "Microphone permission was not granted. Typed commands still work."
         }
     }
@@ -187,17 +197,18 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 
     private val calendarPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        responseText = if (granted) "Calendar context enabled. MAXX can use upcoming events for proactive alerts." else "Calendar access was not granted. MAXX will not read calendar events."
+        responseText = if (granted) "Calendar context enabled. JARVIS can use upcoming events for proactive alerts." else "Calendar access was not granted. JARVIS will not read calendar events."
     }
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        responseText = if (granted) "MAXX notifications enabled." else "Notification permission was not granted; proactive alerts may stay hidden."
+        responseText = if (granted) "JARVIS notifications enabled." else "Notification permission was not granted; proactive alerts may stay hidden."
     }
 
     private val contactsPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        responseText = if (granted) "Contacts access enabled. Ask MAXX to find a contact." else "Contacts access was not granted."
+        responseText = if (granted) "Contacts access enabled. Ask JARVIS to find a contact." else "Contacts access was not granted."
     }
 
+    @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = android.graphics.Color.BLACK
@@ -215,14 +226,14 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         recoveryStore.load()?.let { recovered ->
             MaxxAgentRuntime.restore(recovered)
             pendingAgentConfirmation = recovered.status == MaxxAgentRuntime.Status.WAITING_CONFIRMATION
-            responseText = if (pendingAgentConfirmation) "A previous MAXX agent task is waiting for your confirmation. Say yes/haan to resume or no/nahi to cancel." else "A previous MAXX agent task was recovered and is ready to resume with agent status."
+            responseText = if (pendingAgentConfirmation) "A previous JARVIS agent task is waiting for your confirmation. Say yes/haan to resume or no/nahi to cancel." else "A previous JARVIS agent task was recovered and is ready to resume with agent status."
         }
         securityAudit = MaxxSecurityCenter.auditEntries(this)
-        MaxxDiagnostics.record(this, "lifecycle", "INFO", "MAXX activity initialized")
+        MaxxDiagnostics.record(this, "lifecycle", "INFO", "JARVIS activity initialized")
         tts = TextToSpeech(this, this)
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
-                runOnUiThread { state = MaxState.SPEAKING }
+                runOnUiThread { state = JarvisState.SPEAKING }
             }
             override fun onDone(utteranceId: String?) {
                 runOnUiThread {
@@ -231,13 +242,21 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             }
             override fun onError(utteranceId: String?) {
-                runOnUiThread { state = MaxState.ERROR }
+                runOnUiThread { state = JarvisState.ERROR }
             }
         })
-        registerReceiver(wakeReceiver, IntentFilter(MaxxWakeService.ACTION_WAKE), Context.RECEIVER_NOT_EXPORTED)
+        
+        // 🟢 BUG FIX: Context.RECEIVER_NOT_EXPORTED crash on Android < 13 (API 33)
+        val filter = IntentFilter(MaxxWakeService.ACTION_WAKE) // NOTE: Rename MaxxWakeService to JarvisWakeService in its file
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(wakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(wakeReceiver, filter)
+        }
+
         setContent {
-            MaxxTheme {
-                MaxxApp(
+            JarvisTheme { // 🟢 Changed
+                JarvisApp( // 🟢 Changed
                     state = state,
                     transcript = lastTranscript,
                     response = responseText,
@@ -305,7 +324,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         endpoint = prefs.getString("endpoint", endpoint).orEmpty().ifBlank { endpoint }
         model = prefs.getString("model", model).orEmpty().ifBlank { model }
         speechLocale = prefs.getString("speech_locale", speechLocale).orEmpty().ifBlank { "en-US" }
-        wakeWord = prefs.getString("wake_word", wakeWord).orEmpty().ifBlank { "MAXX" }
+        wakeWord = prefs.getString("wake_word", wakeWord).orEmpty().ifBlank { "JARVIS" } // 🟢 Changed
         speechRate = prefs.getFloat("speech_rate", speechRate).coerceIn(0.5f, 1.5f)
         memoryEnabled = prefs.getBoolean("memory_enabled", true)
         seriousModeActive = prefs.getBoolean("serious_mode", false)
@@ -352,7 +371,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun savePreferences(locale: String, word: String, rate: Float) {
         speechLocale = locale.trim().ifBlank { "en-US" }
-        wakeWord = word.trim().ifBlank { "MAXX" }
+        wakeWord = word.trim().ifBlank { "JARVIS" } // 🟢 Changed
         speechRate = rate.coerceIn(0.5f, 1.5f)
         prefs.edit()
             .putString("speech_locale", speechLocale)
@@ -419,8 +438,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun onOrbClick() {
         when (state) {
-            MaxState.LISTENING -> stopListening()
-            MaxState.SPEAKING -> {
+            JarvisState.LISTENING -> stopListening()
+            JarvisState.SPEAKING -> {
                 tts?.stop()
                 state = restingState()
             }
@@ -435,28 +454,28 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun startListening() {
         if (!MaxxVoiceEngine.isAvailable(this)) {
-            state = MaxState.ERROR
+            state = JarvisState.ERROR
             responseText = "Android speech recognition is unavailable on this device."
             return
         }
         stopListening()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
             recognizer.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) { state = MaxState.LISTENING }
-                override fun onBeginningOfSpeech() { state = MaxState.LISTENING }
+                override fun onReadyForSpeech(params: Bundle?) { state = JarvisState.LISTENING }
+                override fun onBeginningOfSpeech() { state = JarvisState.LISTENING }
                 override fun onRmsChanged(rmsdB: Float) { audioLevel = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
-                override fun onEndOfSpeech() { state = MaxState.THINKING }
+                override fun onEndOfSpeech() { state = JarvisState.THINKING }
                 override fun onError(error: Int) {
                     audioLevel = 0f
-                    state = if (error == SpeechRecognizer.ERROR_NETWORK) MaxState.OFFLINE else MaxState.ERROR
+                    state = if (error == SpeechRecognizer.ERROR_NETWORK) JarvisState.OFFLINE else JarvisState.ERROR
                     responseText = MaxxVoiceEngine.errorMessage(error)
                 }
                 override fun onResults(results: Bundle?) {
                     audioLevel = 0f
                     val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                     if (text.isNullOrBlank()) {
-                        state = MaxState.ERROR
+                        state = JarvisState.ERROR
                         responseText = "No speech was recognized."
                     } else {
                         lastTranscript = text
@@ -468,7 +487,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             })
             val intent = MaxxVoiceEngine.recognitionIntent(speechLocale, preferOffline = false)
             try { recognizer.startListening(intent) } catch (_: Exception) {
-                state = MaxState.ERROR
+                state = JarvisState.ERROR
                 responseText = "Voice recognition could not start. Check microphone permission and try again."
                 recognizer.destroy()
                 speechRecognizer = null
@@ -501,7 +520,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     return
                 }
                 else -> {
-                    responseText = "Emergency security lock is ON. Disable the kill switch to resume MAXX actions."
+                    responseText = "Emergency security lock is ON. Disable the kill switch to resume JARVIS actions."
                     finishTurn(prompt, responseText)
                     return
                 }
@@ -565,7 +584,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val securityDecision = MaxxSecurity.assess(prompt)
         MaxxSecurityCenter.audit(this, prompt, securityDecision.risk.name, if (securityDecision.requiresConfirmation) "confirmation required" else "allowed")
         securityAudit = MaxxSecurityCenter.auditEntries(this)
-        MaxxDiagnostics.record(this, "lifecycle", "INFO", "MAXX activity initialized")
+        MaxxDiagnostics.record(this, "lifecycle", "INFO", "JARVIS activity initialized")
         if (securityDecision.requiresConfirmation) {
             pendingConfirmation = prompt
             responseText = "This action involves ${securityDecision.reason}. Should I continue?"
@@ -612,7 +631,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        state = MaxState.THINKING
+        state = JarvisState.THINKING
         val capturedHistory = history.takeLast(8)
         val capturedMemory = if (memoryEnabled) listOf(memory, longMemory.context()).filter { it.isNotBlank() }.joinToString("\n") else ""
         val key = apiKey
@@ -661,15 +680,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         emergencyKillSwitch = enabled
         MaxxSecurityCenter.setKillSwitch(this, enabled)
         securityAudit = MaxxSecurityCenter.auditEntries(this)
-        MaxxDiagnostics.record(this, "lifecycle", "INFO", "MAXX activity initialized")
-        responseText = if (enabled) "Emergency security lock enabled. MAXX will not execute actions until you disable it." else "Emergency security lock disabled. MAXX is ready again."
+        MaxxDiagnostics.record(this, "lifecycle", "INFO", "JARVIS activity initialized")
+        responseText = if (enabled) "Emergency security lock enabled. JARVIS will not execute actions until you disable it." else "Emergency security lock disabled. JARVIS is ready again."
         if (enabled) { pendingConfirmation = null; pendingAgentConfirmation = false; MaxxAgentRuntime.cancel() }
     }
 
     private fun handleLocalCommand(text: String): String? {
         val command = CommandNormalizer.normalize(text, wakeWord)
         if (command in setOf("help", "commands", "show commands", "what can you do")) {
-            return "MAXX commands: health, diagnostics, network status, performance status, integration status, agent status, agent cancel, daily briefing, proactive status, memory, screenshot, battery status, settings. High-risk actions always require confirmation."
+            return "JARVIS commands: health, diagnostics, network status, performance status, integration status, agent status, agent cancel, daily briefing, proactive status, memory, screenshot, battery status, settings. High-risk actions always require confirmation."
         }
         if (command in setOf("security status", "privacy status", "security center")) {
             return "Emergency kill switch is ${if (emergencyKillSwitch) "ON" else "OFF"}. ${securityAudit.size} security audit entries are stored locally."
@@ -705,7 +724,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             if (secondsLong !in 1L..86_399L) return "Choose a timer between one second and 23 hours, 59 minutes."
             val seconds = secondsLong.toInt()
             safeStartActivity(Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH, seconds)
-                .putExtra(AlarmClock.EXTRA_MESSAGE, "MAXX timer").putExtra(AlarmClock.EXTRA_SKIP_UI, false))
+                .putExtra(AlarmClock.EXTRA_MESSAGE, "JARVIS timer").putExtra(AlarmClock.EXTRA_SKIP_UI, false))
             return "Opening Android Clock to set a $number $unit timer."
         }
         Regex("^(?:set )?(?:an )?alarm for (\\d{1,2}):(\\d{2})$").find(command)?.let { match ->
@@ -713,7 +732,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val minute = match.groupValues[2].toInt()
             if (hour !in 0..23 || minute !in 0..59) return "Use a valid 24-hour time, such as 07:30."
             safeStartActivity(Intent(AlarmClock.ACTION_SET_ALARM).putExtra(AlarmClock.EXTRA_HOUR, hour)
-                .putExtra(AlarmClock.EXTRA_MINUTES, minute).putExtra(AlarmClock.EXTRA_MESSAGE, "MAXX alarm"))
+                .putExtra(AlarmClock.EXTRA_MINUTES, minute).putExtra(AlarmClock.EXTRA_MESSAGE, "JARVIS alarm"))
             return "Opening Android Clock to set the alarm."
         }
         if (command in listOf("volume up", "turn volume up", "increase volume")) {
@@ -765,20 +784,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
         if (command in listOf("notification access", "notification access settings", "enable notification access")) {
             safeStartActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            return "Opening Android notification access settings. MAXX only reads notifications after you explicitly enable access."
+            return "Opening Android notification access settings. JARVIS only reads notifications after you explicitly enable access."
         }
         if (command in listOf("recent notifications", "read notifications", "notifications read karo")) {
             return MaxxNotificationListenerService.recent(this)
         }
         if (command in listOf("take screenshot", "screenshot lo", "screen shot lo", "capture screen")) {
             val service = MaxxAccessibilityService.active
-            if (service == null) return "Enable MAXX Accessibility first so Android can provide a screenshot."
+            if (service == null) return "Enable JARVIS Accessibility first so Android can provide a screenshot."
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return "Screenshot automation requires Android 11 or newer."
-            val file = File(cacheDir, "maxx-screenshot-${System.currentTimeMillis()}.png")
+            val file = File(cacheDir, "jarvis-screenshot-${System.currentTimeMillis()}.png")
             service.captureScreenshot(file) { ok, saved ->
                 runOnUiThread { responseText = if (ok && saved != null) "Screenshot saved locally: ${saved.name}" else "Android did not provide a screenshot." }
             }
-            return "Taking a screenshot using the enabled MAXX Accessibility service."
+            return "Taking a screenshot using the enabled JARVIS Accessibility service."
         }
         if (command == "do not disturb settings" || command == "dnd settings") {
             safeStartActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
@@ -798,7 +817,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 return "Microphone permission is required before background wake listening can start."
             }
             startWakeService()
-            return "MAXX wake-word listening started. Say $wakeWord, then your command."
+            return "JARVIS wake-word listening started. Say $wakeWord, then your command."
         }
         if (command in listOf("stop wake word", "disable wake word", "stop background listening")) {
             stopWakeService()
@@ -816,7 +835,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             return runAccessibility("tap", match.groupValues[1].toFloat(), match.groupValues[2].toFloat())
         }
         if (command.startsWith("type ")) {
-            val typedText = withoutWakePrefix.replaceFirst(Regex("(?i)^type\\s+"), "")
+            val typedText = command.replaceFirst(Regex("(?i)^type\\s+"), "")
             return runAccessibility("type", text = typedText)
         }
         if (command == "lock phone" || command == "lock my phone") return lockPhone()
@@ -828,7 +847,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         Regex("^(?:text|sms|message)(?: to)? (\\+?[\\d ()-]{5,})$").find(command)?.let { match ->
             val number = match.groupValues[1].replace(Regex("[^+\\d]"), "")
             safeStartActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)))
-            return "Opening an SMS draft. MAXX has not sent a message."
+            return "Opening an SMS draft. JARVIS has not sent a message."
         }
         Regex("^open (.+)$").find(command)?.let { match ->
             return openInstalledApp(match.groupValues[1].trim())
@@ -843,7 +862,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 ?: return "I don't recognize that integration. Say integration status to see supported providers."
             return if (MaxxIntegrationHub.openOfficialEntry(this, provider)) "Opening the official ${provider.name.replace('_', ' ').lowercase()} entry point." else "I couldn't open that integration."
         }
-        if (command in listOf("what can you do", "capabilities", "help", "what can maxx do")) {
+        if (command in listOf("what can you do", "capabilities", "help", "what can jarvis do")) {
             return MaxxCapabilities.describe(this)
         }
         if (command in listOf("list tasks", "show tasks", "my tasks", "मेरे टास्क", "टास्क दिखाओ")) {
@@ -909,10 +928,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             return if (MaxxProductivity.openCalendar(this)) "Opening Calendar." else "I couldn't open a calendar app."
         }
         if (command in listOf("create calendar event", "new calendar event", "meeting schedule")) {
-            return if (MaxxProductivity.createEvent(this, "MAXX event")) "Opening a new calendar event." else "I couldn't open the calendar event editor."
+            return if (MaxxProductivity.createEvent(this, "JARVIS event")) "Opening a new calendar event." else "I couldn't open the calendar event editor."
         }
         if (command in listOf("set reminder", "create reminder", "reminder lagao", "रिमाइंडर लगाओ")) {
-            return if (MaxxProductivity.createReminder(this, "MAXX reminder")) "Opening the Android alarm/reminder flow." else "I couldn't open the reminder flow."
+            return if (MaxxProductivity.createReminder(this, "JARVIS reminder")) "Opening the Android alarm/reminder flow." else "I couldn't open the reminder flow."
         }
         Regex("^(?:map|maps|navigate to|directions to) (.+)$").find(command)?.let { match ->
             return if (MaxxProductivity.openMaps(this, match.groupValues[1])) "Opening Maps for ${match.groupValues[1]}." else "I couldn't open Maps."
@@ -925,12 +944,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
         if (command in listOf("choose photo", "pick image", "select image", "gallery kholo", "फोटो चुनो", "इमेज चुनो")) {
             pickVisionImage.launch("image/*")
-            return "Choose an image and MAXX will read visible text from it on-device."
+            return "Choose an image and JARVIS will read visible text from it on-device."
         }
         if (command in listOf("read image text", "read photo", "ocr", "image text", "फोटो का टेक्स्ट पढ़ो", "इमेज का टेक्स्ट पढ़ो")) {
             if (visionText.isBlank()) {
                 pickVisionImage.launch("image/*")
-                return "Choose an image and MAXX will extract its text on-device."
+                return "Choose an image and JARVIS will extract its text on-device."
             }
             return visionText
         }
@@ -955,7 +974,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         Regex("^(?:find contact|contact search|contact dhundo|कॉन्टैक्ट ढूंढो) (.+)$", RegexOption.IGNORE_CASE).find(command)?.let { m ->
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
                 contactsPermission.launch(Manifest.permission.READ_CONTACTS)
-                return "Android will ask for contacts permission. MAXX will only read contact names and phone numbers after you allow it."
+                return "Android will ask for contacts permission. JARVIS will only read contact names and phone numbers after you allow it."
             }
             return MaxxProductivity.findContact(this, m.groupValues[1].trim()) ?: "Contacts access is not available."
         }
@@ -974,10 +993,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         if (command in listOf("enable calendar context", "calendar context on", "calendar context enable", "calendar access on")) {
             if (MaxxContextEngine.calendarAccessEnabled(this)) return "Calendar context is already enabled."
             calendarPermission.launch(Manifest.permission.READ_CALENDAR)
-            return "Android will ask for calendar permission. MAXX will only read upcoming events after you allow it."
+            return "Android will ask for calendar permission. JARVIS will only read upcoming events after you allow it."
         }
         if (command in listOf("disable calendar context", "calendar context off", "calendar access off")) {
-            return "Calendar access can be revoked from Android Settings → App permissions. MAXX will stop using calendar context once permission is revoked."
+            return "Calendar access can be revoked from Android Settings → App permissions. JARVIS will stop using calendar context once permission is revoked."
         }
         if (command in listOf("daily briefing", "morning briefing", "brief me", "आज का ब्रीफिंग")) {
             return MaxxProactiveEngine.dailyBriefing(this)
@@ -1006,8 +1025,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             return "Offline request queue cleared."
         }
         if (command in listOf("proactive test", "test notification")) {
-            MaxxProactiveEngine.notify(this, "MAXX", "Proactive assistant notifications are working.", important = true)
-            return "I sent a local MAXX test notification."
+            MaxxProactiveEngine.notify(this, "JARVIS", "Proactive assistant notifications are working.", important = true)
+            return "I sent a local JARVIS test notification."
         }
         if (command in listOf("proactive status", "proactive mode", "proactive intelligence status")) {
             return "Proactive Mode is ${proactiveMode.name}. Priority engine is active; calendar context is ${if (MaxxContextEngine.calendarAccessEnabled(this)) "enabled" else "disabled"}."
@@ -1017,7 +1036,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             return "Proactive Mode set to ${proactiveMode.name}."
         }
         if (command in listOf("vision status", "screen understanding")) {
-            return if (MaxxVision.accessibilityAvailable()) "Screen understanding is available through the enabled Accessibility service." else "Enable MAXX Accessibility to let MAXX inspect the currently focused UI text."
+            return if (MaxxVision.accessibilityAvailable()) "Screen understanding is available through the enabled Accessibility service." else "Enable JARVIS Accessibility to let JARVIS inspect the currently focused UI text."
         }
         if (command.startsWith("plan ") || command.startsWith("agent plan ")) {
             val goal = command.removePrefix("agent ").removePrefix("plan ").trim()
@@ -1031,7 +1050,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val plan = MaxxAgent.plan(goal)
             if (plan.steps.isEmpty()) return "No executable local tool was selected. Online AI reasoning is needed for this goal."
             if (plan.needsOnlineReasoning && plan.steps.any { it.tool == MaxxToolSystem.Tool.WEB_RESEARCH }) {
-                return "This plan includes web research. Use the normal MAXX request flow for the online research portion; the local agent runtime will not pretend it executed web work."
+                return "This plan includes web research. Use the normal JARVIS request flow for the online research portion; the local agent runtime will not pretend it executed web work."
             }
             MaxxDiagnostics.record(this, "agent", "INFO", "Agent started: ${plan.steps.size} step(s)")
             val result = MaxxAgentRuntime.start(plan) { step -> executeAgentStep(step) }
@@ -1110,7 +1129,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun runAccessibility(command: String, x: Float = 0f, y: Float = 0f, text: String = ""): String {
         val service = MaxxAccessibilityService.active
         if (service == null) {
-            return "Enable MAXX Accessibility in Settings → Permissions first. Android requires you to turn it on manually."
+            return "Enable JARVIS Accessibility in Settings → Permissions first. Android requires you to turn it on manually."
         }
         val accepted = service.performCommand(command, x, y, text)
         return if (accepted) "Android accepted the $command command."
@@ -1144,7 +1163,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val uri = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
             pendingVisionUri = uri
             takeVisionPhoto.launch(uri)
-            "Camera opened. After capture, MAXX will extract visible text on-device."
+            "Camera opened. After capture, JARVIS will extract visible text on-device."
         } catch (e: Exception) {
             "I couldn't start the camera capture: ${e.message ?: "unsupported"}."
         }
@@ -1152,7 +1171,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun runVisionOcr(uri: Uri) {
         responseText = "Reading image text on-device…"
-        state = MaxState.THINKING
+        state = JarvisState.THINKING
         MaxxVisionEngine.recognizeText(this, uri) { result ->
             runOnUiThread {
                 state = restingState()
@@ -1194,9 +1213,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
         val activate = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
             .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-            .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "MAXX can lock this phone only when you explicitly activate its Android device-admin permission.")
+            .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "JARVIS can lock this phone only when you explicitly activate its Android device-admin permission.")
         startActivity(activate)
-        return "Android is showing the optional device-admin screen. Activate it only if you want MAXX to lock the phone."
+        return "Android is showing the optional device-admin screen. Activate it only if you want JARVIS to lock the phone."
     }
 
     private fun requestDeviceAdmin() {
@@ -1206,7 +1225,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             startActivity(
                 Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
                     .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-                    .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "This permission allows MAXX to lock the phone only when you explicitly ask.")
+                    .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "This permission allows JARVIS to lock the phone only when you explicitly ask.")
             )
         } else {
             responseText = "Phone-lock permission is currently enabled in Android."
@@ -1253,7 +1272,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun finishTurn(prompt: String, answer: String) {
         MaxxSecurityCenter.audit(this, prompt, "ACTION", "completed")
         securityAudit = MaxxSecurityCenter.auditEntries(this)
-        MaxxDiagnostics.record(this, "lifecycle", "INFO", "MAXX activity initialized")
+        MaxxDiagnostics.record(this, "lifecycle", "INFO", "JARVIS activity initialized")
         history = (history + ChatTurn(prompt, answer)).takeLast(40)
         saveHistory()
         speak(answer)
@@ -1307,8 +1326,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             state = restingState()
             return
         }
-        state = MaxState.SPEAKING
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "maxx-${SystemClock.uptimeMillis()}")
+        state = JarvisState.SPEAKING
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-${SystemClock.uptimeMillis()}")
     }
 
     override fun onInit(status: Int) {
@@ -1321,14 +1340,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun restingState(): MaxState = when {
-        seriousModeActive -> MaxState.SERIOUS
-        cybersecurityModeActive -> MaxState.CYBERSECURITY
-        else -> MaxState.IDLE
+    private fun restingState(): JarvisState = when {
+        seriousModeActive -> JarvisState.SERIOUS
+        cybersecurityModeActive -> JarvisState.CYBERSECURITY
+        else -> JarvisState.IDLE
     }
 
     private fun playVoiceSample() {
         mediaPlayer?.release()
+        // 🟢 NOTE: Rename maxx_voice_sample to jarvis_voice_sample in res/raw
         mediaPlayer = MediaPlayer.create(this, R.raw.maxx_voice_sample)?.also { player ->
             player.start()
             player.setOnCompletionListener { it.release(); mediaPlayer = null }
@@ -1337,12 +1357,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun startWakeService() {
         if (Build.VERSION.SDK_INT >= 29 && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
-        val intent = Intent(this, MaxxWakeService::class.java)
+        val intent = Intent(this, MaxxWakeService::class.java) // NOTE: Rename MaxxWakeService to JarvisWakeService
             .putExtra("wake", wakeWord)
             .putExtra("locale", speechLocale)
         try {
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
-        } catch (_: Exception) { responseText = "Android did not allow the background MAXX listener to start." }
+        } catch (_: Exception) { responseText = "Android did not allow the background JARVIS listener to start." }
     }
 
     private fun stopWakeService() {
@@ -1360,10 +1380,13 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val severity = if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) "WARN" else "INFO"
         MaxxDiagnostics.record(this, "resource", severity, "Android trim-memory level=$level")
         if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
-            activeTask?.cancel(true)
+            // 🟢 BUG FIX: Safe cancellation if worker is already shutdown
+            try {
+                activeTask?.cancel(true)
+            } catch (_: Exception) { }
             activeTask = null
-            responseText = "Android reported critical memory pressure. MAXX paused the active background request safely."
-            state = MaxState.IDLE
+            responseText = "Android reported critical memory pressure. JARVIS paused the active background request safely."
+            state = JarvisState.IDLE
         }
     }
 
@@ -1374,7 +1397,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         tts?.stop()
         tts?.shutdown()
         mediaPlayer?.release()
-        activeTask?.cancel(true)
+        try {
+            activeTask?.cancel(true)
+        } catch (_: Exception) { }
         worker.shutdownNow()
         stopWakeService()
         try { unregisterReceiver(wakeReceiver) } catch (_: Exception) {}
@@ -1383,7 +1408,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 }
 
 @Composable
-private fun MaxxTheme(content: @Composable () -> Unit) {
+private fun JarvisTheme(content: @Composable () -> Unit) { // 🟢 Changed
     MaterialTheme(
         colorScheme = darkColorScheme(
             background = Bg, surface = Bg, primary = Gold, onBackground = TextMain, onSurface = TextMain
@@ -1393,8 +1418,8 @@ private fun MaxxTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun MaxxApp(
-    state: MaxState,
+private fun JarvisApp( // 🟢 Changed
+    state: JarvisState,
     transcript: String,
     response: String,
     visionText: String,
@@ -1475,18 +1500,19 @@ private fun MaxxApp(
     val accent = when {
         seriousMode -> Red
         cybersecurityMode -> Cyber
-        state == MaxState.ERROR -> Red
+        state == JarvisState.ERROR -> Red
         else -> Gold
     }
 
     // The supplied reference image is the visual shell of the home screen.
     // The settings gear and central core are transparent hit targets layered over it,
-    // so the original image remains visually exact while the existing MAXX actions stay usable.
+    // so the original image remains visually exact while the existing JARVIS actions stay usable.
     Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // 🟢 NOTE: Rename maxx_ui to jarvis_ui in res/drawable
             Image(
                 painter = painterResource(R.drawable.maxx_ui),
-                contentDescription = "MAXX core interface",
+                contentDescription = "JARVIS core interface",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.FillBounds
             )
@@ -1501,7 +1527,7 @@ private fun MaxxApp(
             )
 
             // The artwork remains the visual base, while this Canvas turns its golden core
-            // into a live reactive MAXX core. The animation speed/intensity follows MAXX state.
+            // into a live reactive JARVIS core. The animation speed/intensity follows JARVIS state.
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -1510,7 +1536,7 @@ private fun MaxxApp(
                     .aspectRatio(1f)
                     .clip(CircleShape)
             ) {
-                MaxxCoreAnimation(state = state, accent = accent, audioLevel = audioLevel)
+                JarvisCoreAnimation(state = state, accent = accent, audioLevel = audioLevel)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1518,11 +1544,11 @@ private fun MaxxApp(
                 )
             }
 
-            if (state == MaxState.THINKING || state == MaxState.LISTENING || state == MaxState.SPEAKING || state == MaxState.ERROR) {
+            if (state == JarvisState.THINKING || state == JarvisState.LISTENING || state == JarvisState.SPEAKING || state == JarvisState.ERROR) {
                 val label = when (state) {
-                    MaxState.THINKING -> "THINKING"
-                    MaxState.LISTENING -> "LISTENING"
-                    MaxState.SPEAKING -> "SPEAKING"
+                    JarvisState.THINKING -> "THINKING"
+                    JarvisState.LISTENING -> "LISTENING"
+                    JarvisState.SPEAKING -> "SPEAKING"
                     else -> "CHECK STATUS"
                 }
                 Text(
@@ -1601,18 +1627,18 @@ private fun MaxxApp(
 }
 
 @Composable
-private fun MaxxCoreAnimation(state: MaxState, accent: Color, audioLevel: Float) {
-    val transition = rememberInfiniteTransition(label = "maxx-core")
+private fun JarvisCoreAnimation(state: JarvisState, accent: Color, audioLevel: Float) { // 🟢 Changed
+    val transition = rememberInfiniteTransition(label = "jarvis-core")
     val rotation by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(
                 durationMillis = when (state) {
-                    MaxState.LISTENING -> 4200
-                    MaxState.THINKING -> 2600
-                    MaxState.SPEAKING -> 1800
-                    MaxState.ERROR -> 700
+                    JarvisState.LISTENING -> 4200
+                    JarvisState.THINKING -> 2600
+                    JarvisState.SPEAKING -> 1800
+                    JarvisState.ERROR -> 700
                     else -> 7600
                 },
                 easing = LinearEasing
@@ -1626,10 +1652,10 @@ private fun MaxxCoreAnimation(state: MaxState, accent: Color, audioLevel: Float)
         animationSpec = infiniteRepeatable(
             animation = tween(
                 durationMillis = when (state) {
-                    MaxState.LISTENING -> 650
-                    MaxState.SPEAKING -> 480
-                    MaxState.THINKING -> 900
-                    MaxState.ERROR -> 240
+                    JarvisState.LISTENING -> 650
+                    JarvisState.SPEAKING -> 480
+                    JarvisState.THINKING -> 900
+                    JarvisState.ERROR -> 240
                     else -> 1500
                 },
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
@@ -1643,7 +1669,7 @@ private fun MaxxCoreAnimation(state: MaxState, accent: Color, audioLevel: Float)
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = if (state == MaxState.THINKING) 1200 else 2200,
+                durationMillis = if (state == JarvisState.THINKING) 1200 else 2200,
                 easing = LinearEasing
             )
         ),
@@ -1651,10 +1677,10 @@ private fun MaxxCoreAnimation(state: MaxState, accent: Color, audioLevel: Float)
     )
 
     val intensity = when (state) {
-        MaxState.LISTENING -> 1.0f
-        MaxState.THINKING -> 0.92f
-        MaxState.SPEAKING -> 1.0f
-        MaxState.ERROR -> 0.95f
+        JarvisState.LISTENING -> 1.0f
+        JarvisState.THINKING -> 0.92f
+        JarvisState.SPEAKING -> 1.0f
+        JarvisState.ERROR -> 0.95f
         else -> 0.68f
     }
 
@@ -1662,7 +1688,7 @@ private fun MaxxCoreAnimation(state: MaxState, accent: Color, audioLevel: Float)
         val cx = size.width / 2f
         val cy = size.height / 2f
         val base = size.minDimension
-        val reactive = 1f + (audioLevel * if (state == MaxState.LISTENING || state == MaxState.SPEAKING) 0.32f else 0.08f)
+        val reactive = 1f + (audioLevel * if (state == JarvisState.LISTENING || state == JarvisState.SPEAKING) 0.32f else 0.08f)
         val ring = base * 0.36f
         val gold = accent.copy(alpha = intensity)
         val soft = accent.copy(alpha = 0.18f * intensity)
@@ -1743,12 +1769,12 @@ private fun MaxxCoreAnimation(state: MaxState, accent: Color, audioLevel: Float)
         )
 
         // State-specific radial ticks. They move during listening/thinking/speaking,
-        // making the visualizer communicate that MAXX is actively processing audio.
+        // making the visualizer communicate that JARVIS is actively processing audio.
         val ticks = when (state) {
-            MaxState.LISTENING -> 32
-            MaxState.THINKING -> 48
-            MaxState.SPEAKING -> 38
-            MaxState.ERROR -> 20
+            JarvisState.LISTENING -> 32
+            JarvisState.THINKING -> 48
+            JarvisState.SPEAKING -> 38
+            JarvisState.ERROR -> 20
             else -> 24
         }
         for (i in 0 until ticks) {
@@ -1780,14 +1806,14 @@ private fun SetupScreen(onComplete: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(R.drawable.maxx_ui),
-                contentDescription = "MAXX interface preview",
+                painter = painterResource(R.drawable.maxx_ui), // NOTE: Rename maxx_ui to jarvis_ui in res/drawable
+                contentDescription = "JARVIS interface preview",
                 modifier = Modifier
                     .size(width = 220.dp, height = 390.dp)
                     .clip(RoundedCornerShape(22.dp)),
                 contentScale = ContentScale.FillBounds
             )
-            Text("MEET MAXX", color = Gold, fontSize = 12.sp, letterSpacing = 4.sp)
+            Text("MEET JARVIS", color = Gold, fontSize = 12.sp, letterSpacing = 4.sp)
             Spacer(Modifier.height(12.dp))
             Text("Your personal AI assistant", color = TextMain, fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(10.dp))
@@ -1808,7 +1834,7 @@ private fun SetupScreen(onComplete: () -> Unit) {
                 if (acknowledged) {
                     onComplete()
                 }
-            }, enabled = acknowledged) { Text("Set up MAXX") }
+            }, enabled = acknowledged) { Text("Set up JARVIS") }
         }
     }
 }
@@ -1832,7 +1858,7 @@ private fun PermissionGuideScreen(
                 Text("PERMISSIONS", color = TextMain, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(12.dp))
-            Text("MAXX requests each permission only for a feature you choose.", color = TextMuted, fontSize = 13.sp)
+            Text("JARVIS requests each permission only for a feature you choose.", color = TextMuted, fontSize = 13.sp)
             Spacer(Modifier.height(14.dp))
             PermissionRow("Microphone", if (microphoneGranted) "Allowed" else "Not granted", "Only used after you tap the core to speak.")
             PermissionRow("Camera", if (cameraGranted) "Allowed" else "Not granted", "Used only by Android's flashlight control; the app does not capture photos.")
@@ -1840,15 +1866,15 @@ private fun PermissionGuideScreen(
             Button(onClick = onAccessibilitySetup, modifier = Modifier.fillMaxWidth()) {
                 Text("Open Accessibility settings")
             }
-            PermissionRow("Device admin", if (deviceAdminEnabled) "Enabled" else "Optional · disabled", "Required only if you ask MAXX to lock the phone. Android can revoke this at any time.")
+            PermissionRow("Device admin", if (deviceAdminEnabled) "Enabled" else "Optional · disabled", "Required only if you ask JARVIS to lock the phone. Android can revoke this at any time.")
             Button(onClick = onDeviceAdmin, modifier = Modifier.fillMaxWidth()) {
                 Text("Manage lock-phone permission")
             }
-            PermissionRow("Notifications", "Not requested", "MAXX does not send notifications.")
-            PermissionRow("Phone, SMS, contacts, location, Bluetooth", "Not requested", "Calling and SMS open system UI; MAXX does not directly call or send.")
+            PermissionRow("Notifications", "Not requested", "JARVIS does not send notifications.")
+            PermissionRow("Phone, SMS, contacts, location, Bluetooth", "Not requested", "Calling and SMS open system UI; JARVIS does not directly call or send.")
             Spacer(Modifier.height(18.dp))
             Text(
-                "MAXX does not bypass the lock screen, place calls, send SMS, secretly record, or run a hidden microphone service.",
+                "JARVIS does not bypass the lock screen, place calls, send SMS, secretly record, or run a hidden microphone service.",
                 color = TextMuted, fontSize = 12.sp
             )
         }
@@ -1927,7 +1953,7 @@ private fun SettingsScreen(
                 IconButton(onClick = onClose) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Gold)
                 }
-                Text("MAXX SETTINGS", color = TextMain, fontSize = 17.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("JARVIS SETTINGS", color = TextMain, fontSize = 17.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
             Spacer(Modifier.height(12.dp))
 
@@ -1968,7 +1994,7 @@ private fun SettingsScreen(
                 label = { Text("Wake word preference") }, modifier = Modifier.fillMaxWidth(), singleLine = true
             )
             Text(
-                "Wake-word listening is user-started and runs as an Android microphone foreground service. Android/OEM restrictions can still stop it; MAXX never starts the microphone silently.",
+                "Wake-word listening is user-started and runs as an Android microphone foreground service. Android/OEM restrictions can still stop it; JARVIS never starts the microphone silently.",
                 color = TextMuted, fontSize = 11.sp
             )
             Button(onClick = {
@@ -1980,10 +2006,10 @@ private fun SettingsScreen(
             SettingsSection("MODES")
             SettingSwitch("Serious Mode · red core", seriousMode, onSeriousMode)
             SettingSwitch("Cybersecurity Mode · authorized scope only", cybersecurityMode, onCybersecurityMode)
-            Text("Voice commands: “MAXX, serious mode on/off” and “MAXX, cybersecurity mode on/off”.", color = TextMuted, fontSize = 11.sp)
+            Text("Voice commands: “JARVIS, serious mode on/off” and “JARVIS, cybersecurity mode on/off”.", color = TextMuted, fontSize = 11.sp)
             Spacer(Modifier.height(10.dp))
             Text("PROACTIVE INTELLIGENCE", color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Text("MAXX can surface useful local context without executing high-risk actions.", color = TextMuted, fontSize = 11.sp)
+            Text("JARVIS can surface useful local context without executing high-risk actions.", color = TextMuted, fontSize = 11.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 MaxxProactiveEngine.Mode.values().forEach { mode ->
                     TextButton(onClick = { onProactiveMode(mode) }) {
@@ -2027,7 +2053,7 @@ private fun SettingsScreen(
             SettingSwitch("Use saved memory in AI context", memoryEnabled, onMemoryEnabled)
             OutlinedTextField(
                 value = memory, onValueChange = { memory = it },
-                label = { Text("MAXX memory (only what you choose to save)") },
+                label = { Text("JARVIS memory (only what you choose to save)") },
                 modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 5
             )
             Button(onClick = { onSaveMemory(memory) }, modifier = Modifier.fillMaxWidth()) { Text("Save memory encrypted") }
@@ -2047,7 +2073,7 @@ private fun SettingsScreen(
                         Column(Modifier.padding(12.dp)) {
                             Text("YOU  ·  ${turn.user}", color = TextMain, fontSize = 12.sp)
                             Spacer(Modifier.height(4.dp))
-                            Text("MAXX  ·  ${turn.assistant}", color = TextMuted, fontSize = 12.sp)
+                            Text("JARVIS  ·  ${turn.assistant}", color = TextMuted, fontSize = 12.sp)
                             turn.sources.forEach { source ->
                                 TextButton(onClick = { onOpenSource(source.url) }) {
                                     Text(source.title, color = Gold, fontSize = 11.sp)
@@ -2068,14 +2094,14 @@ private fun SettingsScreen(
             Button(onClick = onAccessibilitySetup, modifier = Modifier.fillMaxWidth()) { Text("Open Accessibility settings") }
             Button(onClick = onDeviceAdmin, modifier = Modifier.fillMaxWidth()) { Text("Optional: enable lock-phone permission") }
             Text(
-                "Accessibility is optional and must be enabled by you in Android settings. MAXX does not record or store screen content.",
+                "Accessibility is optional and must be enabled by you in Android settings. JARVIS does not record or store screen content.",
                 color = TextMuted, fontSize = 11.sp
             )
             Spacer(Modifier.height(16.dp))
 
             SettingsSection("SECURITY CENTER")
             SettingSwitch("Emergency kill switch", emergencyKillSwitch, onEmergencyKillSwitch)
-            Text("When enabled, MAXX stops agent execution and device actions. Disable it manually to resume.", color = TextMuted, fontSize = 11.sp)
+            Text("When enabled, JARVIS stops agent execution and device actions. Disable it manually to resume.", color = TextMuted, fontSize = 11.sp)
             Text("Permission status", color = TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             MaxxSecurityCenter.permissionSummary(LocalContext.current).forEach { Text(it, color = TextMuted, fontSize = 11.sp) }
             Text("Recent security audit", color = TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
@@ -2091,10 +2117,10 @@ private fun SettingsScreen(
                 Text("Remove saved AI key", color = Gold)
             }
             TextButton(onClick = onResetSetup) { Text("Reset Setup", color = Gold) }
-            TextButton(onClick = { showAbout = !showAbout }) { Text("About MAXX", color = Gold) }
+            TextButton(onClick = { showAbout = !showAbout }) { Text("About JARVIS", color = Gold) }
             if (showAbout) {
                 Text(
-                    "MAXX is a personal assistant using Android speech services, TextToSpeech, explicit phone intents, configurable OpenAI-compatible AI providers, passive web research and a user-started foreground wake listener. It does not use a hidden microphone or unrestricted device control.",
+                    "JARVIS is a personal assistant using Android speech services, TextToSpeech, explicit phone intents, configurable OpenAI-compatible AI providers, passive web research and a user-started foreground wake listener. It does not use a hidden microphone or unrestricted device control.",
                     color = TextMuted, fontSize = 12.sp
                 )
             }
@@ -2119,4 +2145,3 @@ private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }
-
