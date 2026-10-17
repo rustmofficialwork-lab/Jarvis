@@ -31,9 +31,17 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # 👇 YEH STEP ADD KIYA HAI - gradlew ko execute permission dene ke liye
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      # 👇 YEH NAYA STEP ADD KIYA HAI
+      - name: Download Missing Gradle Wrapper JAR
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            mkdir -p gradle/wrapper
+            curl -sL -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar
+            echo "Downloaded gradle-wrapper.jar"
+          fi
 
       - name: Run Lint
         run: ./gradlew lintDebug || true
