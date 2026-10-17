@@ -1,41 +1,39 @@
-name: Auto Fix Structure
-on: workflow_dispatch
+name: Check Project Structure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  move-files:
+  check-structure:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Move files and create folders
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Inspect project files
         run: |
-          mkdir -p app/src/main/java/com/jarvisassistant/app
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/xml
-          mkdir -p app/src/main/assets
-          mkdir -p app/src/test/java/com/jarvisassistant/app
-          
-          # Move Kotlin files
-          mv *.kt app/src/main/java/com/jarvisassistant/app/ || true
-          
-          # Move XMLs
-          mv AndroidManifest.xml app/src/main/ || true
-          mv strings.xml app/src/main/res/values/ || true
-          mv styles.xml app/src/main/res/values/ || true
-          mv file_paths.xml app/src/main/res/xml/ || true
-          mv network_security_config.xml app/src/main/res/xml/ || true
-          
-          # Move folders
-          mv "Jarvis voice pack" app/src/main/assets/ || true
-          mv "Jarvis UI" app/src/main/assets/ || true
-          
-          # Create app/build.gradle
-          echo "plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }" > app/build.gradle
-          
-          # Commit changes
-          git config user.name "GitHub Action Bot"
-          git config user.email "bot@github.com"
-          git add .
-          git commit -m "Auto-fixed project structure via bot" || true
-          git push
+          echo "=== Root files ==="
+          ls -la
+
+          echo "=== Gradle wrapper ==="
+          ls -la gradle/wrapper || true
+
+          echo "=== App files ==="
+          ls -la app || true
+
+          echo "=== Source files ==="
+          find app/src -maxdepth 6 -type f \
+            2>/dev/null | sort || true
+
+      - name: Verify required files
+        run: |
+          test -f settings.gradle
+          test -f build.gradle
+          test -f app/build.gradle
+          test -f gradle/wrapper/gradle-wrapper.properties
+
+          echo "Required Gradle files found."
