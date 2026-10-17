@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Manual trigger ke liye
+  workflow_dispatch:
 
 concurrency:
   group: android-ci-${{ github.ref }}
@@ -26,25 +26,24 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Gradle dependencies ko cache karein taaki builds fast ho
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Lint check - code quality ke liye (Agar error aaye toh fail nahi hoga)
+      # 👇 YEH STEP ADD KIYA HAI - gradlew ko execute permission dene ke liye
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
       - name: Run Lint
         run: ./gradlew lintDebug || true
 
-      # Unit tests chalayein
       - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest || true
 
-      # Debug APK build karein
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # APK ko artifact ke roop mein upload karein taaki download kar sakein
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
