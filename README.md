@@ -1,28 +1,25 @@
-## JARVIS 5.0.0 — Rebrand Release
- JARVIS. This release contains only the rename plus the
-compile-blocker and logic bug fixes listed below.
+# 🤖 JARVIS - AI Android Assistant
 
-### Rename summary
-- Package: `com.jarvisassistant.app`
-- App name: JARVIS
-- Wake word default: JARVIS
-- Prefs/Keystore namespace: jarvis*`
-- Theme: Theme.Jarvis`
-- Foreground service channel: jarvis_assistant`
-- Broadcast actions: com.jarvisassistant.app.JARVIS_WAKE`
+**JARVIS** is an advanced, proactive AI assistant built natively for Android using Kotlin. It is designed to act as an intelligent agent that can listen, see, plan, and execute tasks seamlessly on your device.
 
-### Bug fixes included
-1. `MainActivity` — `withoutWakePrefix` undefined variable in `type ...` handler.
-2. `MainActivity` — missing `proactiveMode` / `onProactiveMode` args in `JarvisApp(...)` call.
-3. `JarvisRecoveryStore` — referenced non-existent `step.confirmationReason` (now `step.rationale`).
-4. `JarvisRecoveryStore` — no more `null` passed to non-nullable `rationale`.
-5. Tests — mixed `org.junit.*` and `kotlin.test.*` imports; unified to `kotlin.test.*`.
-6. `CommandNormalizer` — removed duplicate `"स्क्रीनशॉट लो"` key.
-7. `MainActivity` — replaced 5 identical diagnostics messages with distinct, meaningful ones.
-8. `JarvisVoiceEngine` — wake-word Hindi aliases  `जार्विस` / `जारविस`.
-9. `JarvisTaskStoreTest` — replaced a meaningless assertion with real model tests.
-10. `SecureVault` — Keystore alias bumped to `jarvis.local-data.v1` (old encrypted data intentionally not migrated; see file header).
+> **Version:** 5.0.0 (Rebrand Release)
 
-### Build
-```bash
-./gradlew clean testDebugUnitTest :app:assembleDebug
+## ✨ Key Features
+
+Based on the modular architecture, JARVIS includes:
+
+*   🎙️ **Voice Engine:** Advanced speech recognition and command normalization (`JarvisVoiceEngine.kt`).
+*   👁️ **Vision Engine:** Visual context understanding and image processing (`JarvisVisionEngine.kt`).
+*   🧠 **Agent Runtime & Context:** Intelligent decision-making using memory and context engines (`JarvisAgentRuntime.kt`, `JarvisContextEngine.kt`).
+*   ⚡ **Proactive Planner:** Anticipates user needs and schedules tasks (`JarvisProactivePlanner.kt`).
+*   ♿ **Accessibility Service:** Deep system integration to automate tasks across the UI (`JarvisAccessibilityService.kt`).
+*   🔐 **Security Center:** Built-in cybersecurity audits and secure data storage (`CybersecurityAudit.kt`, `SecureVault.kt`).
+*   🛠️ **Tool System & Integration:** Extendable architecture to connect with other services (`JarvisToolSystem.kt`).
+
+## 📂 Project Structure
+
+The project follows standard Android Gradle conventions:
+```text
+app/src/main/java/com/jarvisassistant.app/  -> Main Kotlin Source Code
+app/src/main/res/                           -> XML Layouts, Strings, Configs
+app/src/test/java/com/jarvisassistant.app/  -> Unit Tests for Engines & Runtimes
