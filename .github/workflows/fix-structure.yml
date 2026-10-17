@@ -1,0 +1,41 @@
+name: Auto Fix Structure
+on: workflow_dispatch
+
+jobs:
+  move-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move files and create folders
+        run: |
+          mkdir -p app/src/main/java/com/jarvisassistant/app
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/assets
+          mkdir -p app/src/test/java/com/jarvisassistant/app
+          
+          # Move Kotlin files
+          mv *.kt app/src/main/java/com/jarvisassistant/app/ || true
+          
+          # Move XMLs
+          mv AndroidManifest.xml app/src/main/ || true
+          mv strings.xml app/src/main/res/values/ || true
+          mv styles.xml app/src/main/res/values/ || true
+          mv file_paths.xml app/src/main/res/xml/ || true
+          mv network_security_config.xml app/src/main/res/xml/ || true
+          
+          # Move folders
+          mv "Jarvis voice pack" app/src/main/assets/ || true
+          mv "Jarvis UI" app/src/main/assets/ || true
+          
+          # Create app/build.gradle
+          echo "plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }" > app/build.gradle
+          
+          # Commit changes
+          git config user.name "GitHub Action Bot"
+          git config user.email "bot@github.com"
+          git add .
+          git commit -m "Auto-fixed project structure via bot" || true
+          git push
