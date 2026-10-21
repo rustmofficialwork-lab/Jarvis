@@ -11,11 +11,6 @@ import java.io.FileOutputStream
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
-/**
- * User-enabled, visible Android accessibility integration. It only reads the currently focused input text
- * when explicitly requested by the app and performs explicit commands requested by the user;
- * it does not continuously store screen content.
- */
 class JarvisAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -88,6 +83,14 @@ class JarvisAccessibilityService : AccessibilityService() {
             }
             else -> false
         }
+    }
+
+    fun performTap(x: Float, y: Float) {
+        performCommand("tap", x, y)
+    }
+
+    fun inputText(text: String) {
+        performCommand("type", text = text)
     }
 
     private fun dispatchTouch(x1: Float, y1: Float, x2: Float, y2: Float): Boolean {
