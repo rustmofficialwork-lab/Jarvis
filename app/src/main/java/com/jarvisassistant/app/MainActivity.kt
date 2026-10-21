@@ -52,6 +52,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import android.util.Log
+import android.view.accessibility.AccessibilityNodeInfo
 
 private val Bg = Color(0xFF030303)
 private val Panel = Color(0xFF101010)
@@ -463,28 +464,47 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    // 🟢 FIXED: Accessibility logic updated for scroll, tap, and type
     private fun runAccessibility(action: String, x: Float? = null, y: Float? = null, text: String? = null): String {
         val service = JarvisAccessibilityService.active
-            ?: return "Accessibility service is not active."
+            ?: return "Accessibility service is not active. Enable JARVIS Accessibility in settings."
         
         return when (action) {
-            "home" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME); "Going home." }
-            "back" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); "Going back." }
-            "scroll-up" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_SCROLL_BACKWARD); "Scrolling up." }
-            "scroll-down" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_SCROLL_FORWARD); "Scrolling down." }
+            "home" -> { 
+                service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                "Going home." 
+            }
+            "back" -> { 
+                service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                "Going back." 
+            }
+            "scroll-up" -> { 
+                val root = service.rootInActiveWindow
+                if (root != null) {
+                    root.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+                    "Scrolling up."
+                } else "Cannot scroll up."
+            }
+            "scroll-down" -> { 
+                val root = service.rootInActiveWindow
+                if (root != null) {
+                    root.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                    "Scrolling down."
+                } else "Cannot scroll down."
+            }
             "tap" -> {
                 if (x != null && y != null) {
                     service.performTap(x, y)
-                    "Tapping."
+                    "Tapping at ($x, $y)."
                 } else "Invalid coordinates."
             }
             "type" -> {
                 if (text != null) {
                     service.inputText(text)
-                    "Typing."
+                    "Typing text."
                 } else "No text provided."
             }
-            else -> "Unknown action."
+            else -> "Unknown accessibility action."
         }
     }
 
