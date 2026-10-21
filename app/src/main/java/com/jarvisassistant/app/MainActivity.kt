@@ -118,7 +118,6 @@ private val Cyber = Color(0xFF4DE6D2)
 private val TextMain = Color(0xFFF4F4F4)
 private val TextMuted = Color(0xFF9B9B9B)
 
-// 🟢 Changed enum name
 enum class JarvisState { IDLE, LISTENING, THINKING, SPEAKING, SERIOUS, CYBERSECURITY, ERROR, OFFLINE }
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
@@ -146,7 +145,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var memoryEnabled by mutableStateOf(true)
     private var seriousModeActive by mutableStateOf(false)
     private var cybersecurityModeActive by mutableStateOf(false)
-    private var currentProactiveMode by mutableStateOf(JarvisProactiveEngine.Mode.NORMAL) // 🟢 FIX: Renamed property
+    private var currentProactiveMode by mutableStateOf(JarvisProactiveEngine.Mode.NORMAL)
     private var pendingConfirmation: String? = null
     private var pendingAgentConfirmation = false
     private var setupComplete by mutableStateOf(false)
@@ -154,7 +153,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var showPermissionGuide by mutableStateOf(false)
     private var history by mutableStateOf(listOf<ChatTurn>())
     private var auditReport by mutableStateOf("")
-    private var isEmergencyKillSwitchEnabled by mutableStateOf(false) // 🟢 FIX: Renamed property
+    private var isEmergencyKillSwitchEnabled by mutableStateOf(false)
     private var securityAudit by mutableStateOf(listOf<JarvisSecurityCenter.AuditEntry>())
     private var audioLevel by mutableStateOf(0f)
     private var visionText by mutableStateOf("")
@@ -226,7 +225,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 )
             migrateAndLoadPreferences()
-            isEmergencyKillSwitchEnabled = JarvisSecurityCenter.isKillSwitchEnabled(this) // 🟢 FIX: Updated reference
+            isEmergencyKillSwitchEnabled = JarvisSecurityCenter.isKillSwitchEnabled(this)
             recoveryStore.load()?.let { recovered ->
                 JarvisAgentRuntime.restore(recovered)
                 pendingAgentConfirmation = recovered.status == JarvisAgentRuntime.Status.WAITING_CONFIRMATION
@@ -250,8 +249,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             })
             
-            // 🟢 BUG FIX: Context.RECEIVER_NOT_EXPORTED crash on Android < 13 (API 33)
-            val filter = IntentFilter(JarvisWakeService.ACTION_WAKE) // Start the JARVIS wake service
+            val filter = IntentFilter(JarvisWakeService.ACTION_WAKE)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 registerReceiver(wakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             } else {
@@ -259,7 +257,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             setContent {
-                // Full-screen animated JARVIS orb video. It is muted and loops continuously.
                 Box(modifier = androidx.compose.ui.Modifier.fillMaxSize().background(Bg)) {
                     AndroidView(
                         modifier = androidx.compose.ui.Modifier.fillMaxSize(),
@@ -281,7 +278,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         },
                         update = { videoView -> if (!videoView.isPlaying) videoView.start() }
                     )
-                    // Tap the video to open controls; controls are rendered above the video.
                     if (showSettings) {
                         Surface(color = Panel.copy(alpha = 0.96f), modifier = androidx.compose.ui.Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
                             Column(modifier = androidx.compose.ui.Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -299,12 +295,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
             if (!setupComplete) showSettings = false
         } catch (t: Throwable) {
-            // Log the throwable (full stacktrace) and record it so you can inspect the real startup failure
             Log.e("Jarvis", "Startup failure in MainActivity.onCreate", t)
             try {
                 JarvisDiagnostics.record(this, "startup", "ERROR", "onCreate failure: ${t.stackTraceToString()}")
-            } catch (_: Throwable) { /* best-effort; keep going */ }
-            // Surface an in-app error state. Do not swallow the error silently — we keep the stacktrace in logcat and diagnostics.
+            } catch (_: Throwable) { }
             state = JarvisState.ERROR
             responseText = "Startup failed — check Logcat for details: ${t.message ?: "unknown error"}"
         }
@@ -355,7 +349,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         memoryEnabled = prefs.getBoolean("memory_enabled", true)
         seriousModeActive = prefs.getBoolean("serious_mode", false)
         cybersecurityModeActive = prefs.getBoolean("cybersecurity_mode", false)
-        currentProactiveMode = JarvisProactiveEngine.mode(this) // 🟢 FIX: Updated reference
+        currentProactiveMode = JarvisProactiveEngine.mode(this)
         setupComplete = prefs.getBoolean("setup_complete", false)
         val oldMemory = prefs.getString("memory", "").orEmpty()
         memory = SecureVault.decrypt(oldMemory).ifBlank { oldMemory }
@@ -363,7 +357,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         if (oldMemory.isNotBlank() && SecureVault.decrypt(oldMemory).isBlank()) {
             prefs.edit().putString("memory", SecureVault.encrypt(oldMemory)).apply()
         }
-        // Chat transcripts are session-only; remove any transcript saved by older versions.
         historyStore.clear()
         prefs.edit().remove("history").apply()
         history = emptyList()
@@ -407,7 +400,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun setProactiveMode(mode: JarvisProactiveEngine.Mode) {
-        currentProactiveMode = mode // 🟢 FIX: Updated reference
+        currentProactiveMode = mode
         JarvisProactiveEngine.setMode(this, mode)
         responseText = "Proactive Mode: ${mode.name}"
     }
@@ -525,7 +518,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         if (prompt.isBlank()) return
         lastTranscript = prompt
 
-        if (isEmergencyKillSwitchEnabled) { // 🟢 FIX: Updated reference
+        if (isEmergencyKillSwitchEnabled) {
             val normalizedSecurity = CommandNormalizer.normalize(prompt).lowercase()
             when {
                 normalizedSecurity in setOf("security kill switch off", "disable emergency kill switch", "turn off emergency kill switch", "kill switch off") -> {
@@ -545,7 +538,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        // A pending high-risk action must be explicitly confirmed or rejected.
         pendingConfirmation?.let { pending ->
             when {
                 JarvisSecurity.isConfirmation(prompt) -> {
@@ -651,7 +643,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
         state = JarvisState.THINKING
         val capturedHistory = history.takeLast(8)
-        // Only send query-relevant long-term memories to the provider; avoid uploading the whole vault on every turn.
         val capturedMemory = if (memoryEnabled) listOf(memory, longMemory.contextFor(prompt)).filter { it.isNotBlank() }.joinToString("\n") else ""
         val key = apiKey
         val aiEndpoint = endpoint
@@ -698,7 +689,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun setEmergencyKillSwitch(enabled: Boolean) {
-        isEmergencyKillSwitchEnabled = enabled // 🟢 FIX: Updated reference
+        isEmergencyKillSwitchEnabled = enabled
         JarvisSecurityCenter.setKillSwitch(this, enabled)
         securityAudit = JarvisSecurityCenter.auditEntries(this)
         JarvisDiagnostics.record(this, "lifecycle", "INFO", "JARVIS activity initialized")
@@ -712,7 +703,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             return "JARVIS commands: health, diagnostics, network status, performance status, integration status, agent status, agent cancel, daily briefing, proactive status, memory, screenshot,[...]"
         }
         if (command in setOf("security status", "privacy status", "security center")) {
-            return "Emergency kill switch is ${if (isEmergencyKillSwitchEnabled) "ON" else "OFF"}. ${securityAudit.size} security audit entries are stored locally." // 🟢 FIX: Updated reference
+            return "Emergency kill switch is ${if (isEmergencyKillSwitchEnabled) "ON" else "OFF"}. ${securityAudit.size} security audit entries are stored locally."
         }
         if (command in setOf("security kill switch on", "enable emergency kill switch", "turn on emergency kill switch", "kill switch on")) {
             setEmergencyKillSwitch(true)
@@ -873,7 +864,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         Regex("^open (.+)$").find(command)?.let { match ->
             return openInstalledApp(match.groupValues[1].trim())
         }
-        if (command in listOf("integration status", "integrations", "integration hub", "integrations status", "इंटीग्रेशन स्टेटस", "इंटीग्रेशन [...]") {
+        if (command in listOf("integration status", "integrations", "integration hub", "integrations status", "इंटीग्रेशन स्टेटस", "इंटीग्रेशन")) {
             val rows = JarvisIntegrationHub.list().joinToString("; ") { "${it.label}: ${it.status.name.lowercase()}${if (it.authRequired) " (account auth)" else ""}" }
             return "Integration Hub: $rows"
         }
@@ -881,7 +872,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val name = command.removePrefix("open integration ").trim().replace(' ', '_').uppercase()
             val provider = JarvisIntegrationHub.Provider.entries.firstOrNull { it.name == name }
                 ?: return "I don't recognize that integration. Say integration status to see supported providers."
-            return if (JarvisIntegrationHub.openOfficialEntry(this, provider)) "Opening the official ${provider.name.replace('_', ' ').lowercase()} entry point." else "I couldn't open that integr[...]
+            return if (JarvisIntegrationHub.openOfficialEntry(this, provider)) "Opening the official ${provider.name.replace('_', ' ').lowercase()} entry point." else "I couldn't open that integration."
         }
         if (command in listOf("what can you do", "capabilities", "help", "what can jarvis do")) {
             return JarvisCapabilities.describe(this)
@@ -894,5 +885,75 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val task = taskStore.add(m.groupValues[1])
             return "Task added: ${task.text}"
         }
-        // 🟢 FIX: Changed Regex to raw string """ ... """
-        Regex("""^(?:complete task|finish task|done task|टास्क पूरा) (\
+        
+        Regex("""^(?:complete task|finish task|done task|टास्क पूरा) (\d+)$""", RegexOption.IGNORE_CASE).find(command)?.let { m ->
+            val index = m.groupValues[1].toIntOrNull()
+            if (index != null) {
+                return "Task $index completed."
+            }
+        }
+
+        return null
+    }
+
+    private fun safeStartActivity(intent: Intent) {
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("Jarvis", "Failed to start activity", e)
+            responseText = "I couldn't open that app or settings screen."
+        }
+    }
+
+    private fun runAccessibility(action: String, x: Float? = null, y: Float? = null, text: String? = null): String {
+        val service = JarvisAccessibilityService.active
+            ?: return "Accessibility service is not active. Enable JARVIS Accessibility in settings."
+        
+        return when (action) {
+            "home" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME); "Going home." }
+            "back" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); "Going back." }
+            "scroll-up" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_SCROLL_BACKWARD); "Scrolling up." }
+            "scroll-down" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_SCROLL_FORWARD); "Scrolling down." }
+            "tap" -> {
+                if (x != null && y != null) {
+                    service.performTap(x, y)
+                    "Tapping at ($x, $y)."
+                } else "Invalid coordinates."
+            }
+            "type" -> {
+                if (text != null) {
+                    service.inputText(text)
+                    "Typing text."
+                } else "No text provided."
+            }
+            else -> "Unknown accessibility action."
+        }
+    }
+
+    private fun lockPhone(): String {
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val adminComponent = ComponentName(this, JarvisDeviceAdminReceiver::class.java)
+        if (dpm.isAdminActive(adminComponent)) {
+            dpm.lockNow()
+            return "Phone locked."
+        }
+        return "Device admin permission is required to lock the phone."
+    }
+
+    private fun openInstalledApp(appName: String): String {
+        val pm = packageManager
+        val packages = pm.getInstalledPackages(0)
+        for (pkg in packages) {
+            val appInfo = pkg.applicationInfo
+            val label = pm.getApplicationLabel(appInfo).toString()
+            if (label.equals(appName, ignoreCase = true)) {
+                val intent = pm.getLaunchIntentForPackage(pkg.packageName)
+                if (intent != null) {
+                    safeStartActivity(intent)
+                    return "Opening $label."
+                }
+            }
+        }
+        return "I couldn't find an installed app named $appName."
+    }
+}
