@@ -9,11 +9,9 @@ import android.content.IntentFilter
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraManager
-import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.media.MediaPlayer
-import android.provider.AlarmClock
 import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
@@ -22,27 +20,23 @@ import android.speech.tts.UtteranceProgressListener
 import android.view.View
 import android.widget.VideoView
 import android.net.Uri
-import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,7 +49,6 @@ import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 
 private val Bg = Color(0xFF030303)
-private val Panel = Color(0xFF101010)
 private val TextMain = Color(0xFFF4F4F4)
 
 enum class JarvisState { IDLE, LISTENING, THINKING, SPEAKING, SERIOUS, CYBERSECURITY, ERROR, OFFLINE }
@@ -175,36 +168,123 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             setContent {
-                Box(modifier = Modifier.fillMaxSize().background(Bg)) {
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = { context ->
-                            VideoView(context).apply {
-                                setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_interface}"))
-                                setOnClickListener { showSettings = true }
-                                setOnPreparedListener { player ->
-                                    player.isLooping = true
-                                    player.setVolume(0f, 0f)
-                                    start()
-                                }
-                                setOnErrorListener { _, what, extra ->
-                                    Log.e("Jarvis", "Video error: what=$what extra=$extra")
-                                    responseText = "Interface video failed to play."
-                                    true
-                                }
-                            }
-                        },
-                        update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                // Pulse Animation for Orb
+                val infiniteTransition = rememberInfiniteTransition()
+                val pulseScale by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = if (state == JarvisState.LISTENING) 1.06f else 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(800, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
                     )
-                    if (showSettings) {
-                        Surface(color = Panel.copy(alpha = 0.96f), modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("JARVIS Controls", color = TextMain, fontWeight = FontWeight.Bold)
-                                Text("Wake word: $wakeWord", color = TextMain)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(onClick = { startWakeService() }) { Text("Start listening") }
-                                    Button(onClick = { stopWakeService() }) { Text("Stop listening") }
-                                    TextButton(onClick = { showSettings = false }) { Text("Close") }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF2d001f), Bg),
+                                radius = 1200f,
+                                center = Offset.Unspecified
+                            )
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Top Spacer
+                        Spacer(modifier = Modifier.weight(0.5f))
+
+                        // Main Orb Area
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            AndroidView(
+                                modifier = Modifier
+                                    .size(320.dp)
+                                    .scale(pulseScale)
+                                    .clip(CircleShape),
+                                factory = { context ->
+                                    VideoView(context).apply {
+                                        setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_interface}"))
+                                        setOnClickListener { onOrbClick() }
+                                        setOnPreparedListener { player ->
+                                            player.isLooping = true
+                                            player.setVolume(0f, 0f)
+                                            start()
+                                        }
+                                        setOnErrorListener { _, what, extra ->
+                                            Log.e("Jarvis", "Video error: what=$what extra=$extra")
+                                            true
+                                        }
+                                    }
+                                },
+                                update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                            )
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            // Status Text
+                            val statusText = when (state) {
+                                JarvisState.LISTENING -> "Listening..."
+                                JarvisState.THINKING -> "Thinking..."
+                                JarvisState.SPEAKING -> "Speaking..."
+                                JarvisState.ERROR -> "Error"
+                                else -> "Tap to speak"
+                            }
+                            Text(
+                                text = statusText,
+                                color = TextMain,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Voice Waveform (Visible when listening)
+                            if (state == JarvisState.LISTENING) {
+                                VoiceWaveform(audioLevel = audioLevel)
+                            } else {
+                                Spacer(modifier = Modifier.height(40.dp))
+                            }
+                        }
+
+                        // Bottom Panel & Controls
+                        if (showSettings) {
+                            GlassPanel(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                onStart = { startWakeService(); showSettings = false },
+                                onStop = { stopWakeService(); showSettings = false },
+                                onClose = { showSettings = false }
+                            )
+                        } else {
+                            // Floating Mic / Settings Button (Modern Layout)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 32.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = { onOrbClick() },
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(72.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                                ) {
+                                    Text(if (state == JarvisState.LISTENING) "Stop" else "Mic", color = TextMain, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.width(24.dp))
+                                Button(
+                                    onClick = { showSettings = true },
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(72.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                                ) {
+                                    Text("⚙", color = TextMain, style = MaterialTheme.typography.headlineMedium)
                                 }
                             }
                         }
@@ -217,6 +297,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             responseText = "Startup failed: ${t.message}"
         }
     }
+
+    // ... [BAAKI KA PURANA LOGIC (onInit, speak, toggleTorch, etc.) WAISA HI RAHEGA] ...
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -464,7 +546,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    // 🟢 FIXED: Accessibility logic updated for scroll, tap, and type
     private fun runAccessibility(action: String, x: Float? = null, y: Float? = null, text: String? = null): String {
         val service = JarvisAccessibilityService.active
             ?: return "Accessibility service is not active. Enable JARVIS Accessibility in settings."
@@ -540,5 +621,48 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun formatAgentResult(result: String): String {
         return "Agent result: $result"
+    }
+}
+
+// --- YEH NAYE COMPOSABLES HAIN (UI KE LIYE) ---
+
+@Composable
+fun VoiceWaveform(audioLevel: Float) {
+    Canvas(modifier = Modifier.height(40.dp).fillMaxWidth(0.6f)) {
+        val barCount = 20
+        val barWidth = size.width / (barCount * 2)
+        val spacing = barWidth
+        
+        for (i in 0 until barCount) {
+            val level = if (audioLevel > 0.1f) audioLevel else 0.1f
+            val randomHeight = (size.height * level * (0.5f..1.0f).random())
+            val x = i * (barWidth + spacing) + barWidth/2
+            drawLine(
+                color = Color.Red,
+                start = Offset(x, size.height / 2 - randomHeight / 2),
+                end = Offset(x, size.height / 2 + randomHeight / 2),
+                strokeWidth = barWidth
+            )
+        }
+    }
+}
+
+@Composable
+fun GlassPanel(modifier: Modifier = Modifier, onStart: () -> Unit, onStop: () -> Unit, onClose: () -> Unit) {
+    Surface(
+        modifier = modifier.clip(RoundedCornerShape(25.dp)),
+        color = Color.White.copy(alpha = 0.08f),
+        shadowElevation = 8.dp
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("JARVIS Controls", color = TextMain, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onStart, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Start") }
+                Button(onClick = onStop, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Stop") }
+            }
+            TextButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterHorizontally)) { 
+                Text("Close", color = TextMain) 
+            }
+        }
     }
 }
