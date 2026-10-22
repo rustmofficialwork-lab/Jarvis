@@ -29,6 +29,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -241,32 +244,79 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.35f))
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.55f),
+                                        Color.Black.copy(alpha = 0.05f),
+                                        Color.Black.copy(alpha = 0.05f),
+                                        Color.Black.copy(alpha = 0.65f)
+                                    )
+                                )
+                            )
+                    )
+
+                    // Tap area: screen ke exact center me (HUD hexagon ke upar). Ring sirf listening me dikhegi.
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(240.dp)
+                            .scale(pulseScale)
+                            .clip(CircleShape)
+                            .then(
+                                if (state == JarvisState.LISTENING)
+                                    Modifier.border(2.dp, Color(0xFFFF4444).copy(alpha = 0.85f), CircleShape)
+                                else Modifier
+                            )
+                            .clickable { onOrbClick() }
                     )
 
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Tap area (purani orb video hata di; ab HUD video background me chalti hai)
+                        // Top: chat history
                         Box(
                             modifier = Modifier
-                                .size(260.dp)
-                                .scale(pulseScale)
-                                .clip(CircleShape)
-                                .border(
-                                    width = 2.dp,
-                                    color = Color(0xFFFF4444).copy(alpha = if (state == JarvisState.LISTENING) 0.9f else 0.35f),
-                                    shape = CircleShape
-                                )
-                                .clickable { onOrbClick() }
-                        )
+                                .fillMaxWidth()
+                                .fillMaxHeight(0.24f)
+                                .padding(top = 40.dp)
+                        ) {
+                            if (history.isNotEmpty()) {
+                                val listState = rememberLazyListState()
+                                LaunchedEffect(history.size) {
+                                    if (history.isNotEmpty()) {
+                                        listState.animateScrollToItem(history.size - 1)
+                                    }
+                                }
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 24.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(history) { turn ->
+                                        Text(
+                                            text = "You: ${turn.user}",
+                                            color = Color.White.copy(alpha = 0.7f),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            text = "JARVIS: ${turn.assistant}",
+                                            color = Color(0xFFFF4444),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(bottom = 12.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        // Middle: HUD hexagon ka area (tap area alag layer me, screen ke center me)
+                        Spacer(modifier = Modifier.fillMaxHeight(0.44f))
 
-                        // Status Text
+                        // Status Text (hexagon ke neeche)
                         val statusText = when (state) {
                             JarvisState.LISTENING -> "Listening..."
                             JarvisState.THINKING -> "Thinking..."
@@ -275,9 +325,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             else -> "Tap to speak"
                         }
                         Text(
-                            text = statusText,
-                            color = TextMain,
-                            style = MaterialTheme.typography.titleMedium,
+                            text = statusText.uppercase(),
+                            color = Color(0xFFFF5555),
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                letterSpacing = 3.sp,
+                                shadow = Shadow(color = Color(0xFFFF2A2A), blurRadius = 18f)
+                            ),
                             fontWeight = FontWeight.Medium
                         )
 
@@ -290,39 +343,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             Spacer(modifier = Modifier.height(40.dp))
                         }
 
-                        // Chat History
-                        if (history.isNotEmpty()) {
-                            val listState = rememberLazyListState()
-                            LaunchedEffect(history.size) {
-                                if (history.isNotEmpty()) {
-                                    listState.animateScrollToItem(history.size - 1)
-                                }
-                            }
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(history) { turn ->
-                                    Text(
-                                        text = "You: ${turn.user}",
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    Text(
-                                        text = "JARVIS: ${turn.assistant}",
-                                        color = Color(0xFFFF4444),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.padding(bottom = 12.dp)
-                                    )
-                                }
-                            }
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
+                        Spacer(modifier = Modifier.weight(1f))
 
                         // Bottom Panel
                         if (showSettings) {
@@ -346,7 +367,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                     onClick = { onOrbClick() },
                                     shape = CircleShape,
                                     modifier = Modifier.size(72.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF2A2A).copy(alpha = 0.14f)),
+                                    border = BorderStroke(1.5.dp, Color(0xFFFF4444).copy(alpha = 0.7f)),
+                                    contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text(if (state == JarvisState.LISTENING) "Stop" else "Mic", color = TextMain, fontWeight = FontWeight.Bold)
                                 }
@@ -355,7 +378,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                     onClick = { showSettings = true },
                                     shape = CircleShape,
                                     modifier = Modifier.size(72.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF2A2A).copy(alpha = 0.14f)),
+                                    border = BorderStroke(1.5.dp, Color(0xFFFF4444).copy(alpha = 0.7f)),
+                                    contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text("⚙", color = TextMain, style = MaterialTheme.typography.headlineMedium)
                                 }
