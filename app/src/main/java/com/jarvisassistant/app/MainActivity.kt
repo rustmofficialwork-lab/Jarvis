@@ -84,7 +84,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var activeTask: Future<*>? = null
     private var requestGeneration = 0L
     
-    // BINA WAKE WORD ACTIVE NA HO ISKE LIYE FALSE
     private var continuousConversation = false 
     
     private var pendingWakeServiceStart = false
@@ -93,7 +92,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         override fun onReceive(context: Context?, intent: Intent?) {
             lastTranscript = intent?.getStringExtra("phrase").orEmpty()
             state = JarvisState.LISTENING
-            startListening() // Sirf wake word par active hoga
+            startListening()
         }
     }
 
@@ -138,7 +137,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onDone(utteranceId: String?) {
                     runOnUiThread {
                         state = restingState()
-                        // Yahan continuousConversation check nahi hai, toh apne aap listen nahi karega
                     }
                 }
                 override fun onError(utteranceId: String?) {
@@ -181,11 +179,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         verticalArrangement = Arrangement.Center
                     ) {
                         
-                        // Interface Normal Size + No Tap
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .size(320.dp) // Size pehle jaisa normal
+                                .size(320.dp)
                                 .scale(pulseScale)
                                 .clip(CircleShape)
                         ) {
@@ -195,20 +192,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                     VideoView(context).apply {
                                         setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
                                         setOnPreparedListener { player ->
-                                            player.isLooping = false // Loop band
-                                            player.setVolume(0f, 0f)
+                                            player.isLooping = false
+                                            // Sound ON kiya hai aur ye sirf ek baar bajega
+                                            player.setVolume(1f, 1f) 
                                             player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
                                             start()
                                         }
                                     }
-                                },
-                                update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                                }
+                                // UPDATE BLOCK HATA DIYA HAI TAAKI VIDEO RESTART NA HO
                             )
                         }
 
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // Animation Center me aur Interface match (Red Color)
                         if (state == JarvisState.LISTENING) {
                             Text(
                                 text = "Listening...",
@@ -235,7 +232,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         }
                     }
 
-                    // Settings Panel sirf voice command se
                     if (showSettings) {
                         Box(
                             modifier = Modifier
@@ -271,7 +267,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onEndOfSpeech() { state = JarvisState.THINKING }
                 override fun onError(error: Int) {
                     audioLevel = 0f
-                    state = JarvisState.IDLE // Error par IDLE ho jayega, bina puche wapas listen nahi karega
+                    state = JarvisState.IDLE 
                 }
                 override fun onResults(results: Bundle?) {
                     audioLevel = 0f
@@ -292,7 +288,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun handleLocalCommand(text: String): String? {
         val command = CommandNormalizer.normalize(text, wakeWord)
         
-        // Voice command to open settings
         if (command.contains("settings") || command.contains("setting")) {
             showSettings = true
             return "Opening settings."
@@ -344,7 +339,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun finishTurn(prompt: String, reply: String) {
         history = (history + ChatTurn(prompt, reply, emptyList())).takeLast(40)
-        state = restingState() // Bina puche listen nahi karega
+        state = restingState()
         tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "jarvis_utterance")
     }
 
@@ -447,7 +442,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 }
 
-// Interface se match karne wala RED waveform
 @Composable
 fun RedSmoothWaveform(audioLevel: Float) {
     val infiniteTransition = rememberInfiniteTransition(label = "waveform")
@@ -481,7 +475,7 @@ fun RedSmoothWaveform(audioLevel: Float) {
         
         drawPath(
             path = path,
-            color = Color(0xFFFF4444), // Interface match Red color
+            color = Color(0xFFFF4444), 
             style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
         )
     }
