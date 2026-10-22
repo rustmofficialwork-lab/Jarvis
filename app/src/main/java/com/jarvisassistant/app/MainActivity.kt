@@ -32,20 +32,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import java.util.Locale
@@ -54,6 +49,7 @@ import java.util.concurrent.Future
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 
+private val Bg = Color(0xFF030303)
 private val TextMain = Color(0xFFF4F4F4)
 
 enum class JarvisState { IDLE, LISTENING, THINKING, SPEAKING, SERIOUS, CYBERSECURITY, ERROR, OFFLINE }
@@ -87,14 +83,17 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private val worker = Executors.newSingleThreadExecutor()
     private var activeTask: Future<*>? = null
     private var requestGeneration = 0L
-    private var continuousConversation = true 
+    
+    // BINA WAKE WORD ACTIVE NA HO ISKE LIYE FALSE
+    private var continuousConversation = false 
+    
     private var pendingWakeServiceStart = false
     
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             lastTranscript = intent?.getStringExtra("phrase").orEmpty()
             state = JarvisState.LISTENING
-            startListening()
+            startListening() // Sirf wake word par active hoga
         }
     }
 
@@ -103,7 +102,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             if (pendingWakeServiceStart) {
                 pendingWakeServiceStart = false
                 startWakeService()
-            } else startListening()
+            }
         } else {
             pendingWakeServiceStart = false
             state = JarvisState.ERROR
@@ -139,7 +138,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onDone(utteranceId: String?) {
                     runOnUiThread {
                         state = restingState()
-                        if (continuousConversation && !isFinishing && !isDestroyed) startListening()
+                        // Yahan continuousConversation check nahi hai, toh apne aap listen nahi karega
                     }
                 }
                 override fun onError(utteranceId: String?) {
@@ -161,28 +160,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             setContent {
-                // Enhanced Pulse Animation
                 val infiniteTransition = rememberInfiniteTransition()
                 val pulseScale by infiniteTransition.animateFloat(
                     initialValue = 1f,
                     targetValue = if (state == JarvisState.LISTENING) 1.05f else 1f,
                     animationSpec = infiniteRepeatable(
-                        animation = tween(1200, easing = FastOutSlowInEasing),
+                        animation = tween(1000, easing = FastOutSlowInEasing),
                         repeatMode = RepeatMode.Reverse
                     )
                 )
 
-                // Premium Background Gradient
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(Color(0xFF1A0000), Color(0xFF000000)),
-                                radius = 1500f,
-                                center = Offset.Unspecified
-                            )
-                        )
+                        .background(Bg)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -190,102 +181,61 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         verticalArrangement = Arrangement.Center
                     ) {
                         
-                        // Orb Area with Glow
+                        // Interface Normal Size + No Tap
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(360.dp) 
+                            modifier = Modifier
+                                .size(320.dp) // Size pehle jaisa normal
+                                .scale(pulseScale)
+                                .clip(CircleShape)
                         ) {
-                            // Red Neon Glow behind the video
-                            Box(
-                                modifier = Modifier
-                                    .size(340.dp)
-                                    .scale(pulseScale)
-                                    .background(
-                                        Brush.radialGradient(
-                                            colors = listOf(Color(0xFFFF0000).copy(alpha = 0.25f), Color.Transparent),
-                                            radius = 300f
-                                        )
-                                    )
-                                    .blur(30.dp)
-                            )
-
-                            // Video
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(340.dp)
-                                    .scale(pulseScale)
-                                    .clip(CircleShape)
-                            ) {
-                                AndroidView(
-                                    modifier = Modifier.fillMaxSize(),
-                                    factory = { context ->
-                                        VideoView(context).apply {
-                                            setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
-                                            setOnPreparedListener { player ->
-                                                player.isLooping = false
-                                                player.setVolume(0f, 0f)
-                                                player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
-                                                start()
-                                            }
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { context ->
+                                    VideoView(context).apply {
+                                        setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
+                                        setOnPreparedListener { player ->
+                                            player.isLooping = false // Loop band
+                                            player.setVolume(0f, 0f)
+                                            player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
+                                            start()
                                         }
-                                    },
-                                    update = { videoView -> if (!videoView.isPlaying) videoView.start() }
-                                )
-                            }
+                                    }
+                                },
+                                update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                            )
                         }
 
-                        Spacer(modifier = Modifier.height(40.dp))
+                        Spacer(modifier = Modifier.height(32.dp))
 
-                        // Premium Text & Waveform
+                        // Animation Center me aur Interface match (Red Color)
                         if (state == JarvisState.LISTENING) {
                             Text(
-                                text = "LISTENING...",
-                                style = TextStyle(
-                                    color = Color.White,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 4.sp,
-                                    shadow = Shadow(
-                                        color = Color(0xFFFF0000),
-                                        blurRadius = 20f
-                                    )
-                                )
+                                text = "Listening...",
+                                color = TextMain,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.height(24.dp))
-                            PremiumWaveform(audioLevel = audioLevel) 
+                            Spacer(modifier = Modifier.height(16.dp))
+                            RedSmoothWaveform(audioLevel = audioLevel) 
                         } else if (state == JarvisState.THINKING) {
                             Text(
-                                text = "THINKING...",
-                                style = TextStyle(
-                                    color = Color.White,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 4.sp,
-                                    shadow = Shadow(
-                                        color = Color(0xFFFF0000),
-                                        blurRadius = 20f
-                                    )
-                                )
+                                text = "Thinking...",
+                                color = TextMain,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
                             )
                         } else if (state == JarvisState.SPEAKING) {
                             Text(
-                                text = "SPEAKING...",
-                                style = TextStyle(
-                                    color = Color.White,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 4.sp,
-                                    shadow = Shadow(
-                                        color = Color(0xFFFF0000),
-                                        blurRadius = 20f
-                                    )
-                                )
+                                text = "Speaking...",
+                                color = TextMain,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    // Settings Panel
+                    // Settings Panel sirf voice command se
                     if (showSettings) {
                         Box(
                             modifier = Modifier
@@ -310,10 +260,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun startListening() {
-        if (!JarvisVoiceEngine.isAvailable(this)) {
-            Log.e("Jarvis", "Speech recognition unavailable")
-            return
-        }
+        if (!JarvisVoiceEngine.isAvailable(this)) return
         stopListening()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
             recognizer.setRecognitionListener(object : RecognitionListener {
@@ -324,14 +271,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onEndOfSpeech() { state = JarvisState.THINKING }
                 override fun onError(error: Int) {
                     audioLevel = 0f
-                    state = JarvisState.ERROR
-                    if (continuousConversation) startListening()
+                    state = JarvisState.IDLE // Error par IDLE ho jayega, bina puche wapas listen nahi karega
                 }
                 override fun onResults(results: Bundle?) {
                     audioLevel = 0f
                     val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                    if (!text.isNullOrBlank()) handlePrompt(text) else {
-                        if (continuousConversation) startListening()
+                    if (!text.isNullOrBlank()) {
+                        handlePrompt(text)
+                    } else {
+                        state = JarvisState.IDLE
                     }
                 }
                 override fun onPartialResults(partialResults: Bundle?) = Unit
@@ -344,6 +292,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun handleLocalCommand(text: String): String? {
         val command = CommandNormalizer.normalize(text, wakeWord)
         
+        // Voice command to open settings
         if (command.contains("settings") || command.contains("setting")) {
             showSettings = true
             return "Opening settings."
@@ -395,7 +344,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun finishTurn(prompt: String, reply: String) {
         history = (history + ChatTurn(prompt, reply, emptyList())).takeLast(40)
-        if (!continuousConversation) state = restingState()
+        state = restingState() // Bina puche listen nahi karega
         tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "jarvis_utterance")
     }
 
@@ -407,9 +356,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ContextCompat.startForegroundService(this, intent)
             else startService(intent)
-        } catch (e: Exception) {
-            Log.e("Jarvis", "Wake service error: ${e.message}")
-        }
+        } catch (e: Exception) {}
     }
 
     private fun stopWakeService() {
@@ -500,10 +447,21 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 }
 
-// Ultra-Smooth Sine Waveform
+// Interface se match karne wala RED waveform
 @Composable
-fun PremiumWaveform(audioLevel: Float) {
-    Canvas(modifier = Modifier.height(80.dp).fillMaxWidth(0.8f)) {
+fun RedSmoothWaveform(audioLevel: Float) {
+    val infiniteTransition = rememberInfiniteTransition(label = "waveform")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    Canvas(modifier = Modifier.height(50.dp).fillMaxWidth(0.7f)) {
         val path = Path()
         val midY = size.height / 2f
         val width = size.width
@@ -515,16 +473,15 @@ fun PremiumWaveform(audioLevel: Float) {
         
         path.moveTo(0f, midY)
         
-        for (i in 1..points) {
+        for (i in 0..points) {
             val x = i * stepX
-            val sineValue = kotlin.math.sin(i * 0.2f + System.currentTimeMillis() / 100f)
-            val y = midY + (sineValue * maxAmplitude)
+            val y = midY + kotlin.math.sin(i * 0.15f + phase) * maxAmplitude
             path.lineTo(x, y)
         }
         
         drawPath(
             path = path,
-            color = Color.White,
+            color = Color(0xFFFF4444), // Interface match Red color
             style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
         )
     }
