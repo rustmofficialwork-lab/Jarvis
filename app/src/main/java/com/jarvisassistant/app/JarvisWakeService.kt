@@ -9,7 +9,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
 
@@ -52,10 +51,20 @@ class JarvisWakeService : Service() {
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
-                override fun onError(error: Int) { scheduleRestart(1200L) }
+                
+                override fun onError(error: Int) { 
+                    // Thoda wait badha diya taaki baar-baar trigger na ho
+                    scheduleRestart(1500L) 
+                }
+                
                 override fun onResults(results: android.os.Bundle?) {
                     val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    val hit = words.firstOrNull { spoken -> JarvisVoiceEngine.containsWakeWord(spoken, wakeWord) }
+                    
+                    // STRICT CHECK: Sirf tab trigger hoga jab exact word mile aur lambai 4 se zyada ho
+                    val hit = words.firstOrNull { spoken -> 
+                        spoken.length >= 4 && spoken.contains(wakeWord, ignoreCase = true) 
+                    }
+                    
                     if (hit != null) {
                         // Release this recognizer before handing the microphone to MainActivity.
                         recognizer?.cancel()
@@ -65,7 +74,8 @@ class JarvisWakeService : Service() {
                         sendBroadcast(Intent(ACTION_WAKE).setPackage(packageName).putExtra("phrase", hit))
                         scheduleRestart(8_500L)
                     } else {
-                        scheduleRestart(700L)
+                        // Agar Jarvis nahi bola, toh chup-chaap wapas restart karo
+                        scheduleRestart(1000L)
                     }
                 }
                 override fun onPartialResults(partialResults: android.os.Bundle?) = Unit
@@ -97,7 +107,6 @@ class JarvisWakeService : Service() {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
-            // ✅ RENAMED: channel id + name
             val channel = NotificationChannel("jarvis_assistant", "JARVIS Assistant", NotificationManager.IMPORTANCE_LOW)
             channel.description = "User-started JARVIS microphone wake listener"
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -119,7 +128,6 @@ class JarvisWakeService : Service() {
             Intent(this, JarvisWakeService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        // ✅ RENAMED: channel id
         return NotificationCompat.Builder(this, "jarvis_assistant")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("JARVIS is listening for $wakeWord")
@@ -132,7 +140,6 @@ class JarvisWakeService : Service() {
     }
 
     companion object {
-        // ✅ RENAMED: package + action ids
         const val ACTION_WAKE = "com.jarvisassistant.app.JARVIS_WAKE"
         const val ACTION_STOP = "com.jarvisassistant.app.JARVIS_STOP_WAKE"
     }
