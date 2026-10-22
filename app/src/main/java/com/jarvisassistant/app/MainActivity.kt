@@ -27,6 +27,9 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -168,7 +171,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             setContent {
-                // Pulse Animation for Orb
                 val infiniteTransition = rememberInfiniteTransition()
                 val pulseScale by infiniteTransition.animateFloat(
                     initialValue = 1f,
@@ -192,65 +194,95 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Top Spacer
-                        Spacer(modifier = Modifier.weight(0.5f))
+                        Spacer(modifier = Modifier.weight(1f))
 
-                        // Main Orb Area
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            AndroidView(
-                                modifier = Modifier
-                                    .size(320.dp)
-                                    .scale(pulseScale)
-                                    .clip(CircleShape),
-                                factory = { context ->
-                                    VideoView(context).apply {
-                                        setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_interface}"))
-                                        setOnClickListener { onOrbClick() }
-                                        setOnPreparedListener { player ->
-                                            player.isLooping = true
-                                            player.setVolume(0f, 0f)
-                                            start()
-                                        }
-                                        setOnErrorListener { _, what, extra ->
-                                            Log.e("Jarvis", "Video error: what=$what extra=$extra")
-                                            true
-                                        }
+                        // Main Orb
+                        AndroidView(
+                            modifier = Modifier
+                                .size(320.dp)
+                                .scale(pulseScale)
+                                .clip(CircleShape),
+                            factory = { context ->
+                                VideoView(context).apply {
+                                    setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_interface}"))
+                                    setOnClickListener { onOrbClick() }
+                                    setOnPreparedListener { player ->
+                                        player.isLooping = true
+                                        player.setVolume(0f, 0f)
+                                        start()
                                     }
-                                },
-                                update = { videoView -> if (!videoView.isPlaying) videoView.start() }
-                            )
+                                    setOnErrorListener { _, what, extra ->
+                                        Log.e("Jarvis", "Video error: what=$what extra=$extra")
+                                        true
+                                    }
+                                }
+                            },
+                            update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                        )
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                            // Status Text
-                            val statusText = when (state) {
-                                JarvisState.LISTENING -> "Listening..."
-                                JarvisState.THINKING -> "Thinking..."
-                                JarvisState.SPEAKING -> "Speaking..."
-                                JarvisState.ERROR -> "Error"
-                                else -> "Tap to speak"
-                            }
-                            Text(
-                                text = statusText,
-                                color = TextMain,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium
-                            )
+                        // Status Text
+                        val statusText = when (state) {
+                            JarvisState.LISTENING -> "Listening..."
+                            JarvisState.THINKING -> "Thinking..."
+                            JarvisState.SPEAKING -> "Speaking..."
+                            JarvisState.ERROR -> "Error"
+                            else -> "Tap to speak"
+                        }
+                        Text(
+                            text = statusText,
+                            color = TextMain,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                            // Voice Waveform (Visible when listening)
-                            if (state == JarvisState.LISTENING) {
-                                VoiceWaveform(audioLevel = audioLevel)
-                            } else {
-                                Spacer(modifier = Modifier.height(40.dp))
-                            }
+                        // Voice Waveform
+                        if (state == JarvisState.LISTENING) {
+                            VoiceWaveform(audioLevel = audioLevel)
+                        } else {
+                            Spacer(modifier = Modifier.height(40.dp))
                         }
 
-                        // Bottom Panel & Controls
+                        // Chat History
+                        if (history.isNotEmpty()) {
+                            val listState = rememberLazyListState()
+                            LaunchedEffect(history.size) {
+                                if (history.isNotEmpty()) {
+                                    listState.animateScrollToItem(history.size - 1)
+                                }
+                            }
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(history) { turn ->
+                                    Text(
+                                        text = "You: ${turn.prompt}",
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = "JARVIS: ${turn.reply}",
+                                        color = Color(0xFFFF4444),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(bottom = 12.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+
+                        // Bottom Panel
                         if (showSettings) {
                             GlassPanel(
                                 modifier = Modifier
@@ -261,7 +293,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                 onClose = { showSettings = false }
                             )
                         } else {
-                            // Floating Mic / Settings Button (Modern Layout)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -297,8 +328,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             responseText = "Startup failed: ${t.message}"
         }
     }
-
-    // ... [BAAKI KA PURANA LOGIC (onInit, speak, toggleTorch, etc.) WAISA HI RAHEGA] ...
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -624,23 +653,25 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 }
 
-// --- YEH NAYE COMPOSABLES HAIN (UI KE LIYE) ---
-
 @Composable
 fun VoiceWaveform(audioLevel: Float) {
     Canvas(modifier = Modifier.height(40.dp).fillMaxWidth(0.6f)) {
         val barCount = 20
-        val barWidth = size.width / (barCount * 2)
+        // .toFloat() add kiya gaya hai taaki division mein error na aaye
+        val barWidth = size.width / (barCount * 2f)
         val spacing = barWidth
         
         for (i in 0 until barCount) {
             val level = if (audioLevel > 0.1f) audioLevel else 0.1f
-            val randomHeight = (size.height * level * (0.5f..1.0f).random())
-            val x = i * (barWidth + spacing) + barWidth/2
+            // Random error fix: 0.5f se 1.0f ke beech ka random float
+            val randomFactor = 0.5f + kotlin.random.Random.nextFloat() * 0.5f
+            val randomHeight = size.height * level * randomFactor
+            val x = i * (barWidth + spacing) + barWidth / 2f
+            
             drawLine(
                 color = Color.Red,
-                start = Offset(x, size.height / 2 - randomHeight / 2),
-                end = Offset(x, size.height / 2 + randomHeight / 2),
+                start = Offset(x, size.height / 2f - randomHeight / 2f),
+                end = Offset(x, size.height / 2f + randomHeight / 2f),
                 strokeWidth = barWidth
             )
         }
