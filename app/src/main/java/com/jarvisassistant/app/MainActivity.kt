@@ -266,12 +266,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             ) {
                                 items(history) { turn ->
                                     Text(
-                                        text = "You: ${turn.prompt}",
+                                        text = "You: ${turn.user}",
                                         color = Color.White.copy(alpha = 0.7f),
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                     Text(
-                                        text = "JARVIS: ${turn.reply}",
+                                        text = "JARVIS: ${turn.assistant}",
                                         color = Color(0xFFFF4444),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.padding(bottom = 12.dp)
@@ -657,13 +657,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 fun VoiceWaveform(audioLevel: Float) {
     Canvas(modifier = Modifier.height(40.dp).fillMaxWidth(0.6f)) {
         val barCount = 20
-        // .toFloat() add kiya gaya hai taaki division mein error na aaye
         val barWidth = size.width / (barCount * 2f)
         val spacing = barWidth
         
         for (i in 0 until barCount) {
             val level = if (audioLevel > 0.1f) audioLevel else 0.1f
-            // Random error fix: 0.5f se 1.0f ke beech ka random float
             val randomFactor = 0.5f + kotlin.random.Random.nextFloat() * 0.5f
             val randomHeight = size.height * level * randomFactor
             val x = i * (barWidth + spacing) + barWidth / 2f
