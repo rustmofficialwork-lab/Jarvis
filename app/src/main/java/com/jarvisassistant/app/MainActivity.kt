@@ -32,12 +32,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import java.util.Locale
@@ -46,7 +54,6 @@ import java.util.concurrent.Future
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 
-private val Bg = Color(0xFF030303)
 private val TextMain = Color(0xFFF4F4F4)
 
 enum class JarvisState { IDLE, LISTENING, THINKING, SPEAKING, SERIOUS, CYBERSECURITY, ERROR, OFFLINE }
@@ -154,20 +161,28 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             setContent {
+                // Enhanced Pulse Animation
                 val infiniteTransition = rememberInfiniteTransition()
                 val pulseScale by infiniteTransition.animateFloat(
                     initialValue = 1f,
-                    targetValue = if (state == JarvisState.LISTENING) 1.03f else 1f,
+                    targetValue = if (state == JarvisState.LISTENING) 1.05f else 1f,
                     animationSpec = infiniteRepeatable(
-                        animation = tween(1000, easing = LinearEasing),
+                        animation = tween(1200, easing = FastOutSlowInEasing),
                         repeatMode = RepeatMode.Reverse
                     )
                 )
 
+                // Premium Background Gradient
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Bg)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF1A0000), Color(0xFF000000)),
+                                radius = 1500f,
+                                center = Offset.Unspecified
+                            )
+                        )
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -175,58 +190,102 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         verticalArrangement = Arrangement.Center
                     ) {
                         
+                        // Orb Area with Glow
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(340.dp)
-                                .scale(pulseScale)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(360.dp) 
                         ) {
-                            AndroidView(
-                                modifier = Modifier.fillMaxSize(),
-                                factory = { context ->
-                                    VideoView(context).apply {
-                                        setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
-                                        setOnPreparedListener { player ->
-                                            player.isLooping = true
-                                            player.setVolume(0f, 0f)
-                                            player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
-                                            start()
-                                        }
-                                    }
-                                },
-                                update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                            // Red Neon Glow behind the video
+                            Box(
+                                modifier = Modifier
+                                    .size(340.dp)
+                                    .scale(pulseScale)
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(Color(0xFFFF0000).copy(alpha = 0.25f), Color.Transparent),
+                                            radius = 300f
+                                        )
+                                    )
+                                    .blur(30.dp)
                             )
 
-                            if (state == JarvisState.LISTENING) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "Listening...",
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    VoiceWaveform(audioLevel = audioLevel)
-                                }
-                            } else if (state == JarvisState.THINKING) {
-                                Text(
-                                    text = "Thinking...",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            } else if (state == JarvisState.SPEAKING) {
-                                Text(
-                                    text = "Speaking...",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
+                            // Video
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(340.dp)
+                                    .scale(pulseScale)
+                                    .clip(CircleShape)
+                            ) {
+                                AndroidView(
+                                    modifier = Modifier.fillMaxSize(),
+                                    factory = { context ->
+                                        VideoView(context).apply {
+                                            setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
+                                            setOnPreparedListener { player ->
+                                                player.isLooping = false
+                                                player.setVolume(0f, 0f)
+                                                player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
+                                                start()
+                                            }
+                                        }
+                                    },
+                                    update = { videoView -> if (!videoView.isPlaying) videoView.start() }
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(40.dp))
+
+                        // Premium Text & Waveform
+                        if (state == JarvisState.LISTENING) {
+                            Text(
+                                text = "LISTENING...",
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 4.sp,
+                                    shadow = Shadow(
+                                        color = Color(0xFFFF0000),
+                                        blurRadius = 20f
+                                    )
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            PremiumWaveform(audioLevel = audioLevel) 
+                        } else if (state == JarvisState.THINKING) {
+                            Text(
+                                text = "THINKING...",
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 4.sp,
+                                    shadow = Shadow(
+                                        color = Color(0xFFFF0000),
+                                        blurRadius = 20f
+                                    )
+                                )
+                            )
+                        } else if (state == JarvisState.SPEAKING) {
+                            Text(
+                                text = "SPEAKING...",
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 4.sp,
+                                    shadow = Shadow(
+                                        color = Color(0xFFFF0000),
+                                        blurRadius = 20f
+                                    )
+                                )
+                            )
+                        }
                     }
 
+                    // Settings Panel
                     if (showSettings) {
                         Box(
                             modifier = Modifier
@@ -247,6 +306,38 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         } catch (t: Throwable) {
             Log.e("Jarvis", "Startup failure", t)
             state = JarvisState.ERROR
+        }
+    }
+
+    private fun startListening() {
+        if (!JarvisVoiceEngine.isAvailable(this)) {
+            Log.e("Jarvis", "Speech recognition unavailable")
+            return
+        }
+        stopListening()
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) { state = JarvisState.LISTENING }
+                override fun onBeginningOfSpeech() { state = JarvisState.LISTENING }
+                override fun onRmsChanged(rmsdB: Float) { audioLevel = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+                override fun onEndOfSpeech() { state = JarvisState.THINKING }
+                override fun onError(error: Int) {
+                    audioLevel = 0f
+                    state = JarvisState.ERROR
+                    if (continuousConversation) startListening()
+                }
+                override fun onResults(results: Bundle?) {
+                    audioLevel = 0f
+                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!text.isNullOrBlank()) handlePrompt(text) else {
+                        if (continuousConversation) startListening()
+                    }
+                }
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            })
+            try { recognizer.startListening(JarvisVoiceEngine.recognitionIntent(speechLocale, false)) } catch (_: Exception) {}
         }
     }
 
@@ -333,32 +424,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         speechRate = prefs.getFloat("speech_rate", speechRate).coerceIn(0.5f, 1.5f)
     }
 
-    private fun startListening() {
-        if (!JarvisVoiceEngine.isAvailable(this)) return
-        stopListening()
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
-            recognizer.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) { state = JarvisState.LISTENING }
-                override fun onBeginningOfSpeech() { state = JarvisState.LISTENING }
-                override fun onRmsChanged(rmsdB: Float) { audioLevel = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
-                override fun onBufferReceived(buffer: ByteArray?) = Unit
-                override fun onEndOfSpeech() { state = JarvisState.THINKING }
-                override fun onError(error: Int) {
-                    audioLevel = 0f
-                    state = JarvisState.ERROR
-                }
-                override fun onResults(results: Bundle?) {
-                    audioLevel = 0f
-                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                    if (!text.isNullOrBlank()) handlePrompt(text)
-                }
-                override fun onPartialResults(partialResults: Bundle?) = Unit
-                override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            })
-            try { recognizer.startListening(JarvisVoiceEngine.recognitionIntent(speechLocale, false)) } catch (_: Exception) {}
-        }
-    }
-
     private fun stopListening() {
         speechRecognizer?.cancel()
         speechRecognizer?.destroy()
@@ -435,26 +500,33 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 }
 
+// Ultra-Smooth Sine Waveform
 @Composable
-fun VoiceWaveform(audioLevel: Float) {
-    Canvas(modifier = Modifier.height(40.dp).fillMaxWidth(0.6f)) {
-        val barCount = 20
-        val barWidth = size.width / (barCount * 2f)
-        val spacing = barWidth
+fun PremiumWaveform(audioLevel: Float) {
+    Canvas(modifier = Modifier.height(80.dp).fillMaxWidth(0.8f)) {
+        val path = Path()
+        val midY = size.height / 2f
+        val width = size.width
+        val points = 100
+        val stepX = width / points
         
-        for (i in 0 until barCount) {
-            val level = if (audioLevel > 0.1f) audioLevel else 0.1f
-            val randomFactor = 0.5f + kotlin.random.Random.nextFloat() * 0.5f
-            val randomHeight = size.height * level * randomFactor
-            val x = i * (barWidth + spacing) + barWidth / 2f
-            
-            drawLine(
-                color = Color(0xFFFF4444),
-                start = Offset(x, size.height / 2f - randomHeight / 2f),
-                end = Offset(x, size.height / 2f + randomHeight / 2f),
-                strokeWidth = barWidth
-            )
+        val level = if (audioLevel > 0.1f) audioLevel else 0.1f
+        val maxAmplitude = (size.height / 2f) * level
+        
+        path.moveTo(0f, midY)
+        
+        for (i in 1..points) {
+            val x = i * stepX
+            val sineValue = kotlin.math.sin(i * 0.2f + System.currentTimeMillis() / 100f)
+            val y = midY + (sineValue * maxAmplitude)
+            path.lineTo(x, y)
         }
+        
+        drawPath(
+            path = path,
+            color = Color.White,
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+        )
     }
 }
 
