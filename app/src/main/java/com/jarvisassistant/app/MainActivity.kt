@@ -12,16 +12,12 @@ import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.os.Bundle
 import android.media.MediaPlayer
-import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.View
-import android.view.Gravity
-import android.widget.FrameLayout
 import android.widget.VideoView
-import kotlin.math.max
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,15 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -47,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -84,23 +71,16 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var speechLocale by mutableStateOf("en-US")
     private var wakeWord by mutableStateOf("JARVIS")
     private var speechRate by mutableStateOf(0.90f)
-    private var memory by mutableStateOf("")
-    private var memoryEnabled by mutableStateOf(true)
     private var seriousModeActive by mutableStateOf(false)
     private var cybersecurityModeActive by mutableStateOf(false)
-    private var currentProactiveMode by mutableStateOf(JarvisProactiveEngine.Mode.NORMAL)
-    private var pendingConfirmation: String? = null
-    private var pendingAgentConfirmation = false
-    private var setupComplete by mutableStateOf(false)
     private var showSettings by mutableStateOf(false)
     private var history by mutableStateOf(listOf<ChatTurn>())
     private var isEmergencyKillSwitchEnabled by mutableStateOf(false)
-    private var securityAudit by mutableStateOf(listOf<JarvisSecurityCenter.AuditEntry>())
     private var audioLevel by mutableStateOf(0f)
     private val worker = Executors.newSingleThreadExecutor()
     private var activeTask: Future<*>? = null
     private var requestGeneration = 0L
-    private var continuousConversation = false
+    private var continuousConversation = true 
     private var pendingWakeServiceStart = false
     
     private val wakeReceiver = object : BroadcastReceiver() {
@@ -126,15 +106,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) toggleTorch()
-        else responseText = "Camera permission is required by Android to control the flashlight."
-    }
-
-    private val calendarPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        responseText = if (granted) "Calendar context enabled." else "Calendar access was not granted."
-    }
-
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        responseText = if (granted) "JARVIS notifications enabled." else "Notification permission was not granted."
     }
 
     @Suppress("DEPRECATION")
@@ -153,8 +124,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 )
             migrateAndLoadPreferences()
             isEmergencyKillSwitchEnabled = JarvisSecurityCenter.isKillSwitchEnabled(this)
-            securityAudit = JarvisSecurityCenter.auditEntries(this)
-            JarvisDiagnostics.record(this, "lifecycle", "INFO", "JARVIS activity initialized")
             tts = TextToSpeech(this, this)
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
@@ -178,13 +147,19 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 registerReceiver(wakeReceiver, filter)
             }
 
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                startWakeService()
+            } else {
+                micPermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+
             setContent {
                 val infiniteTransition = rememberInfiniteTransition()
                 val pulseScale by infiniteTransition.animateFloat(
                     initialValue = 1f,
-                    targetValue = if (state == JarvisState.LISTENING) 1.06f else 1f,
+                    targetValue = if (state == JarvisState.LISTENING) 1.03f else 1f,
                     animationSpec = infiniteRepeatable(
-                        animation = tween(800, easing = LinearEasing),
+                        animation = tween(1000, easing = LinearEasing),
                         repeatMode = RepeatMode.Reverse
                     )
                 )
@@ -192,199 +167,79 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(Color(0xFF2d001f), Bg),
-                                radius = 1200f,
-                                center = Offset.Unspecified
-                            )
-                        )
+                        .background(Bg)
                 ) {
-                    // HUD background video (full screen, muted, looping, center-crop)
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = { context ->
-                            FrameLayout(context).apply {
-                                val bgVideo = VideoView(context)
-                                addView(
-                                    bgVideo,
-                                    FrameLayout.LayoutParams(
-                                        FrameLayout.LayoutParams.MATCH_PARENT,
-                                        FrameLayout.LayoutParams.MATCH_PARENT,
-                                        Gravity.CENTER
-                                    )
-                                )
-                                bgVideo.setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
-                                bgVideo.setOnPreparedListener { player ->
-                                    player.isLooping = true
-                                    player.setVolume(0f, 0f)
-                                    // Center-crop: video ko poori screen me fill karo (aspect ratio bacha ke)
-                                    this.post {
-                                        val vw = player.videoWidth
-                                        val vh = player.videoHeight
-                                        if (width > 0 && height > 0 && vw > 0 && vh > 0) {
-                                            val scale = max(width.toFloat() / vw, height.toFloat() / vh)
-                                            bgVideo.layoutParams = FrameLayout.LayoutParams(
-                                                (vw * scale).toInt(),
-                                                (vh * scale).toInt(),
-                                                Gravity.CENTER
-                                            )
-                                        }
-                                    }
-                                    bgVideo.start()
-                                }
-                                bgVideo.setOnErrorListener { _, what, extra ->
-                                    Log.e("Jarvis", "HUD bg video error: what=$what extra=$extra")
-                                    true
-                                }
-                            }
-                        }
-                    )
-                    // Dark scrim taaki text/buttons clearly dikhein
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Black.copy(alpha = 0.55f),
-                                        Color.Black.copy(alpha = 0.05f),
-                                        Color.Black.copy(alpha = 0.05f),
-                                        Color.Black.copy(alpha = 0.65f)
-                                    )
-                                )
-                            )
-                    )
-
-                    // Tap area: screen ke exact center me (HUD hexagon ke upar). Ring sirf listening me dikhegi.
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(240.dp)
-                            .scale(pulseScale)
-                            .clip(CircleShape)
-                            .then(
-                                if (state == JarvisState.LISTENING)
-                                    Modifier.border(2.dp, Color(0xFFFF4444).copy(alpha = 0.85f), CircleShape)
-                                else Modifier
-                            )
-                            .clickable { onOrbClick() }
-                    )
-
                     Column(
                         modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        // Top: chat history
+                        
                         Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(0.24f)
-                                .padding(top = 40.dp)
+                                .size(340.dp)
+                                .scale(pulseScale)
+                                .clip(CircleShape)
                         ) {
-                            if (history.isNotEmpty()) {
-                                val listState = rememberLazyListState()
-                                LaunchedEffect(history.size) {
-                                    if (history.isNotEmpty()) {
-                                        listState.animateScrollToItem(history.size - 1)
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { context ->
+                                    VideoView(context).apply {
+                                        setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
+                                        setOnPreparedListener { player ->
+                                            player.isLooping = true
+                                            player.setVolume(0f, 0f)
+                                            player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
+                                            start()
+                                        }
                                     }
+                                },
+                                update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                            )
+
+                            if (state == JarvisState.LISTENING) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Listening...",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    VoiceWaveform(audioLevel = audioLevel)
                                 }
-                                LazyColumn(
-                                    state = listState,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 24.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(history) { turn ->
-                                        Text(
-                                            text = "You: ${turn.user}",
-                                            color = Color.White.copy(alpha = 0.7f),
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                        Text(
-                                            text = "JARVIS: ${turn.assistant}",
-                                            color = Color(0xFFFF4444),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            modifier = Modifier.padding(bottom = 12.dp)
-                                        )
-                                    }
-                                }
+                            } else if (state == JarvisState.THINKING) {
+                                Text(
+                                    text = "Thinking...",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else if (state == JarvisState.SPEAKING) {
+                                Text(
+                                    text = "Speaking...",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
+                    }
 
-                        // Middle: HUD hexagon ka area (tap area alag layer me, screen ke center me)
-                        Spacer(modifier = Modifier.fillMaxHeight(0.44f))
-
-                        // Status Text (hexagon ke neeche)
-                        val statusText = when (state) {
-                            JarvisState.LISTENING -> "Listening..."
-                            JarvisState.THINKING -> "Thinking..."
-                            JarvisState.SPEAKING -> "Speaking..."
-                            JarvisState.ERROR -> "Error"
-                            else -> "Tap to speak"
-                        }
-                        Text(
-                            text = statusText.uppercase(),
-                            color = Color(0xFFFF5555),
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                letterSpacing = 3.sp,
-                                shadow = Shadow(color = Color(0xFFFF2A2A), blurRadius = 18f)
-                            ),
-                            fontWeight = FontWeight.Medium
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Voice Waveform
-                        if (state == JarvisState.LISTENING) {
-                            VoiceWaveform(audioLevel = audioLevel)
-                        } else {
-                            Spacer(modifier = Modifier.height(40.dp))
-                        }
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Bottom Panel
-                        if (showSettings) {
+                    if (showSettings) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.9f)), 
+                            contentAlignment = Alignment.Center
+                        ) {
                             GlassPanel(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
+                                modifier = Modifier.padding(16.dp),
                                 onStart = { startWakeService(); showSettings = false },
                                 onStop = { stopWakeService(); showSettings = false },
                                 onClose = { showSettings = false }
                             )
-                        } else {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 32.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Button(
-                                    onClick = { onOrbClick() },
-                                    shape = CircleShape,
-                                    modifier = Modifier.size(72.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF2A2A).copy(alpha = 0.14f)),
-                                    border = BorderStroke(1.5.dp, Color(0xFFFF4444).copy(alpha = 0.7f)),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text(if (state == JarvisState.LISTENING) "Stop" else "Mic", color = TextMain, fontWeight = FontWeight.Bold)
-                                }
-                                Spacer(modifier = Modifier.width(24.dp))
-                                Button(
-                                    onClick = { showSettings = true },
-                                    shape = CircleShape,
-                                    modifier = Modifier.size(72.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF2A2A).copy(alpha = 0.14f)),
-                                    border = BorderStroke(1.5.dp, Color(0xFFFF4444).copy(alpha = 0.7f)),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text("⚙", color = TextMain, style = MaterialTheme.typography.headlineMedium)
-                                }
-                            }
                         }
                     }
                 }
@@ -392,217 +247,19 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         } catch (t: Throwable) {
             Log.e("Jarvis", "Startup failure", t)
             state = JarvisState.ERROR
-            responseText = "Startup failed: ${t.message}"
-        }
-    }
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            applyTtsPreferences()
-        } else {
-            Log.e("Jarvis", "TTS Initialization failed")
-        }
-    }
-
-    private fun applyTtsPreferences() {
-        tts?.let { t ->
-            t.language = Locale.forLanguageTag(speechLocale)
-            t.setSpeechRate(speechRate)
-        }
-    }
-
-    private fun speak(text: String) {
-        if (text.isBlank()) return
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis_utterance")
-    }
-
-    private fun restingState(): JarvisState {
-        return if (seriousModeActive) JarvisState.SERIOUS
-        else if (cybersecurityModeActive) JarvisState.CYBERSECURITY
-        else JarvisState.IDLE
-    }
-
-    private fun finishTurn(prompt: String, reply: String) {
-        history = (history + ChatTurn(prompt, reply, emptyList())).takeLast(40)
-        if (!continuousConversation) state = restingState()
-        speak(reply)
-    }
-
-    private fun toggleTorch() {
-        try {
-            val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            val cameraId = cameraManager.cameraIdList[0]
-            cameraManager.setTorchMode(cameraId, !torchOn)
-            torchOn = !torchOn
-        } catch (e: Exception) {
-            responseText = "Could not toggle flashlight: ${e.message}"
-        }
-    }
-
-    private fun startWakeService() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            pendingWakeServiceStart = true
-            micPermission.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
-        pendingWakeServiceStart = false
-        val intent = Intent(this, JarvisWakeService::class.java)
-            .putExtra("wake", wakeWord)
-            .putExtra("locale", speechLocale)
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ContextCompat.startForegroundService(this, intent)
-            else startService(intent)
-            responseText = "Wake-word listening started."
-        } catch (e: Exception) {
-            responseText = "Could not start wake-word listening: ${e.message}"
-        }
-    }
-
-    private fun stopWakeService() {
-        try {
-            startService(Intent(this, JarvisWakeService::class.java).setAction(JarvisWakeService.ACTION_STOP))
-            responseText = "Wake-word listening stopped."
-        } catch (e: Exception) {
-            stopService(Intent(this, JarvisWakeService::class.java))
-        }
-    }
-
-    private fun migrateAndLoadPreferences() {
-        endpoint = prefs.getString("endpoint", endpoint).orEmpty().ifBlank { endpoint }
-        model = prefs.getString("model", model).orEmpty().ifBlank { model }
-        speechLocale = prefs.getString("speech_locale", speechLocale).orEmpty().ifBlank { "en-US" }
-        wakeWord = prefs.getString("wake_word", wakeWord).orEmpty().ifBlank { "JARVIS" }
-        speechRate = prefs.getFloat("speech_rate", speechRate).coerceIn(0.5f, 1.5f)
-        setupComplete = prefs.getBoolean("setup_complete", false)
-    }
-
-    private fun setSeriousMode(enabled: Boolean) {
-        seriousModeActive = enabled
-        prefs.edit().putBoolean("serious_mode", enabled).apply()
-        responseText = if (enabled) "Serious Mode is on." else "Serious Mode is off."
-    }
-
-    private fun setCybersecurityMode(enabled: Boolean) {
-        cybersecurityModeActive = enabled
-        prefs.edit().putBoolean("cybersecurity_mode", enabled).apply()
-        responseText = if (enabled) "Cybersecurity Mode is on." else "Cybersecurity Mode is off."
-    }
-
-    private fun onOrbClick() {
-        when (state) {
-            JarvisState.LISTENING -> stopListening()
-            JarvisState.SPEAKING -> {
-                tts?.stop()
-                state = restingState()
-            }
-            else -> {
-                tts?.stop()
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                    startListening()
-                } else micPermission.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        }
-    }
-
-    private fun startListening() {
-        if (!JarvisVoiceEngine.isAvailable(this)) {
-            state = JarvisState.ERROR
-            responseText = "Android speech recognition is unavailable."
-            return
-        }
-        stopListening()
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
-            recognizer.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) { state = JarvisState.LISTENING }
-                override fun onBeginningOfSpeech() { state = JarvisState.LISTENING }
-                override fun onRmsChanged(rmsdB: Float) { audioLevel = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
-                override fun onBufferReceived(buffer: ByteArray?) = Unit
-                override fun onEndOfSpeech() { state = JarvisState.THINKING }
-                override fun onError(error: Int) {
-                    audioLevel = 0f
-                    state = if (error == SpeechRecognizer.ERROR_NETWORK) JarvisState.OFFLINE else JarvisState.ERROR
-                    responseText = JarvisVoiceEngine.errorMessage(error)
-                }
-                override fun onResults(results: Bundle?) {
-                    audioLevel = 0f
-                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                    if (text.isNullOrBlank()) {
-                        state = JarvisState.ERROR
-                        responseText = "No speech was recognized."
-                    } else {
-                        lastTranscript = text
-                        handlePrompt(text)
-                    }
-                }
-                override fun onPartialResults(partialResults: Bundle?) = Unit
-                override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            })
-            val intent = JarvisVoiceEngine.recognitionIntent(speechLocale, preferOffline = false)
-            try { recognizer.startListening(intent) } catch (_: Exception) {
-                state = JarvisState.ERROR
-                responseText = "Voice recognition could not start."
-                recognizer.destroy()
-                speechRecognizer = null
-            }
-        }
-    }
-
-    private fun stopListening() {
-        speechRecognizer?.cancel()
-        speechRecognizer?.destroy()
-        speechRecognizer = null
-        state = restingState()
-    }
-
-    private fun handlePrompt(rawPrompt: String) {
-        val prompt = rawPrompt.trim()
-        if (prompt.isBlank()) return
-        lastTranscript = prompt
-
-        if (isEmergencyKillSwitchEnabled) {
-            responseText = "Emergency security lock is ON."
-            finishTurn(prompt, responseText)
-            return
-        }
-
-        val localReply = handleLocalCommand(prompt)
-        if (localReply != null) {
-            responseText = localReply
-            finishTurn(prompt, localReply)
-            return
-        }
-
-        state = JarvisState.THINKING
-        val key = apiKey
-        if (key.isBlank()) {
-            responseText = "Add an AI provider key in Settings."
-            finishTurn(prompt, responseText)
-            return
-        }
-
-        activeTask?.cancel(true)
-        val generation = ++requestGeneration
-        activeTask = worker.submit {
-            try {
-                val result = AiProvider.answer(endpoint, model, key, prompt, history, "", emptyList(), false, false, false) { false }
-                runOnUiThread {
-                    if (generation != requestGeneration) return@runOnUiThread
-                    responseText = result
-                    finishTurn(prompt, result)
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    responseText = "Error: ${e.message}"
-                    finishTurn(prompt, responseText)
-                }
-            }
         }
     }
 
     private fun handleLocalCommand(text: String): String? {
         val command = CommandNormalizer.normalize(text, wakeWord)
+        
+        if (command.contains("settings") || command.contains("setting")) {
+            showSettings = true
+            return "Opening settings."
+        }
+
         if (command in setOf("help", "commands", "what can you do")) {
-            return "JARVIS commands: time, date, battery, flashlight, home, back, scroll up/down, open app, lock phone, screenshot."
+            return "JARVIS commands: time, date, battery, flashlight, home, back, open app, lock phone."
         }
         if (command.matches(Regex("(what('?s| is) the )?time( now)?\\??"))) {
             return "It is ${java.text.SimpleDateFormat("h:mm a", Locale.getDefault()).format(java.util.Date())}."
@@ -625,8 +282,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
         if (command == "home" || command == "go home") return runAccessibility("home")
         if (command == "back" || command == "go back") return runAccessibility("back")
-        if (command.startsWith("scroll up")) return runAccessibility("scroll-up")
-        if (command.startsWith("scroll down")) return runAccessibility("scroll-down")
         if (command == "lock phone") return lockPhone()
         Regex("^open (.+)$").find(command)?.let { match ->
             return openInstalledApp(match.groupValues[1].trim())
@@ -634,66 +289,137 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         return null
     }
 
-    private fun safeStartActivity(intent: Intent) {
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            responseText = "I couldn't open that app or settings screen."
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.language = Locale.forLanguageTag(speechLocale)
+            tts?.setSpeechRate(speechRate)
         }
     }
 
+    private fun restingState(): JarvisState {
+        return if (seriousModeActive) JarvisState.SERIOUS
+        else if (cybersecurityModeActive) JarvisState.CYBERSECURITY
+        else JarvisState.IDLE
+    }
+
+    private fun finishTurn(prompt: String, reply: String) {
+        history = (history + ChatTurn(prompt, reply, emptyList())).takeLast(40)
+        if (!continuousConversation) state = restingState()
+        tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "jarvis_utterance")
+    }
+
+    private fun startWakeService() {
+        pendingWakeServiceStart = false
+        val intent = Intent(this, JarvisWakeService::class.java)
+            .putExtra("wake", wakeWord)
+            .putExtra("locale", speechLocale)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ContextCompat.startForegroundService(this, intent)
+            else startService(intent)
+        } catch (e: Exception) {
+            Log.e("Jarvis", "Wake service error: ${e.message}")
+        }
+    }
+
+    private fun stopWakeService() {
+        try { startService(Intent(this, JarvisWakeService::class.java).setAction(JarvisWakeService.ACTION_STOP)) } catch (e: Exception) {}
+    }
+
+    private fun migrateAndLoadPreferences() {
+        endpoint = prefs.getString("endpoint", endpoint).orEmpty().ifBlank { endpoint }
+        model = prefs.getString("model", model).orEmpty().ifBlank { model }
+        speechLocale = prefs.getString("speech_locale", speechLocale).orEmpty().ifBlank { "en-US" }
+        wakeWord = prefs.getString("wake_word", wakeWord).orEmpty().ifBlank { "JARVIS" }
+        speechRate = prefs.getFloat("speech_rate", speechRate).coerceIn(0.5f, 1.5f)
+    }
+
+    private fun startListening() {
+        if (!JarvisVoiceEngine.isAvailable(this)) return
+        stopListening()
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) { state = JarvisState.LISTENING }
+                override fun onBeginningOfSpeech() { state = JarvisState.LISTENING }
+                override fun onRmsChanged(rmsdB: Float) { audioLevel = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+                override fun onEndOfSpeech() { state = JarvisState.THINKING }
+                override fun onError(error: Int) {
+                    audioLevel = 0f
+                    state = JarvisState.ERROR
+                }
+                override fun onResults(results: Bundle?) {
+                    audioLevel = 0f
+                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!text.isNullOrBlank()) handlePrompt(text)
+                }
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            })
+            try { recognizer.startListening(JarvisVoiceEngine.recognitionIntent(speechLocale, false)) } catch (_: Exception) {}
+        }
+    }
+
+    private fun stopListening() {
+        speechRecognizer?.cancel()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        state = restingState()
+    }
+
+    private fun handlePrompt(rawPrompt: String) {
+        val prompt = rawPrompt.trim()
+        if (prompt.isBlank()) return
+        lastTranscript = prompt
+
+        val localReply = handleLocalCommand(prompt)
+        if (localReply != null) {
+            finishTurn(prompt, localReply)
+            return
+        }
+
+        state = JarvisState.THINKING
+        val key = apiKey
+        if (key.isBlank()) {
+            finishTurn(prompt, "Add an AI provider key in Settings.")
+            return
+        }
+
+        activeTask?.cancel(true)
+        activeTask = worker.submit {
+            try {
+                val result = AiProvider.answer(endpoint, model, key, prompt, history, "", emptyList(), false, false, false) { false }
+                runOnUiThread { finishTurn(prompt, result) }
+            } catch (e: Exception) {
+                runOnUiThread { finishTurn(prompt, "Error: ${e.message}") }
+            }
+        }
+    }
+
+    private fun toggleTorch() {
+        try {
+            val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            cameraManager.setTorchMode(cameraManager.cameraIdList[0], !torchOn)
+            torchOn = !torchOn
+        } catch (e: Exception) {}
+    }
+
+    private fun safeStartActivity(intent: Intent) {
+        try { startActivity(intent) } catch (e: Exception) {}
+    }
+
     private fun runAccessibility(action: String, x: Float? = null, y: Float? = null, text: String? = null): String {
-        val service = JarvisAccessibilityService.active
-            ?: return "Accessibility service is not active. Enable JARVIS Accessibility in settings."
-        
+        val service = JarvisAccessibilityService.active ?: return "Accessibility service is not active."
         return when (action) {
-            "home" -> { 
-                service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-                "Going home." 
-            }
-            "back" -> { 
-                service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
-                "Going back." 
-            }
-            "scroll-up" -> { 
-                val root = service.rootInActiveWindow
-                if (root != null) {
-                    root.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
-                    "Scrolling up."
-                } else "Cannot scroll up."
-            }
-            "scroll-down" -> { 
-                val root = service.rootInActiveWindow
-                if (root != null) {
-                    root.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-                    "Scrolling down."
-                } else "Cannot scroll down."
-            }
-            "tap" -> {
-                if (x != null && y != null) {
-                    service.performTap(x, y)
-                    "Tapping at ($x, $y)."
-                } else "Invalid coordinates."
-            }
-            "type" -> {
-                if (text != null) {
-                    service.inputText(text)
-                    "Typing text."
-                } else "No text provided."
-            }
-            else -> "Unknown accessibility action."
+            "home" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME); "Going home." }
+            "back" -> { service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); "Going back." }
+            else -> "Unknown action."
         }
     }
 
     private fun lockPhone(): String {
         val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val adminComponent = ComponentName(this, JarvisDeviceAdminReceiver::class.java)
-        return if (dpm.isAdminActive(adminComponent)) {
-            dpm.lockNow()
-            "Phone locked."
-        } else {
-            "Device admin permission required."
-        }
+        return if (dpm.isAdminActive(adminComponent)) { dpm.lockNow(); "Phone locked." } else { "Device admin permission required." }
     }
 
     private fun openInstalledApp(appName: String): String {
@@ -702,21 +428,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val label = pm.getApplicationLabel(pkg.applicationInfo).toString()
             if (label.equals(appName, ignoreCase = true)) {
                 val intent = pm.getLaunchIntentForPackage(pkg.packageName)
-                if (intent != null) {
-                    safeStartActivity(intent)
-                    return "Opening $label."
-                }
+                if (intent != null) { safeStartActivity(intent); return "Opening $label." }
             }
         }
         return "App not found: $appName"
-    }
-
-    private fun executeAgentStep(step: String): String {
-        return "Agent step executed: $step"
-    }
-
-    private fun formatAgentResult(result: String): String {
-        return "Agent result: $result"
     }
 }
 
@@ -734,7 +449,7 @@ fun VoiceWaveform(audioLevel: Float) {
             val x = i * (barWidth + spacing) + barWidth / 2f
             
             drawLine(
-                color = Color.Red,
+                color = Color(0xFFFF4444),
                 start = Offset(x, size.height / 2f - randomHeight / 2f),
                 end = Offset(x, size.height / 2f + randomHeight / 2f),
                 strokeWidth = barWidth
@@ -747,11 +462,11 @@ fun VoiceWaveform(audioLevel: Float) {
 fun GlassPanel(modifier: Modifier = Modifier, onStart: () -> Unit, onStop: () -> Unit, onClose: () -> Unit) {
     Surface(
         modifier = modifier.clip(RoundedCornerShape(25.dp)),
-        color = Color.White.copy(alpha = 0.08f),
-        shadowElevation = 8.dp
+        color = Color.Black.copy(alpha = 0.9f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("JARVIS Controls", color = TextMain, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("JARVIS Settings", color = TextMain, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = onStart, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Start") }
                 Button(onClick = onStop, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Stop") }
