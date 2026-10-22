@@ -63,7 +63,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     
     private var tts: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
-    private var mediaPlayer: MediaPlayer? = null 
     private var torchOn = false
     private var lastTranscript by mutableStateOf("")
     private var responseText by mutableStateOf("")
@@ -87,13 +86,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var continuousConversation = false 
     private var pendingWakeServiceStart = false
     
-    // STRICT WAKE RECEIVER (Fix: Bina Jarvis bole active nahi hoga)
+    // STRICT WAKE RECEIVER (Bina Jarvis bole active nahi hoga)
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            // Agar app pehle se busy hai, toh naya signal ignore karo
             if (state != JarvisState.IDLE) return
 
             val phrase = intent?.getStringExtra("phrase").orEmpty()
             
+            // Strict check: Sirf tab trigger hoga jab exact "Jarvis" mile
             if (phrase.length >= 4 && phrase.contains(wakeWord, ignoreCase = true)) {
                 lastTranscript = phrase
                 state = JarvisState.LISTENING
@@ -202,18 +203,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                         setOnPreparedListener { player ->
                                             player.isLooping = false
                                             
-                                            // VIDEO MUTED, CUSTOM SOUND PLAY
-                                            player.setVolume(0f, 0f) 
+                                            // VIDEO KA ORIGINAL SOUND ON (1f, 1f)
+                                            player.setVolume(1f, 1f) 
                                             player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
                                             start()
-
-                                            try {
-                                                mediaPlayer?.release()
-                                                mediaPlayer = MediaPlayer.create(context, R.raw.custom_sound) 
-                                                mediaPlayer?.start()
-                                            } catch (e: Exception) {
-                                                Log.e("Jarvis", "Custom sound error: ${e.message}")
-                                            }
                                         }
                                     }
                                 }
@@ -269,12 +262,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             Log.e("Jarvis", "Startup failure", t)
             state = JarvisState.ERROR
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        mediaPlayer?.release()
-        mediaPlayer = null
     }
 
     private fun startListening() {
