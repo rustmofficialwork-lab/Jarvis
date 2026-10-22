@@ -18,7 +18,10 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.View
+import android.view.Gravity
+import android.widget.FrameLayout
 import android.widget.VideoView
+import kotlin.math.max
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,6 +29,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -192,34 +197,71 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             )
                         )
                 ) {
+                    // HUD background video (full screen, muted, looping, center-crop)
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { context ->
+                            FrameLayout(context).apply {
+                                val bgVideo = VideoView(context)
+                                addView(
+                                    bgVideo,
+                                    FrameLayout.LayoutParams(
+                                        FrameLayout.LayoutParams.MATCH_PARENT,
+                                        FrameLayout.LayoutParams.MATCH_PARENT,
+                                        Gravity.CENTER
+                                    )
+                                )
+                                bgVideo.setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
+                                bgVideo.setOnPreparedListener { player ->
+                                    player.isLooping = true
+                                    player.setVolume(0f, 0f)
+                                    // Center-crop: video ko poori screen me fill karo (aspect ratio bacha ke)
+                                    this.post {
+                                        val vw = player.videoWidth
+                                        val vh = player.videoHeight
+                                        if (width > 0 && height > 0 && vw > 0 && vh > 0) {
+                                            val scale = max(width.toFloat() / vw, height.toFloat() / vh)
+                                            bgVideo.layoutParams = FrameLayout.LayoutParams(
+                                                (vw * scale).toInt(),
+                                                (vh * scale).toInt(),
+                                                Gravity.CENTER
+                                            )
+                                        }
+                                    }
+                                    bgVideo.start()
+                                }
+                                bgVideo.setOnErrorListener { _, what, extra ->
+                                    Log.e("Jarvis", "HUD bg video error: what=$what extra=$extra")
+                                    true
+                                }
+                            }
+                        }
+                    )
+                    // Dark scrim taaki text/buttons clearly dikhein
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.35f))
+                    )
+
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Spacer(modifier = Modifier.weight(1f))
 
-                        // Main Orb
-                        AndroidView(
+                        // Tap area (purani orb video hata di; ab HUD video background me chalti hai)
+                        Box(
                             modifier = Modifier
-                                .size(320.dp)
+                                .size(260.dp)
                                 .scale(pulseScale)
-                                .clip(CircleShape),
-                            factory = { context ->
-                                VideoView(context).apply {
-                                    setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_interface}"))
-                                    setOnClickListener { onOrbClick() }
-                                    setOnPreparedListener { player ->
-                                        player.isLooping = true
-                                        player.setVolume(0f, 0f)
-                                        start()
-                                    }
-                                    setOnErrorListener { _, what, extra ->
-                                        Log.e("Jarvis", "Video error: what=$what extra=$extra")
-                                        true
-                                    }
-                                }
-                            },
-                            update = { videoView -> if (!videoView.isPlaying) videoView.start() }
+                                .clip(CircleShape)
+                                .border(
+                                    width = 2.dp,
+                                    color = Color(0xFFFF4444).copy(alpha = if (state == JarvisState.LISTENING) 0.9f else 0.35f),
+                                    shape = CircleShape
+                                )
+                                .clickable { onOrbClick() }
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
