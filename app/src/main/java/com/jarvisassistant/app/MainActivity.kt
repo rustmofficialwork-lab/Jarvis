@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     
     private var tts: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
-    private var mediaPlayer: MediaPlayer? = null
+    private var mediaPlayer: MediaPlayer? = null 
     private var torchOn = false
     private var lastTranscript by mutableStateOf("")
     private var responseText by mutableStateOf("")
@@ -85,14 +85,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var requestGeneration = 0L
     
     private var continuousConversation = false 
-    
     private var pendingWakeServiceStart = false
     
+    // STRICT WAKE RECEIVER (Fix: Bina Jarvis bole active nahi hoga)
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            lastTranscript = intent?.getStringExtra("phrase").orEmpty()
-            state = JarvisState.LISTENING
-            startListening()
+            if (state != JarvisState.IDLE) return
+
+            val phrase = intent?.getStringExtra("phrase").orEmpty()
+            
+            if (phrase.length >= 4 && phrase.contains(wakeWord, ignoreCase = true)) {
+                lastTranscript = phrase
+                state = JarvisState.LISTENING
+                startListening()
+            } else {
+                Log.d("Jarvis", "Ignored false wake word: $phrase")
+            }
         }
     }
 
@@ -193,14 +201,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                         setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"))
                                         setOnPreparedListener { player ->
                                             player.isLooping = false
-                                            // Sound ON kiya hai aur ye sirf ek baar bajega
-                                            player.setVolume(1f, 1f) 
+                                            
+                                            // VIDEO MUTED, CUSTOM SOUND PLAY
+                                            player.setVolume(0f, 0f) 
                                             player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
                                             start()
+
+                                            try {
+                                                mediaPlayer?.release()
+                                                mediaPlayer = MediaPlayer.create(context, R.raw.custom_sound) 
+                                                mediaPlayer?.start()
+                                            } catch (e: Exception) {
+                                                Log.e("Jarvis", "Custom sound error: ${e.message}")
+                                            }
                                         }
                                     }
                                 }
-                                // UPDATE BLOCK HATA DIYA HAI TAAKI VIDEO RESTART NA HO
                             )
                         }
 
@@ -253,6 +269,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             Log.e("Jarvis", "Startup failure", t)
             state = JarvisState.ERROR
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 
     private fun startListening() {
