@@ -33,6 +33,23 @@ android {
         buildConfig true
         compose true
     }
+    
+    // 1. Duplicate META-INF files ko pick karne ke liye (Coroutine conflict fix)
+    packagingOptions {
+        resources {
+            pickFirsts += ['META-INF/kotlinx_coroutines_core.version', 'META-INF/AL2.0', 'META-INF/LGPL2.1']
+        }
+    }
+}
+
+// 2. Kotlin version force karne ke liye (Sabse important fix)
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:2.0.21'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.21'
+        force 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+        force 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    }
 }
 
 dependencies {
