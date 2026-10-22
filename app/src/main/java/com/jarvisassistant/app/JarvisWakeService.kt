@@ -7,7 +7,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
@@ -43,53 +46,72 @@ class JarvisWakeService : Service() {
 
     private fun startListening() {
         if (stopRequested || System.currentTimeMillis() < wakePauseUntil || !SpeechRecognizer.isRecognitionAvailable(this)) return
+        
+        recognizer?.cancel()
         recognizer?.destroy()
+        
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).also { r ->
             r.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: android.os.Bundle?) = Unit
+                override fun onReadyForSpeech(params: Bundle?) = Unit
                 override fun onBeginningOfSpeech() = Unit
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
                 
                 override fun onError(error: Int) { 
-                    // Thoda wait badha diya taaki baar-baar trigger na ho
+                    // Error aane par thoda wait karke wapas restart karo
                     scheduleRestart(1500L) 
                 }
                 
-                override fun onResults(results: android.os.Bundle?) {
+                override fun onResults(results: Bundle?) {
                     val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                    val confidences = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
                     
-                    // STRICT CHECK: Sirf tab trigger hoga jab exact word mile aur lambai 4 se zyada ho
-                    val hit = words.firstOrNull { spoken -> 
-                        spoken.length >= 4 && spoken.contains(wakeWord, ignoreCase = true) 
+                    var hit = false
+                    for (i in words.indices) {
+                        val spoken = words[i].trim().uppercase()
+                        val confidence = confidences?.getOrNull(i) ?: 0f
+                        
+                        // STRICT CHECK: Exact word ho aur Confidence 85% se zyada ho
+                        if ((spoken == "JARVIS" || spoken == "HEY JARVIS") && confidence >= 0.85f) {
+                            hit = true
+                            break
+                        }
                     }
                     
-                    if (hit != null) {
-                        // Release this recognizer before handing the microphone to MainActivity.
+                    if (hit) {
+                        // Mic ko free karo taaki MainActivity use kar sake
                         recognizer?.cancel()
                         recognizer?.destroy()
                         recognizer = null
-                        wakePauseUntil = System.currentTimeMillis() + 8_000L
-                        sendBroadcast(Intent(ACTION_WAKE).setPackage(packageName).putExtra("phrase", hit))
-                        scheduleRestart(8_500L)
+                        
+                        // 10 second ka pause taaki turant wapas trigger na ho
+                        wakePauseUntil = System.currentTimeMillis() + 10_000L
+                        
+                        sendBroadcast(Intent(ACTION_WAKE).setPackage(packageName).putExtra("phrase", "JARVIS"))
+                        scheduleRestart(10_500L)
                     } else {
-                        // Agar Jarvis nahi bola, toh chup-chaap wapas restart karo
+                        // Agar exact word nahi mila (background noise), toh chup-chaap restart
                         scheduleRestart(1000L)
                     }
                 }
-                override fun onPartialResults(partialResults: android.os.Bundle?) = Unit
-                override fun onEvent(eventType: Int, params: android.os.Bundle?) = Unit
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
             })
+            
             val i = JarvisVoiceEngine.recognitionIntent(locale, preferOffline = false)
-            try { r.startListening(i) } catch (_: Exception) { scheduleRestart(1500L) }
+            try { 
+                r.startListening(i) 
+            } catch (_: Exception) { 
+                scheduleRestart(1500L) 
+            }
         }
     }
 
     private fun scheduleRestart(delay: Long) {
         if (restarting || stopRequested) return
         restarting = true
-        android.os.Handler(mainLooper).postDelayed({
+        Handler(Looper.getMainLooper()).postDelayed({
             restarting = false
             if (!stopRequested) startListening()
         }, delay)
