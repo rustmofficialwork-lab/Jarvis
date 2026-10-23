@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var model by mutableStateOf("gpt-4o-mini")
     private var speechLocale by mutableStateOf("en-US")
     private var wakeWord by mutableStateOf("JARVIS")
-    private var speechRate by mutableStateOf(0.90f)
+    private var speechRate by mutableStateOf(0.85f)
     private var showSettings by mutableStateOf(false)
     private var history by mutableStateOf(listOf<ChatTurn>())
     private var audioLevel by mutableStateOf(0f)
@@ -89,24 +89,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     
     private var continuousConversation = false 
     private var pendingWakeServiceStart = false
-    
-    // MIC FIX: 500ms delay aur proper state check
+    private var isVideoFinished = false
+
+    // Jab app khuli hai tab background service ko ignore karega, kyunki app khud sun rahi hai
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            // Agar app pehle se sun rahi hai ya bol rahi hai, toh naya signal ignore karo
-            if (state == JarvisState.LISTENING || state == JarvisState.SPEAKING) return
-
-            val phrase = intent?.getStringExtra("phrase").orEmpty()
-            
-            if (phrase.contains(wakeWord, ignoreCase = true)) {
-                lastTranscript = phrase
-                state = JarvisState.LISTENING
-                
-                // 500ms delay taaki background service mic ko free kar sake
-                Handler(Looper.getMainLooper()).postDelayed({
-                    startListening()
-                }, 500L)
-            }
+            // If app is in foreground, we handle it. Service handles it if app is closed.
         }
     }
 
@@ -159,13 +147,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             })
             
-            val filter = IntentFilter(JarvisWakeService.ACTION_WAKE)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(wakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(wakeReceiver, filter)
-            }
-
+            // Start background service to listen when app is closed
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 startWakeService()
             } else {
@@ -212,44 +194,28 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                             player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
                                             start()
                                         }
+                                        setOnCompletionListener {
+                                            isVideoFinished = true
+                                        }
                                     }
                                 }
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(32.dp))
+                        // LISTENING ANIMATION REMOVED AS REQUESTED. UI IS CLEAN NOW.
 
-                        if (state == JarvisState.LISTENING) {
-                            Text(
-                                text = "Listening...",
-                                color = TextMain,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            RedSmoothWaveform(audioLevel = audioLevel) 
-                        } else if (state == JarvisState.THINKING) {
-                            Text(
-                                text = "Thinking...",
-                                color = TextMain,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                        if (state == JarvisState.THINKING) {
+                            Spacer(modifier = Modifier.height(32.dp))
+                            Text("Thinking...", color = TextMain, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         } else if (state == JarvisState.SPEAKING) {
-                            Text(
-                                text = "Speaking...",
-                                color = TextMain,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Spacer(modifier = Modifier.height(32.dp))
+                            Text("Speaking...", color = TextMain, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     if (showSettings) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.9f)), 
+                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)), 
                             contentAlignment = Alignment.Center
                         ) {
                             GlassPanel(
@@ -268,6 +234,21 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.let { t ->
+                val ukLocale = Locale("en", "GB")
+                t.setLanguage(ukLocale)
+                val voices = t.voices
+                val maleVoice = voices?.firstOrNull { it.locale == ukLocale && !it.isNetworkConnectionRequired && it.name.contains("male", ignoreCase = true) }
+                    ?: voices?.firstOrNull { it.locale == ukLocale && !it.isNetworkConnectionRequired }
+                if (maleVoice != null) t.voice = maleVoice
+                t.setPitch(0.85f) 
+                t.setSpeechRate(speechRate) 
+            }
+        }
+    }
+
     private fun startListening() {
         if (!JarvisVoiceEngine.isAvailable(this)) return
         stopListening()
@@ -281,6 +262,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onError(error: Int) {
                     audioLevel = 0f
                     state = JarvisState.IDLE 
+                    Log.e("Jarvis", "MainActivity Speech Error: $error")
                 }
                 override fun onResults(results: Bundle?) {
                     audioLevel = 0f
@@ -302,8 +284,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val command = CommandNormalizer.normalize(text, wakeWord)
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        // --- JARVIS INTRODUCTION (NAYA FEATURE) ---
-        if (command.contains("introduction") || command.contains("intro") || command.contains("introduce yourself") || command.contains("who are you")) {
+        if (command.contains("introduction") || command.contains("intro") || command.contains("introduce yourself") || command.contains("who are you") || command.contains("tum kaun ho") || command.contains("apna parichay do")) {
             return "Hello, Sir.\n\n" +
                    "I am JARVIS — your personal AI assistant.\n\n" +
                    "I am designed to assist you, understand your commands, answer your questions, and help you accomplish your tasks with intelligence and precision.\n\n" +
@@ -313,45 +294,41 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                    "How may I assist you today?"
         }
 
-        // --- SETTINGS ---
         if (command.contains("settings") || command.contains("setting")) {
             showSettings = true
             return "Opening settings."
         }
 
-        // --- HELP ---
-        if (command in setOf("help", "commands", "what can you do")) {
-            return "I can control calls, sms, music, maps, and use accessibility to click, scroll, and read the screen."
+        if (command in setOf("help", "commands", "what can you do", "kya kar sakte ho")) {
+            return "I can control calls, sms, music, maps, apps, and use accessibility to click, scroll, and read the screen."
         }
 
-        // --- ACCESSIBILITY FEATURES ---
-        if (command == "open recent apps" || command == "recents") return runAccessibility("recents")
-        if (command.contains("open notifications") || command.contains("notification panel")) return runAccessibility("notifications")
-        if (command.contains("open power menu") || command.contains("power menu")) return runAccessibility("power-menu")
+        if (command.contains("recent apps") || command.contains("recents")) return runAccessibility("recents")
+        if (command.contains("notifications") || command.contains("notification panel")) return runAccessibility("notifications")
+        if (command.contains("power menu") || command.contains("power options")) return runAccessibility("power-menu")
         
-        if (command.contains("read screen") || command.contains("what is on the screen")) {
+        if (command.contains("read screen") || command.contains("screen padho") || command.contains("what is on the screen")) {
             return runAccessibility("read-screen")
         }
-        if (command.startsWith("click on ")) {
-            val target = command.removePrefix("click on ").trim()
+        if (command.startsWith("click on ") || command.startsWith("click ")) {
+            val target = command.replace("click on ", "").replace("click ", "").trim()
             return runAccessibility("click", text = target)
         }
-        if (command == "scroll up") return runAccessibility("scroll-up")
-        if (command == "scroll down") return runAccessibility("scroll-down")
+        if (command.contains("scroll up") || command.contains("upar scroll karo")) return runAccessibility("scroll-up")
+        if (command.contains("scroll down") || command.contains("niche scroll karo")) return runAccessibility("scroll-down")
 
-        // --- BASIC SYSTEM FEATURES ---
-        if (command.matches(Regex("(what('?s| is) the )?time( now)?\\??"))) {
+        if (command.contains("time") || command.contains("samay") || command.contains("waqt")) {
             return "It is ${java.text.SimpleDateFormat("h:mm a", Locale.getDefault()).format(java.util.Date())}."
         }
-        if (command.matches(Regex("(what('?s| is) the )?date( today)?\\??"))) {
+        if (command.contains("date") || command.contains("tareekh")) {
             return "Today is ${java.text.SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(java.util.Date())}."
         }
-        if (command in listOf("battery status", "battery percentage")) {
+        if (command.contains("battery") || command.contains("charge")) {
             val bm = getSystemService(BATTERY_SERVICE) as android.os.BatteryManager
             val pct = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
             return if (pct >= 0) "Battery is at $pct percent." else "Battery percentage is unavailable."
         }
-        if (command in listOf("flashlight", "toggle flashlight")) {
+        if (command.contains("flashlight") || command.contains("torch") || command.contains("batti")) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 toggleTorch()
                 return if (torchOn) "Flashlight on." else "Flashlight off."
@@ -365,37 +342,45 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             else vibrator.vibrate(1000)
             return "Vibrating."
         }
-        if (command.contains("volume up") || command.contains("increase volume")) {
+        if (command.contains("volume up") || command.contains("volume badhao") || command.contains("awaaz badhao")) {
             audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
             return "Volume increased."
         }
-        if (command.contains("volume down") || command.contains("decrease volume")) {
+        if (command.contains("volume down") || command.contains("volume kam karo") || command.contains("awaaz kam karo")) {
             audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
             return "Volume decreased."
         }
-        if (command.contains("mute") || command.contains("silent mode")) {
+        if (command.contains("mute") || command.contains("silent")) {
             audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, AudioManager.FLAG_SHOW_UI)
             return "Phone muted."
         }
-        if (command.contains("play music") || command.contains("pause music") || command.contains("next song") || command.contains("previous song")) {
+        if (command.contains("play music") || command.contains("pause music") || command.contains("next song") || command.contains("previous song") || command.contains("gana chalao") || command.contains("gana roko")) {
             val action = when {
-                command.contains("play") -> KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_MEDIA_PLAY
-                command.contains("pause") -> KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_MEDIA_PAUSE
+                command.contains("play") || command.contains("chalao") -> KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_MEDIA_PLAY
+                command.contains("pause") || command.contains("roko") -> KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_MEDIA_PAUSE
                 command.contains("next") -> KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_MEDIA_NEXT
                 else -> KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_MEDIA_PREVIOUS
             }
             audioManager.dispatchMediaKeyEvent(KeyEvent(action.first, action.second))
             return "Music controlled."
         }
-        if (command.contains("set alarm")) {
+        if (command.contains("set alarm") || command.contains("alarm laga")) {
             val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
                 putExtra(AlarmClock.EXTRA_HOUR, 7); putExtra(AlarmClock.EXTRA_MINUTES, 0); putExtra(AlarmClock.EXTRA_SKIP_UI, true)
             }
             safeStartActivity(intent)
             return "Setting alarm for 7 AM."
         }
-        if (command.startsWith("call ")) {
-            val contactName = command.removePrefix("call ").trim()
+        
+        if (command.startsWith("call ") || command.contains("call lagao") || command.contains("phone karo") || command.contains("phone lagao")) {
+            val contactName = command
+                .replace("call ", "")
+                .replace("call lagao", "")
+                .replace("phone karo", "")
+                .replace("phone lagao", "")
+                .replace(" ko", "")
+                .trim()
+                
             val phoneNumber = getContactNumber(contactName)
             if (phoneNumber != null) {
                 val intent = Intent(Intent.ACTION_CALL).apply { data = Uri.parse("tel:$phoneNumber") }
@@ -407,15 +392,26 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 return "Contact not found. Opening dialer."
             }
         }
-        if (command.startsWith("send sms to ")) {
+        
+        if (command.startsWith("send sms to ") || command.contains("message bhejo") || command.contains("sms bhejo")) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
                 smsPermission.launch(Manifest.permission.SEND_SMS)
                 return "Requesting SMS permission. Please say again."
             }
-            val parts = command.removePrefix("send sms to ").split(" saying ")
-            if (parts.size == 2) {
-                val name = parts[0].trim()
-                val msg = parts[1].trim()
+            
+            var name = ""
+            var msg = ""
+            if (command.contains(" saying ")) {
+                val parts = command.split(" saying ")
+                name = parts[0].replace("send sms to ", "").replace(" ko", "").trim()
+                msg = parts[1].trim()
+            } else if (command.contains(" ko ") && command.contains(" bolo ")) {
+                val parts = command.split(" ko ")
+                name = parts[0].replace("send sms to ", "").replace("message bhejo ", "").replace("sms bhejo ", "").trim()
+                msg = parts[1].replace(" bolo", "").replace(" message bhejo", "").replace(" sms bhejo", "").trim()
+            }
+            
+            if (name.isNotEmpty() && msg.isNotEmpty()) {
                 val number = getContactNumber(name)
                 if (number != null) {
                     try {
@@ -424,20 +420,34 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     } catch (e: Exception) { return "Failed to send SMS." }
                 } else return "Contact $name not found."
             }
-            return "Format: Send SMS to Rahul saying Hello."
+            return "Format: Rahul ko Hello bolo."
         }
-        if (command.contains("take photo") || command.contains("open camera")) {
+
+        if (command.contains("take photo") || command.contains("open camera") || command.contains("camera kholo")) {
             val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
             safeStartActivity(intent)
             return "Opening camera."
         }
-        if (command == "home" || command == "go home") return runAccessibility("home")
-        if (command == "back" || command == "go back") return runAccessibility("back")
-        if (command == "lock phone") return lockPhone()
         
-        Regex("^open (.+)$").find(command)?.let { match ->
-            return openInstalledApp(match.groupValues[1].trim())
+        if (command == "home" || command == "go home" || command.contains("ghar jao") || command.contains("home jao")) return runAccessibility("home")
+        if (command == "back" || command == "go back" || command.contains("wapas jao") || command.contains("peeche jao")) return runAccessibility("back")
+        if (command == "lock phone" || command.contains("phone lock karo")) return lockPhone()
+        
+        var appNameToOpen: String? = null
+        if (command.startsWith("open ")) {
+            appNameToOpen = command.removePrefix("open ").trim()
+        } else if (command.contains(" kholo")) {
+            appNameToOpen = command.replace(" kholo", "").replace(" ko", "").trim()
+        } else if (command.contains(" chalu karo")) {
+            appNameToOpen = command.replace(" chalu karo", "").replace(" ko", "").trim()
+        } else if (command.contains(" start karo")) {
+            appNameToOpen = command.replace(" start karo", "").replace(" ko", "").trim()
         }
+        
+        if (appNameToOpen != null) {
+            return openInstalledApp(appNameToOpen)
+        }
+        
         return null
     }
 
@@ -494,13 +504,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun safeStartActivity(intent: Intent) {
         try { startActivity(intent) } catch (e: Exception) { Log.e("Jarvis", "Activity start failed: ${e.message}") }
-    }
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale.forLanguageTag(speechLocale)
-            tts?.setSpeechRate(speechRate)
-        }
     }
 
     private fun restingState(): JarvisState = JarvisState.IDLE
@@ -573,34 +576,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             cameraManager.setTorchMode(cameraManager.cameraIdList[0], !torchOn)
             torchOn = !torchOn
         } catch (e: Exception) {}
-    }
-}
-
-@Composable
-fun RedSmoothWaveform(audioLevel: Float) {
-    val infiniteTransition = rememberInfiniteTransition(label = "waveform")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(animation = tween(1500, easing = LinearEasing), repeatMode = RepeatMode.Restart),
-        label = "phase"
-    )
-
-    Canvas(modifier = Modifier.height(50.dp).fillMaxWidth(0.7f)) {
-        val path = Path()
-        val midY = size.height / 2f
-        val width = size.width
-        val points = 100
-        val stepX = width / points
-        val level = if (audioLevel > 0.1f) audioLevel else 0.1f
-        val maxAmplitude = (size.height / 2f) * level
-        path.moveTo(0f, midY)
-        for (i in 0..points) {
-            val x = i * stepX
-            val y = midY + kotlin.math.sin(i * 0.15f + phase) * maxAmplitude
-            path.lineTo(x, y)
-        }
-        drawPath(path = path, color = Color(0xFFFF4444), style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
     }
 }
 
