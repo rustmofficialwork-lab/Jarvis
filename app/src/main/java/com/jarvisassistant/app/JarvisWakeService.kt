@@ -66,11 +66,10 @@ class JarvisWakeService : Service() {
                     
                     var hit = false
                     for (spoken in words) {
-                        // Clean punctuation and spaces
-                        val cleanText = spoken.trim().replace(".", "").replace(",", "").replace("!", "").uppercase()
+                        val cleanText = spoken.trim().lowercase()
                         
-                        // Check for exact words
-                        if (cleanText == "JARVIS" || cleanText == "HEY JARVIS") {
+                        // RELAXED CHECK: Agar line me 'jarvis' hai aur line bahut lambi nahi hai (to avoid TV noise)
+                        if (cleanText.contains("jarvis") && cleanText.length < 30) {
                             hit = true
                             break
                         }
@@ -81,7 +80,7 @@ class JarvisWakeService : Service() {
                         recognizer?.destroy()
                         recognizer = null
                         
-                        // Reduced pause to 2 seconds
+                        // 2 second ka pause
                         wakePauseUntil = System.currentTimeMillis() + 2000L
                         
                         sendBroadcast(Intent(ACTION_WAKE).setPackage(packageName).putExtra("phrase", "JARVIS"))
