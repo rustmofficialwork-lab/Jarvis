@@ -14,6 +14,8 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.media.MediaPlayer
@@ -88,14 +90,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var continuousConversation = false 
     private var pendingWakeServiceStart = false
     
+    // Yahan Fix kiya hai: 400ms ka delay lagaya hai taaki background service mic release kar sake
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (state != JarvisState.IDLE) return
             val phrase = intent?.getStringExtra("phrase").orEmpty()
-            if (phrase.length >= 4 && phrase.contains(wakeWord, ignoreCase = true)) {
+            
+            if (phrase.contains(wakeWord, ignoreCase = true)) {
                 lastTranscript = phrase
                 state = JarvisState.LISTENING
-                startListening()
+                
+                // Mic ke conflict ko solve karne ke liye 400ms ka delay
+                Handler(Looper.getMainLooper()).postDelayed({
+                    startListening()
+                }, 400L)
             }
         }
     }
