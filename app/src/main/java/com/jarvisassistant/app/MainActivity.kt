@@ -90,20 +90,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var continuousConversation = false 
     private var pendingWakeServiceStart = false
     
-    // Yahan Fix kiya hai: 400ms ka delay lagaya hai taaki background service mic release kar sake
+    // MIC FIX: 500ms delay aur proper state check
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (state != JarvisState.IDLE) return
+            // Agar app pehle se sun rahi hai ya bol rahi hai, toh naya signal ignore karo
+            if (state == JarvisState.LISTENING || state == JarvisState.SPEAKING) return
+
             val phrase = intent?.getStringExtra("phrase").orEmpty()
             
             if (phrase.contains(wakeWord, ignoreCase = true)) {
                 lastTranscript = phrase
                 state = JarvisState.LISTENING
                 
-                // Mic ke conflict ko solve karne ke liye 400ms ka delay
+                // 500ms delay taaki background service mic ko free kar sake
                 Handler(Looper.getMainLooper()).postDelayed({
                     startListening()
-                }, 400L)
+                }, 500L)
             }
         }
     }
@@ -300,11 +302,24 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val command = CommandNormalizer.normalize(text, wakeWord)
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
+        // --- JARVIS INTRODUCTION (NAYA FEATURE) ---
+        if (command.contains("introduction") || command.contains("intro") || command.contains("introduce yourself") || command.contains("who are you")) {
+            return "Hello, Sir.\n\n" +
+                   "I am JARVIS — your personal AI assistant.\n\n" +
+                   "I am designed to assist you, understand your commands, answer your questions, and help you accomplish your tasks with intelligence and precision.\n\n" +
+                   "Always ready. Always learning. Always at your service.\n\n" +
+                   "Systems online. All functions operational.\n\n" +
+                   "Welcome back, Sir.\n\n" +
+                   "How may I assist you today?"
+        }
+
+        // --- SETTINGS ---
         if (command.contains("settings") || command.contains("setting")) {
             showSettings = true
             return "Opening settings."
         }
 
+        // --- HELP ---
         if (command in setOf("help", "commands", "what can you do")) {
             return "I can control calls, sms, music, maps, and use accessibility to click, scroll, and read the screen."
         }
