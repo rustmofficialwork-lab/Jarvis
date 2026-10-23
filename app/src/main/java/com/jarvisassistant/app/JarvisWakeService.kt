@@ -15,7 +15,6 @@ import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
 
-/** User-started, explicit foreground wake listener. */
 class JarvisWakeService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var wakeWord = "JARVIS"
@@ -59,40 +58,36 @@ class JarvisWakeService : Service() {
                 override fun onEndOfSpeech() = Unit
                 
                 override fun onError(error: Int) { 
-                    // Error aane par thoda wait karke wapas restart karo
-                    scheduleRestart(1500L) 
+                    scheduleRestart(1000L) 
                 }
                 
                 override fun onResults(results: Bundle?) {
                     val words = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    val confidences = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
                     
                     var hit = false
-                    for (i in words.indices) {
-                        val spoken = words[i].trim().uppercase()
-                        val confidence = confidences?.getOrNull(i) ?: 0f
+                    for (spoken in words) {
+                        // Clean punctuation and spaces
+                        val cleanText = spoken.trim().replace(".", "").replace(",", "").replace("!", "").uppercase()
                         
-                        // STRICT CHECK: Exact word ho aur Confidence 85% se zyada ho
-                        if ((spoken == "JARVIS" || spoken == "HEY JARVIS") && confidence >= 0.85f) {
+                        // Check for exact words
+                        if (cleanText == "JARVIS" || cleanText == "HEY JARVIS") {
                             hit = true
                             break
                         }
                     }
                     
                     if (hit) {
-                        // Mic ko free karo taaki MainActivity use kar sake
                         recognizer?.cancel()
                         recognizer?.destroy()
                         recognizer = null
                         
-                        // 10 second ka pause taaki turant wapas trigger na ho
-                        wakePauseUntil = System.currentTimeMillis() + 10_000L
+                        // Reduced pause to 2 seconds
+                        wakePauseUntil = System.currentTimeMillis() + 2000L
                         
                         sendBroadcast(Intent(ACTION_WAKE).setPackage(packageName).putExtra("phrase", "JARVIS"))
-                        scheduleRestart(10_500L)
+                        scheduleRestart(2500L)
                     } else {
-                        // Agar exact word nahi mila (background noise), toh chup-chaap restart
-                        scheduleRestart(1000L)
+                        scheduleRestart(800L)
                     }
                 }
                 override fun onPartialResults(partialResults: Bundle?) = Unit
@@ -103,7 +98,7 @@ class JarvisWakeService : Service() {
             try { 
                 r.startListening(i) 
             } catch (_: Exception) { 
-                scheduleRestart(1500L) 
+                scheduleRestart(1000L) 
             }
         }
     }
@@ -141,19 +136,17 @@ class JarvisWakeService : Service() {
 
     private fun notification(): Notification {
         val open = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java),
+            this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val stop = PendingIntent.getService(
-            this, 1,
-            Intent(this, JarvisWakeService::class.java).setAction(ACTION_STOP),
+            this, 1, Intent(this, JarvisWakeService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return NotificationCompat.Builder(this, "jarvis_assistant")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("JARVIS is listening for $wakeWord")
-            .setContentText("Microphone wake listener is active. JARVIS does not start it silently.")
+            .setContentText("Microphone wake listener is active.")
             .setContentIntent(open)
             .addAction(NotificationCompat.Action.Builder(0, "Stop", stop).build())
             .setOngoing(true)
