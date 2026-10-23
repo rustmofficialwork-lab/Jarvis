@@ -25,11 +25,53 @@ class JarvisAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
+    // 1. Focused Text padhna
     fun readFocusedText(): String {
         val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         return node?.text?.toString().orEmpty().take(2000)
     }
 
+    // 2. NAYA: Poori screen ka text padhna (AI ko context dene ke liye)
+    fun readScreenContent(): String {
+        val root = rootInActiveWindow ?: return ""
+        val sb = StringBuilder()
+        traverseNode(root, sb)
+        return sb.toString().trim().take(4000)
+    }
+
+    private fun traverseNode(node: AccessibilityNodeInfo?, sb: StringBuilder) {
+        if (node == null) return
+        if (!node.text.isNullOrBlank()) {
+            sb.append(node.text).append("\n")
+        }
+        for (i in 0 until node.childCount) {
+            traverseNode(node.getChild(i), sb)
+        }
+    }
+
+    // 3. NAYA: Text ke naam par click karna
+    fun clickByText(targetText: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val nodes = root.findAccessibilityNodeInfosByText(targetText)
+        
+        for (node in nodes) {
+            if (node.isClickable) {
+                return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            } else {
+                // Agar node clickable nahi hai, toh uske parent ko check karo
+                var parent = node.parent
+                while (parent != null) {
+                    if (parent.isClickable) {
+                        return parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    }
+                    parent = parent.parent
+                }
+            }
+        }
+        return false
+    }
+
+    // 4. Screenshot lena
     fun captureScreenshot(output: File, callback: (Boolean, File?) -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) { callback(false, null); return }
         takeScreenshot(
@@ -56,10 +98,14 @@ class JarvisAccessibilityService : AccessibilityService() {
         )
     }
 
+    // 5. UPDATED: Naye Global Actions add kiye hain
     fun performCommand(command: String, x: Float = 0f, y: Float = 0f, text: String = ""): Boolean {
         return when (command) {
             "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
             "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
+            "recents" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+            "notifications" -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+            "power-menu" -> performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
             "tap" -> dispatchTouch(x, y, x, y)
             "scroll-up" -> dispatchTouch(
                 resources.displayMetrics.widthPixels / 2f,
