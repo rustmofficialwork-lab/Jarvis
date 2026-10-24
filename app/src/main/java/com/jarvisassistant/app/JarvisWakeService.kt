@@ -1,3 +1,4 @@
+
 package com.jarvisassistant.app
 
 import android.app.Notification
@@ -5,101 +6,74 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import androidx.core.app.NotificationCompat
-import java.text.SimpleDateFormat
-import java.util.Date
+import androidx.core.content.ContextCompat
 import java.util.Locale
 
-class JarvisWakeService : Service() {
+class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
+
+    companion object {
+        const val ACTION_WAKE =
+            "com.jarvisassistant.app.JARVIS_WAKE"
+
+        const val ACTION_STOP =
+            "com.jarvisassistant.app.JARVIS_STOP_WAKE"
+
+        private const val TAG = "JarvisWakeService"
+        private const val CHANNEL_ID = "jarvis_wake_channel"
+        private const val NOTIFICATION_ID = 4101
+
+        private const val MIN_RETRY_MS = 2000L
+        private const val MAX_RETRY_MS = 15000L
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
 
     private var recognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
 
     private var wakeWord = "JARVIS"
-    private var locale = "en-US"
+    private var localeTag = "en-US"
 
-    private var stopRequested = false
-    private var isListeningForCommand = false
-    private var isSpeaking = false
-    private var ttsReady = false
     private var serviceStarted = false
+    private var ttsReady = false
+    private var isSpeaking = false
+    private var isListeningForCommand = false
+    private var recognizerActive = false
+    private var stopped = false
 
-    private var restartRunnable: Runnable? = null
-    private var restartDelay = 1500L
+    private var retryDelay = MIN_RETRY_MS
+    private var sessionId = 0
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val restartRunnable = Runnable {
+        if (!stopped && serviceStarted && !isSpeaking) {
+            startListeningSession()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
 
-        createChannel()
-        startForeground(91, notification())
+        createNotificationChannel()
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification("Starting JARVIS...")
+        )
 
-        tts = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                ttsReady = true
-
-                tts?.language = Locale.UK
-                tts?.setPitch(0.85f)
-                tts?.setSpeechRate(0.90f)
-
-                tts?.setOnUtteranceProgressListener(
-                    object : UtteranceProgressListener() {
-
-                        override fun onStart(utteranceId: String?) {
-                            mainHandler.post {
-                                isSpeaking = true
-                            }
-                        }
-
-                        override fun onDone(utteranceId: String?) {
-                            mainHandler.post {
-                                isSpeaking = false
-
-                                when (utteranceId) {
-                                    "wake_ack" -> {
-                                        if (!stopRequested) {
-                                            isListeningForCommand = true
-                                            updateNotification()
-                                            scheduleRestart(500L)
-                                        }
-                                    }
-
-                                    "cmd_reply", "command_error" -> {
-                                        isListeningForCommand = false
-                                        updateNotification()
-                                        scheduleRestart(1500L)
-                                    }
-                                }
-                            }
-                        }
-
-                        override fun onError(utteranceId: String?) {
-                            mainHandler.post {
-                                isSpeaking = false
-                                isListeningForCommand = false
-                                updateNotification()
-                                scheduleRestart(2000L)
-                            }
-                        }
-                    }
-                )
-
-                if (serviceStarted && !stopRequested) {
-                    scheduleRestart(500L)
-                }
-            }
-        }
+        tts = TextToSpeech(this, this)
     }
 
     override fun onStartCommand(
@@ -109,250 +83,494 @@ class JarvisWakeService : Service() {
     ): Int {
 
         if (intent?.action == ACTION_STOP) {
-            stopRequested = true
-            cancelRestart()
+            stopEverything()
             stopSelf()
             return START_NOT_STICKY
         }
 
-        stopRequested = false
-        serviceStarted = true
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.e(TAG, "Microphone permission not granted")
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         wakeWord = intent
             ?.getStringExtra("wake")
             ?.trim()
             ?.ifBlank { "JARVIS" }
-            ?: "JARVIS"
+            ?: wakeWord
 
-        locale = intent
+        localeTag = intent
             ?.getStringExtra("locale")
             ?.trim()
             ?.ifBlank { "en-US" }
-            ?: "en-US"
+            ?: localeTag
 
-        isListeningForCommand = false
-        updateNotification()
-
-        cancelRestart()
-
-        if (ttsReady) {
+        if (!serviceStarted) {
+            stopped = false
+            serviceStarted = true
+            retryDelay = MIN_RETRY_MS
+            updateNotification("Waiting for \"$wakeWord\"")
             scheduleRestart(500L)
+        } else {
+            Log.d(TAG, "Service already running; ignoring duplicate start")
         }
 
         return START_NOT_STICKY
     }
 
-    private fun startListening() {
-        if (stopRequested || isSpeaking || isListeningForCommand) {
+    override fun onInit(status: Int) {
+        if (status != TextToSpeech.SUCCESS) {
+            Log.e(TAG, "TextToSpeech initialization failed")
+            return
+        }
+
+        val engine = tts ?: return
+
+        val languageResult = engine.setLanguage(
+            Locale.forLanguageTag(localeTag)
+        )
+
+        if (
+            languageResult == TextToSpeech.LANG_MISSING_DATA ||
+            languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+        ) {
+            engine.setLanguage(Locale.US)
+        }
+
+        engine.setOnUtteranceProgressListener(
+            object : UtteranceProgressListener() {
+
+                override fun onStart(utteranceId: String?) {
+                    handler.post {
+                        isSpeaking = true
+                        cancelRestart()
+                        cancelRecognizer()
+                        updateNotification("JARVIS is speaking")
+                    }
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    handler.post {
+                        isSpeaking = false
+                        isListeningForCommand = false
+
+                        if (!stopped && serviceStarted) {
+                            updateNotification(
+                                "Waiting for \"$wakeWord\""
+                            )
+                            scheduleRestart(MIN_RETRY_MS)
+                        }
+                    }
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) {
+                    handler.post {
+                        onSpeechFinishedWithError()
+                    }
+                }
+
+                override fun onError(
+                    utteranceId: String?,
+                    errorCode: Int
+                ) {
+                    handler.post {
+                        Log.e(
+                            TAG,
+                            "TTS error: $errorCode"
+                        )
+                        onSpeechFinishedWithError()
+                    }
+                }
+            }
+        )
+
+        ttsReady = true
+
+        if (serviceStarted && !stopped) {
+            scheduleRestart(500L)
+        }
+    }
+
+    private fun startListeningSession() {
+        if (
+            stopped ||
+            !serviceStarted ||
+            isSpeaking ||
+            recognizerActive
+        ) {
+            return
+        }
+
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.e(TAG, "Microphone permission missing")
+            stopSelf()
             return
         }
 
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            scheduleRestart(10000L)
+            Log.e(TAG, "Speech recognition unavailable")
+            scheduleRetry()
             return
         }
 
         cancelRecognizer()
 
+        val currentSession = ++sessionId
+
         try {
-            val newRecognizer =
-                SpeechRecognizer.createSpeechRecognizer(this)
+            recognizer = SpeechRecognizer
+                .createSpeechRecognizer(this)
+                .also { speechRecognizer ->
 
-            recognizer = newRecognizer
+                    speechRecognizer.setRecognitionListener(
+                        object : RecognitionListener {
 
-            newRecognizer.setRecognitionListener(
-                object : RecognitionListener {
+                            override fun onReadyForSpeech(
+                                params: android.os.Bundle?
+                            ) {
+                                if (currentSession != sessionId) return
 
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        restartDelay = 1500L
+                                recognizerActive = true
+                                retryDelay = MIN_RETRY_MS
+                                updateNotification(
+                                    "Listening for \"$wakeWord\""
+                                )
+                                Log.d(TAG, "Ready for wake word")
+                            }
+
+                            override fun onBeginningOfSpeech() {
+                                if (currentSession != sessionId) return
+                                updateNotification("Hearing speech...")
+                            }
+
+                            override fun onRmsChanged(rmsdB: Float) = Unit
+
+                            override fun onBufferReceived(
+                                buffer: ByteArray?
+                            ) = Unit
+
+                            override fun onEndOfSpeech() {
+                                if (currentSession != sessionId) return
+                                updateNotification("Processing speech...")
+                            }
+
+                            override fun onError(error: Int) {
+                                if (currentSession != sessionId) return
+
+                                Log.w(
+                                    TAG,
+                                    "Wake recognition error: $error"
+                                )
+
+                                recognizerActive = false
+                                cancelRecognizer()
+                                scheduleRetry()
+                            }
+
+                            override fun onResults(
+                                results: android.os.Bundle?
+                            ) {
+                                if (currentSession != sessionId) return
+
+                                recognizerActive = false
+
+                                val matches = results
+                                    ?.getStringArrayList(
+                                        SpeechRecognizer.RESULTS_RECOGNITION
+                                    )
+                                    .orEmpty()
+
+                                val detectedWakeWord = matches.any {
+                                    it.contains(
+                                        wakeWord,
+                                        ignoreCase = true
+                                    )
+                                }
+
+                                cancelRecognizer()
+
+                                if (detectedWakeWord) {
+                                    isListeningForCommand = true
+                                    speak(
+                                        "Yes Sir, how may I help you?",
+                                        "wake_ack"
+                                    )
+                                } else {
+                                    scheduleRestart(MIN_RETRY_MS)
+                                }
+                            }
+
+                            override fun onPartialResults(
+                                partialResults: android.os.Bundle?
+                            ) = Unit
+
+                            override fun onEvent(
+                                eventType: Int,
+                                params: android.os.Bundle?
+                            ) = Unit
+                        }
+                    )
+
+                    val speechIntent = Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                    ).apply {
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                        )
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE,
+                            localeTag
+                        )
+                        putExtra(
+                            RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                            false
+                        )
+                        putExtra(
+                            RecognizerIntent.EXTRA_MAX_RESULTS,
+                            3
+                        )
                     }
 
-                    override fun onBeginningOfSpeech() = Unit
-
-                    override fun onRmsChanged(rmsdB: Float) = Unit
-
-                    override fun onBufferReceived(buffer: ByteArray?) = Unit
-
-                    override fun onEndOfSpeech() = Unit
-
-                    override fun onPartialResults(
-                        partialResults: Bundle?
-                    ) = Unit
-
-                    override fun onEvent(
-                        eventType: Int,
-                        params: Bundle?
-                    ) = Unit
-
-                    override fun onError(error: Int) {
-                        if (stopRequested || isListeningForCommand) {
-                            return
-                        }
-
-                        recognizer?.destroy()
-                        recognizer = null
-
-                        // Gradually back off when recognition keeps failing.
-                        val delay = restartDelay
-                        restartDelay = (restartDelay * 2)
-                            .coerceAtMost(15000L)
-
-                        scheduleRestart(delay)
-                    }
-
-                    override fun onResults(results: Bundle?) {
-                        if (stopRequested) return
-
-                        val spokenWords = results
-                            ?.getStringArrayList(
-                                SpeechRecognizer.RESULTS_RECOGNITION
-                            )
-                            .orEmpty()
-
-                        val wakeDetected = spokenWords.any { spoken ->
-                            spoken.trim().contains(
-                                wakeWord,
-                                ignoreCase = true
-                            )
-                        }
-
-                        cancelRecognizer()
-
-                        if (wakeDetected) {
-                            isListeningForCommand = true
-                            updateNotification()
-
-                            speak(
-                                "Yes Sir, how may I help you?",
-                                "wake_ack"
-                            )
-                        } else {
-                            scheduleRestart(500L)
-                        }
-                    }
+                    recognizerActive = true
+                    speechRecognizer.startListening(speechIntent)
                 }
-            )
 
-            val intent = JarvisVoiceEngine.recognitionIntent(
-                locale,
-                preferOffline = false
-            )
-
-            newRecognizer.startListening(intent)
-
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not start recognizer", e)
+            recognizerActive = false
             cancelRecognizer()
-            scheduleRestart(restartDelay)
-
-            restartDelay = (restartDelay * 2)
-                .coerceAtMost(15000L)
+            scheduleRetry()
         }
     }
 
     private fun startCommandListening() {
-        if (stopRequested || isSpeaking) return
+        if (stopped || isSpeaking || !serviceStarted) return
 
+        cancelRestart()
         cancelRecognizer()
 
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            isListeningForCommand = false
-            scheduleRestart(10000L)
+            speak(
+                "Speech recognition is unavailable.",
+                "command_error"
+            )
             return
         }
 
-        isListeningForCommand = true
-        updateNotification()
+        val currentSession = ++sessionId
 
         try {
-            val newRecognizer =
-                SpeechRecognizer.createSpeechRecognizer(this)
+            recognizer = SpeechRecognizer
+                .createSpeechRecognizer(this)
+                .also { speechRecognizer ->
 
-            recognizer = newRecognizer
+                    speechRecognizer.setRecognitionListener(
+                        object : RecognitionListener {
 
-            newRecognizer.setRecognitionListener(
-                object : RecognitionListener {
+                            override fun onReadyForSpeech(
+                                params: android.os.Bundle?
+                            ) {
+                                if (currentSession != sessionId) return
+                                recognizerActive = true
+                                updateNotification("Listening for command")
+                            }
 
-                    override fun onReadyForSpeech(params: Bundle?) = Unit
+                            override fun onBeginningOfSpeech() = Unit
 
-                    override fun onBeginningOfSpeech() = Unit
+                            override fun onRmsChanged(rmsdB: Float) = Unit
 
-                    override fun onRmsChanged(rmsdB: Float) = Unit
+                            override fun onBufferReceived(
+                                buffer: ByteArray?
+                            ) = Unit
 
-                    override fun onBufferReceived(buffer: ByteArray?) = Unit
+                            override fun onEndOfSpeech() {
+                                updateNotification("Processing command...")
+                            }
 
-                    override fun onEndOfSpeech() = Unit
+                            override fun onError(error: Int) {
+                                if (currentSession != sessionId) return
 
-                    override fun onPartialResults(
-                        partialResults: Bundle?
-                    ) = Unit
+                                Log.w(
+                                    TAG,
+                                    "Command recognition error: $error"
+                                )
 
-                    override fun onEvent(
-                        eventType: Int,
-                        params: Bundle?
-                    ) = Unit
+                                recognizerActive = false
+                                cancelRecognizer()
 
-                    override fun onError(error: Int) {
-                        if (stopRequested) return
+                                speak(
+                                    "I didn't catch that. Please try again.",
+                                    "command_error"
+                                )
+                            }
 
-                        cancelRecognizer()
-                        isListeningForCommand = false
-                        updateNotification()
+                            override fun onResults(
+                                results: android.os.Bundle?
+                            ) {
+                                if (currentSession != sessionId) return
 
-                        speak(
-                            "I didn't catch that.",
-                            "command_error"
+                                recognizerActive = false
+
+                                val text = results
+                                    ?.getStringArrayList(
+                                        SpeechRecognizer.RESULTS_RECOGNITION
+                                    )
+                                    ?.firstOrNull()
+                                    ?.trim()
+
+                                cancelRecognizer()
+
+                                if (!text.isNullOrBlank()) {
+                                    processBackgroundCommand(text)
+                                } else {
+                                    speak(
+                                        "I didn't catch that.",
+                                        "command_error"
+                                    )
+                                }
+                            }
+
+                            override fun onPartialResults(
+                                partialResults: android.os.Bundle?
+                            ) = Unit
+
+                            override fun onEvent(
+                                eventType: Int,
+                                params: android.os.Bundle?
+                            ) = Unit
+                        }
+                    )
+
+                    val speechIntent = Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                    ).apply {
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                        )
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE,
+                            localeTag
+                        )
+                        putExtra(
+                            RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                            false
+                        )
+                        putExtra(
+                            RecognizerIntent.EXTRA_MAX_RESULTS,
+                            1
                         )
                     }
 
-                    override fun onResults(results: Bundle?) {
-                        if (stopRequested) return
-
-                        val words = results
-                            ?.getStringArrayList(
-                                SpeechRecognizer.RESULTS_RECOGNITION
-                            )
-                            .orEmpty()
-
-                        val command = words.firstOrNull().orEmpty()
-
-                        cancelRecognizer()
-                        isListeningForCommand = false
-                        updateNotification()
-
-                        if (command.isNotBlank()) {
-                            processBackgroundCommand(command)
-                        } else {
-                            scheduleRestart(1000L)
-                        }
-                    }
+                    recognizerActive = true
+                    speechRecognizer.startListening(speechIntent)
                 }
-            )
 
-            val intent = JarvisVoiceEngine.recognitionIntent(
-                locale,
-                preferOffline = false
-            )
-
-            newRecognizer.startListening(intent)
-
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not listen for command", e)
+            recognizerActive = false
             cancelRecognizer()
-            isListeningForCommand = false
-            updateNotification()
-            scheduleRestart(3000L)
+            speak("I couldn't start listening.", "command_error")
         }
     }
 
-    private fun speak(text: String, utteranceId: String) {
-        if (stopRequested || !ttsReady) {
-            isSpeaking = false
-            isListeningForCommand = false
-            scheduleRestart(2000L)
-            return
+    private fun processBackgroundCommand(rawText: String) {
+        val text = CommandNormalizer
+            .normalize(rawText, wakeWord)
+            .lowercase(Locale.ROOT)
+
+        val reply = when {
+            text.contains("time") ||
+                text.contains("samay") ||
+                text.contains("waqt") -> {
+                "It is ${
+                    java.text.SimpleDateFormat(
+                        "h:mm a",
+                        Locale.getDefault()
+                    ).format(java.util.Date())
+                }."
+            }
+
+            text.contains("date") ||
+                text.contains("tareekh") -> {
+                "Today is ${
+                    java.text.SimpleDateFormat(
+                        "EEEE, d MMMM yyyy",
+                        Locale.getDefault()
+                    ).format(java.util.Date())
+                }."
+            }
+
+            text.startsWith("open ") ||
+                text.endsWith(" kholo") -> {
+                val appName = text
+                    .removePrefix("open ")
+                    .removeSuffix(" kholo")
+                    .trim()
+
+                val launchIntent = packageManager
+                    .getInstalledPackages(0)
+                    .firstNotNullOfOrNull { packageInfo ->
+                        val label = packageManager
+                            .getApplicationLabel(
+                                packageInfo.applicationInfo
+                            )
+                            .toString()
+
+                        if (label.equals(appName, true)) {
+                            packageManager.getLaunchIntentForPackage(
+                                packageInfo.packageName
+                            )
+                        } else {
+                            null
+                        }
+                    }
+
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(launchIntent)
+                    "Opening $appName."
+                } else {
+                    "I couldn't find $appName."
+                }
+            }
+
+            else -> {
+                "I heard $rawText. Please open JARVIS to use the full assistant."
+            }
         }
 
+        speak(reply, "cmd_reply")
+    }
+
+    private fun speak(text: String, utteranceId: String) {
+        if (stopped || !serviceStarted) return
+
+        cancelRestart()
         cancelRecognizer()
+
         isSpeaking = true
+        updateNotification("JARVIS is speaking")
+
+        if (!ttsReady || tts == null) {
+            Log.w(TAG, "TTS is not ready")
+            isSpeaking = false
+            scheduleRestart(MIN_RETRY_MS)
+            return
+        }
 
         val result = tts?.speak(
             text,
@@ -362,133 +580,144 @@ class JarvisWakeService : Service() {
         )
 
         if (result == TextToSpeech.ERROR) {
+            Log.e(TAG, "TTS speak failed")
             isSpeaking = false
-            isListeningForCommand = false
-            scheduleRestart(2000L)
+            scheduleRestart(MIN_RETRY_MS)
         }
     }
 
-    private fun processBackgroundCommand(command: String) {
-        val lower = command.lowercase(Locale.ROOT)
-        val reply: String = when {
-            lower.contains("time") ->
-                "It is ${
-                    SimpleDateFormat(
-                        "h:mm a",
-                        Locale.getDefault()
-                    ).format(Date())
-                }."
+    private fun onSpeechFinishedWithError() {
+        isSpeaking = false
+        isListeningForCommand = false
 
-            lower.contains("date") ->
-                "Today is ${
-                    SimpleDateFormat(
-                        "EEEE, d MMMM yyyy",
-                        Locale.getDefault()
-                    ).format(Date())
-                }."
-
-            lower.contains("open") || lower.contains("kholo") -> {
-                val appName = lower
-                    .replace("open ", "")
-                    .replace(" kholo", "")
-                    .replace(" ko", "")
-                    .trim()
-
-                openAppInBackground(appName)
-            }
-
-            else ->
-                "I heard: $command. Please open the JARVIS app for advanced commands."
+        if (!stopped && serviceStarted) {
+            updateNotification("Waiting for \"$wakeWord\"")
+            scheduleRestart(MIN_RETRY_MS)
         }
-
-        speak(reply, "cmd_reply")
     }
 
-    private fun openAppInBackground(appName: String): String {
-        val pm = packageManager
+    private fun scheduleRetry() {
+        if (stopped || !serviceStarted || isSpeaking) return
 
-        return try {
-            val apps = pm.getInstalledApplications(0)
+        val delay = retryDelay
+        retryDelay = (retryDelay * 2).coerceAtMost(MAX_RETRY_MS)
 
-            for (app in apps) {
-                val label = pm.getApplicationLabel(app).toString()
-
-                if (label.equals(appName, ignoreCase = true)) {
-                    val launchIntent =
-                        pm.getLaunchIntentForPackage(app.packageName)
-
-                    if (launchIntent != null) {
-                        launchIntent.addFlags(
-                            Intent.FLAG_ACTIVITY_NEW_TASK
-                        )
-                        startActivity(launchIntent)
-                        return "Opening $label."
-                    }
-                }
-            }
-
-            "App not found: $appName"
-
-        } catch (_: Exception) {
-            "I couldn't open that app."
-        }
+        scheduleRestart(delay)
     }
 
     private fun scheduleRestart(delay: Long) {
-        if (stopRequested) return
+        if (stopped || !serviceStarted || isSpeaking) return
 
-        cancelRestart()
-
-        val task = Runnable {
-            restartRunnable = null
-
-            if (stopRequested || isSpeaking) return@Runnable
-
-            if (isListeningForCommand) {
-                startCommandListening()
-            } else {
-                startListening()
-            }
-        }
-
-        restartRunnable = task
-        mainHandler.postDelayed(task, delay)
+        handler.removeCallbacks(restartRunnable)
+        handler.postDelayed(restartRunnable, delay)
     }
 
     private fun cancelRestart() {
-        restartRunnable?.let {
-            mainHandler.removeCallbacks(it)
-        }
-        restartRunnable = null
+        handler.removeCallbacks(restartRunnable)
     }
 
     private fun cancelRecognizer() {
+        sessionId++
+        recognizerActive = false
+
         val oldRecognizer = recognizer
         recognizer = null
 
         try {
             oldRecognizer?.cancel()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "Recognizer cancel failed", e)
         }
 
         try {
             oldRecognizer?.destroy()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "Recognizer destroy failed", e)
         }
     }
 
-    override fun onDestroy() {
-        stopRequested = true
+    private fun updateNotification(message: String) {
+        val manager = getSystemService(
+            Context.NOTIFICATION_SERVICE
+        ) as NotificationManager
+
+        manager.notify(
+            NOTIFICATION_ID,
+            buildNotification(message)
+        )
+    }
+
+    private fun buildNotification(message: String): Notification {
+        val openIntent = Intent(this, MainActivity::class.java)
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    PendingIntent.FLAG_IMMUTABLE
+                } else {
+                    0
+                }
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentTitle("JARVIS Assistant")
+            .setContentText(message)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "JARVIS voice assistant",
+                NotificationManager.IMPORTANCE_LOW
+            )
+
+            val manager = getSystemService(
+                Context.NOTIFICATION_SERVICE
+            ) as NotificationManager
+
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun stopEverything() {
+        stopped = true
         serviceStarted = false
+        isSpeaking = false
+        isListeningForCommand = false
 
         cancelRestart()
-        mainHandler.removeCallbacksAndMessages(null)
         cancelRecognizer()
 
         try {
             tts?.stop()
+        } catch (e: Exception) {
+            Log.w(TAG, "TTS stop failed", e)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+    }
+
+    override fun onDestroy() {
+        stopEverything()
+
+        try {
             tts?.shutdown()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "TTS shutdown failed", e)
         }
 
         tts = null
@@ -498,77 +727,4 @@ class JarvisWakeService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    private fun createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "jarvis_assistant",
-                "JARVIS Assistant",
-                NotificationManager.IMPORTANCE_LOW
-            )
-
-            channel.description = "JARVIS background listener"
-
-            getSystemService(
-                NotificationManager::class.java
-            ).createNotificationChannel(channel)
-        }
-    }
-
-    private fun updateNotification() {
-        getSystemService(NotificationManager::class.java)
-            .notify(91, notification())
-    }
-
-    private fun notification(): Notification {
-        val openIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or
-                PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val stopIntent = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, JarvisWakeService::class.java)
-                .setAction(ACTION_STOP),
-            PendingIntent.FLAG_IMMUTABLE or
-                PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val title = when {
-            isSpeaking -> "JARVIS is speaking..."
-            isListeningForCommand -> "JARVIS is listening for command..."
-            else -> "JARVIS is ready"
-        }
-
-        return NotificationCompat.Builder(
-            this,
-            "jarvis_assistant"
-        )
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle(title)
-            .setContentText("Say '$wakeWord' to activate.")
-            .setContentIntent(openIntent)
-            .addAction(
-                NotificationCompat.Action.Builder(
-                    0,
-                    "Stop",
-                    stopIntent
-                ).build()
-            )
-            .setOngoing(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
-    }
-
-    companion object {
-        const val ACTION_WAKE =
-            "com.jarvisassistant.app.JARVIS_WAKE"
-
-        const val ACTION_STOP =
-            "com.jarvisassistant.app.JARVIS_STOP_WAKE"
-    }
 }
