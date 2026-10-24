@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            // Foreground app handles its own voice commands.
+            // Wake service handles background voice recognition.
         }
     }
 
@@ -177,6 +177,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             )
 
+            // Only the foreground service manages background microphone use.
+            // MainActivity does not start a second SpeechRecognizer.
             if (
                 ContextCompat.checkSelfPermission(
                     this,
@@ -327,83 +329,13 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    // Manual foreground recognition is intentionally not started here.
+    // The wake service owns the background recognition lifecycle.
     private fun startListening() {
-        if (!JarvisVoiceEngine.isAvailable(this)) return
-
-        stopListening()
-
-        speechRecognizer =
-            SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
-
-                recognizer.setRecognitionListener(
-                    object : RecognitionListener {
-
-                        override fun onReadyForSpeech(params: Bundle?) {
-                            state = JarvisState.LISTENING
-                        }
-
-                        override fun onBeginningOfSpeech() {
-                            state = JarvisState.LISTENING
-                        }
-
-                        override fun onRmsChanged(rmsdB: Float) {
-                            audioLevel =
-                                ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
-                        }
-
-                        override fun onBufferReceived(buffer: ByteArray?) = Unit
-
-                        override fun onEndOfSpeech() {
-                            state = JarvisState.THINKING
-                        }
-
-                        override fun onError(error: Int) {
-                            audioLevel = 0f
-                            state = JarvisState.IDLE
-                            Log.e(
-                                "Jarvis",
-                                "MainActivity Speech Error: $error"
-                            )
-                        }
-
-                        override fun onResults(results: Bundle?) {
-                            audioLevel = 0f
-
-                            val text = results
-                                ?.getStringArrayList(
-                                    SpeechRecognizer.RESULTS_RECOGNITION
-                                )
-                                ?.firstOrNull()
-
-                            if (!text.isNullOrBlank()) {
-                                handlePrompt(text)
-                            } else {
-                                state = JarvisState.IDLE
-                            }
-                        }
-
-                        override fun onPartialResults(
-                            partialResults: Bundle?
-                        ) = Unit
-
-                        override fun onEvent(
-                            eventType: Int,
-                            params: Bundle?
-                        ) = Unit
-                    }
-                )
-
-                try {
-                    recognizer.startListening(
-                        JarvisVoiceEngine.recognitionIntent(
-                            speechLocale,
-                            false
-                        )
-                    )
-                } catch (e: Exception) {
-                    Log.e("Jarvis", "Could not start listening", e)
-                }
-            }
+        Log.d(
+            "Jarvis",
+            "MainActivity recognition disabled; JarvisWakeService owns the microphone"
+        )
     }
 
     private fun handleLocalCommand(text: String): String? {
@@ -1028,28 +960,24 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         state = restingState()
     }
 
-    // UPDATED: local phone commands -> offline engine -> online AI.
     private fun handlePrompt(rawPrompt: String) {
         val prompt = rawPrompt.trim()
         if (prompt.isBlank()) return
 
         lastTranscript = prompt
 
-        // 1. Existing phone controls take priority.
         val localReply = handleLocalCommand(prompt)
         if (localReply != null) {
             finishTurn(prompt, localReply)
             return
         }
 
-        // 2. Try the offline assistant.
         val offlineReply = OfflineAssistantEngine.handleCommand(prompt)
         if (offlineReply != null) {
             finishTurn(prompt, offlineReply)
             return
         }
 
-        // 3. Unsupported offline questions go to the configured AI provider.
         state = JarvisState.THINKING
         val key = apiKey
 
