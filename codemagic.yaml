@@ -1,0 +1,13 @@
+workflows:
+  android-workflow:
+    name: Android APK Build
+    instance_type: mac_mini_m1
+    scripts:
+      - name: Fix Gradle Permission
+        script: |
+          chmod +x gradlew
+      - name: Build Android APK
+        script: |
+          ./gradlew assembleDebug
+    artifacts:
+      - app/build/outputs/apk/**/*.apk
