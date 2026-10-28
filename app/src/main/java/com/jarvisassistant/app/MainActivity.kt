@@ -201,7 +201,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             loadPreferences()
             refreshNetworkStatus()
             registerNetworkStatusListener()
-            tts = TextToSpeech(this, this)            tts?.setOnUtteranceProgressListener(
+            tts = TextToSpeech(this, this)
+            tts?.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         runOnUiThread { state = JarvisState.SPEAKING }
