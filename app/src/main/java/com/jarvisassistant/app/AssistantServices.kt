@@ -3,6 +3,7 @@ package com.jarvisassistant.app
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.pow
 
 // AI Search ke liye data classes
 data class ResearchSource(
@@ -74,21 +75,122 @@ object OfflineAssistantEngine {
     }
 
     private fun extractExpression(text: String): String? {
-        val match = Regex("""[\d\.\s\+\-\*\/\%]+""").find(text)
+        val match = Regex("""[\d\.\s\+\-\*\/\%\^\(\)]+""").find(text)
         val exp = match?.value?.trim()
         return if (exp != null && exp.length > 2 && exp.any { it.isDigit() }) exp else null
     }
 
-    private fun calculate(expression: String): Double? {
+    // Internal visibility lets the JVM unit tests exercise the parser directly.
+    internal fun calculate(expression: String): Double? {
         return try {
-            val tokens = expression.replace(" ", "")
-            if (tokens.contains("+")) return tokens.split("+").let { it[0].toDouble() + it[1].toDouble() }
-            if (tokens.contains("-")) return tokens.split("-").let { it[0].toDouble() - it[1].toDouble() }
-            if (tokens.contains("*")) return tokens.split("*").let { it[0].toDouble() * it[1].toDouble() }
-            if (tokens.contains("/")) return tokens.split("/").let { it[0].toDouble() / it[1].toDouble() }
+            ExpressionParser(expression).parse()
+        } catch (_: Exception) {
             null
-        } catch (e: Exception) {
-            null
+        }
+    }
+
+    /** Small, bounded arithmetic parser: parentheses, precedence, unary signs and powers. */
+    private class ExpressionParser(private val input: String) {
+        private var index = 0
+
+        fun parse(): Double {
+            require(input.isNotBlank() && input.length <= 256)
+            val result = parseExpression()
+            skipSpaces()
+            require(index == input.length)
+            return checked(result)
+        }
+
+        private fun parseExpression(): Double {
+            var value = parseTerm()
+            while (true) {
+                skipSpaces()
+                value = when {
+                    consume('+') -> checked(value + parseTerm())
+                    consume('-') -> checked(value - parseTerm())
+                    else -> return checked(value)
+                }
+            }
+        }
+
+        private fun parseTerm(): Double {
+            var value = parseUnary()
+            while (true) {
+                skipSpaces()
+                value = when {
+                    consume('*') -> checked(value * parseUnary())
+                    consume('/') -> {
+                        val divisor = parseUnary()
+                        require(divisor != 0.0) { "Division by zero" }
+                        checked(value / divisor)
+                    }
+                    consume('%') -> {
+                        val divisor = parseUnary()
+                        require(divisor != 0.0) { "Modulo by zero" }
+                        checked(value % divisor)
+                    }
+                    else -> return checked(value)
+                }
+            }
+        }
+
+        private fun parseUnary(): Double {
+            skipSpaces()
+            return when {
+                consume('+') -> parseUnary()
+                consume('-') -> checked(-parseUnary())
+                else -> parsePower()
+            }
+        }
+
+        private fun parsePower(): Double {
+            var value = parsePrimary()
+            skipSpaces()
+            if (consume('^')) {
+                value = checked(value.pow(parseUnary()))
+            }
+            return checked(value)
+        }
+
+        private fun parsePrimary(): Double {
+            skipSpaces()
+            if (consume('(')) {
+                val value = parseExpression()
+                skipSpaces()
+                require(consume(')')) { "Missing closing parenthesis" }
+                return value
+            }
+
+            val start = index
+            var decimalSeen = false
+            while (index < input.length) {
+                when (val ch = input[index]) {
+                    in '0'..'9' -> index++
+                    '.' -> {
+                        require(!decimalSeen) { "Invalid number" }
+                        decimalSeen = true
+                        index++
+                    }
+                    else -> break
+                }
+            }
+            require(index > start) { "Expected a number" }
+            return input.substring(start, index).toDouble()
+        }
+
+        private fun skipSpaces() {
+            while (index < input.length && input[index].isWhitespace()) index++
+        }
+
+        private fun consume(char: Char): Boolean {
+            if (index >= input.length || input[index] != char) return false
+            index++
+            return true
+        }
+
+        private fun checked(value: Double): Double {
+            require(value.isFinite()) { "Result is not finite" }
+            return value
         }
     }
 
