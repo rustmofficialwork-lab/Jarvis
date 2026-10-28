@@ -120,6 +120,9 @@ class JarvisDesktop:
 
         self._build_ui()
         self._load_secrets()
+        # Snapshot secrets as plain strings so worker threads never call Tk variables.
+        self.ai_api_key = self.api_key_var.get()
+        self.picovoice_access_key = self.picovoice_var.get()
         self.root.after(120, self._poll_events)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
@@ -204,7 +207,7 @@ class JarvisDesktop:
             answer = chat_completion(
                 self.settings.get("endpoint", DEFAULT_ENDPOINT),
                 self.settings.get("model", DEFAULT_MODEL),
-                self.api_key_var.get(),
+                self.ai_api_key,
                 prompt,
                 self.history,
             )
@@ -228,7 +231,7 @@ class JarvisDesktop:
             self.listen_button.configure(text="Stopping…", state="disabled")
             self._set_status("Stopping microphone listener…")
             return
-        if not self.picovoice_var.get().strip():
+        if not self.picovoice_access_key.strip():
             self.open_settings()
             self._set_status("Add a Picovoice AccessKey in Settings to enable wake listening.")
             return
@@ -247,7 +250,7 @@ class JarvisDesktop:
             import speech_recognition as sr
 
             porcupine = pvporcupine.create(
-                access_key=self.picovoice_var.get().strip(),
+                access_key=self.picovoice_access_key.strip(), 
                 keywords=["jarvis"],
             )
             recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
@@ -302,7 +305,7 @@ class JarvisDesktop:
             answer = chat_completion(
                 self.settings.get("endpoint", DEFAULT_ENDPOINT),
                 self.settings.get("model", DEFAULT_MODEL),
-                self.api_key_var.get(),
+                self.ai_api_key,
                 prompt,
                 self.history,
             )
@@ -354,6 +357,8 @@ class JarvisDesktop:
             self.settings["language"] = language.get().strip() or "en-IN"
             self.api_key_var.set(entries["ai_key"].get().strip())
             self.picovoice_var.set(entries["picovoice_key"].get().strip())
+            self.ai_api_key = self.api_key_var.get()
+            self.picovoice_access_key = self.picovoice_var.get()
             try:
                 save_settings(self.settings)
                 if self.keyring:
