@@ -1246,8 +1246,7 @@ private fun JarvisSpeakingVisual(modifier: Modifier = Modifier) {
         )
         drawCircle(
             color = cyan.copy(alpha = 0.18f),
-            radius = baseRadius * 0.19f
-                .coerceAtLeast(1f),
+            radius = baseRadius * 0.19f,
             center = center
         )
         drawCircle(
