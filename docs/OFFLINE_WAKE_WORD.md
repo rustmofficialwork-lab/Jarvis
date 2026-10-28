@@ -1,28 +1,29 @@
-# Offline wake-word engine: implementation notes
+# Offline wake-word engine
 
-## Current status
+## Implementation
 
-The wake listener currently uses Android's `SpeechRecognizer` to recognize speech and then checks the returned text for “Jarvis”. This is **not** a dedicated offline wake-word detector. The silence retry delay has been increased to the existing 2-second minimum to reduce rapid recognizer recreation, privacy-indicator flicker, and battery churn.
+JARVIS can use Picovoice Porcupine's built-in **JARVIS** keyword for on-device wake-word detection. Porcupine owns microphone capture while waiting for the keyword; after detection, JARVIS stops and releases Porcupine before starting Android `SpeechRecognizer` for the actual command.
 
-## Requirements for a real offline wake-word detector
+The app uses `ai.picovoice:porcupine-android:4.0.2`. Wake-word inference is performed on-device, but the SDK AccessKey must be configured and may require internet for SDK key validation. No AccessKey is stored in this repository.
 
-A dedicated keyword engine needs an actual acoustic model for the requested phrase and a compatible Android runtime. The repository does not currently include a “Hey Jarvis” model.
+## Configure the AccessKey
 
-Before enabling an engine, choose and supply one of:
+1. Create an AccessKey in the [Picovoice Console](https://console.picovoice.ai/).
+2. Add this line to your **user-level** Gradle properties file (normally `~/.gradle/gradle.properties`), not to a tracked repository file:
 
-- **Picovoice Porcupine**: Android SDK, an access key configured locally (never committed), and a custom keyword model file for “Hey Jarvis”.
-- **An open-source on-device keyword-spotting model/runtime**: compatible model files, license review, and Android integration.
+   ```properties
+   PICOVOICE_ACCESS_KEY=your_actual_access_key
+   ```
 
-A generic built-in keyword or a text-matching rule is not a substitute for a trained “Hey Jarvis” acoustic model. Do not enable a placeholder engine that would silently fail at runtime.
+   Alternatively, set the `PICOVOICE_ACCESS_KEY` environment variable when building.
+3. Sync and build the Android project, install it, grant microphone permission, and start the foreground JARVIS service.
 
-## Next integration steps
+If no key is configured or Porcupine initialization fails, the service logs a warning and falls back to the previous Android `SpeechRecognizer` wake-word path. In that fallback mode, silence retry delay is 2 seconds; microphone indicator flicker can still occur.
 
-1. Add the selected engine/runtime and model-loading lifecycle.
-2. Route the microphone audio to the wake-word engine continuously while the foreground microphone service is active.
-3. Start `SpeechRecognizer` only after a wake-word hit, for the actual user command.
-4. Release audio resources on pause/stop, handle Android microphone permission and foreground-service restrictions, and test on physical devices.
-5. Verify that the selected runtime and model are genuinely offline; test with mobile data and Wi-Fi disabled.
+## Runtime behavior and limitations
 
-## Validation caveat
-
-This branch change is a retry-loop mitigation only. It does not yet implement true offline “Hey Jarvis” detection, and no Android build or device test has been run in this environment.
+- Porcupine listens for its built-in `JARVIS` keyword. Saying “Hey Jarvis” should trigger when the spoken keyword is detected; the built-in model is for “JARVIS”, not a custom phrase-specific “Hey Jarvis” model.
+- On detection, Porcupine is stopped and deleted before command speech recognition starts, avoiding simultaneous microphone ownership.
+- Pausing or stopping the service releases Porcupine resources.
+- Android's microphone privacy indicator remains visible whenever the foreground service is actively using the microphone. The goal is to avoid rapid session restarts, not to hide the indicator.
+- This source change has not been built or tested on a physical device in this environment. Validate Gradle sync, SDK initialization, foreground-service behavior, wake-word accuracy, and battery usage on-device.
