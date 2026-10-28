@@ -1,5 +1,7 @@
 package com.jarvisassistant.app
 
+import ai.picovoice.porcupine.Porcupine
+import ai.picovoice.porcupine.PorcupineManager
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -94,6 +96,8 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
     private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     private var recognizer: SpeechRecognizer? = null
+    private var porcupineManager: PorcupineManager? = null
+    private var porcupineUnavailable = false
     private var tts: TextToSpeech? = null
 
     private var wakeWord = "JARVIS"
@@ -326,6 +330,62 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
 
     // ---- Wake word session ----
     private fun startListeningSession() {
+        if (stopped || !serviceStarted || paused || isBusy()) return
+        if (BuildConfig.PICOVOICE_ACCESS_KEY.isNotBlank() && !porcupineUnavailable) {
+            startPorcupineWakeListening()
+        } else {
+            startLegacyWakeListening()
+        }
+    }
+
+    /** Porcupine owns microphone capture while waiting for the wake keyword. */
+    private fun startPorcupineWakeListening() {
+        if (stopped || !serviceStarted || paused || isBusy() || porcupineManager != null) return
+        if (!hasMicPermission()) { stopSelf(); return }
+        try {
+            val manager = PorcupineManager.Builder()
+                .setAccessKey(BuildConfig.PICOVOICE_ACCESS_KEY)
+                .setKeyword(Porcupine.BuiltInKeyword.JARVIS)
+                .build(this) { keywordIndex ->
+                    if (keywordIndex >= 0) {
+                        handler.post {
+                            if (!stopped && serviceStarted && !paused && !isBusy()) {
+                                stopPorcupineWakeListening()
+                                onWakeWordDetected()
+                            }
+                        }
+                    }
+                }
+            porcupineManager = manager
+            manager.start()
+            updateNotification("Listening offline for \"JARVIS\"")
+        } catch (e: Exception) {
+            Log.e(TAG, "Porcupine unavailable; falling back to Android speech recognition", e)
+            porcupineUnavailable = true
+            stopPorcupineWakeListening()
+            startLegacyWakeListening()
+        }
+    }
+
+    private fun stopPorcupineWakeListening() {
+        val manager = porcupineManager ?: return
+        porcupineManager = null
+        try { manager.stop() } catch (e: Exception) { Log.w(TAG, "Porcupine stop failed", e) }
+        try { manager.delete() } catch (e: Exception) { Log.w(TAG, "Porcupine cleanup failed", e) }
+    }
+
+    private fun onWakeWordDetected() {
+        commandMode = true
+        followUp = false
+        followUpCount = 0
+        if (prefs.getBoolean("wake_beep", false)) {
+            beepThenListen()
+        } else {
+            speak(t("Yes Sir, how may I help you?", "जी, बोलिए।"), "wake_ack")
+        }
+    }
+
+    private fun startLegacyWakeListening() {
         if (stopped || !serviceStarted || paused || isBusy() || recognizerActive) return
         if (!hasMicPermission()) { stopSelf(); return }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -378,11 +438,7 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
                     commandMode = true
                     followUp = false
                     followUpCount = 0
-                    if (prefs.getBoolean("wake_beep", false)) {
-                        beepThenListen()
-                    } else {
-                        speak(t("Yes Sir, how may I help you?", "जी, बोलिए।"), "wake_ack")
-                    }
+                    onWakeWordDetected()
                 } else {
                     scheduleRestart(MIN_RETRY_MS)
                 }
@@ -653,6 +709,7 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
         paused = value
         if (value) {
             cancelRestart()
+            stopPorcupineWakeListening()
             cancelRecognizer()
             commandMode = false
             followUp = false
@@ -993,6 +1050,7 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
         aiRequestId++
 
         handler.removeCallbacksAndMessages(null)
+        stopPorcupineWakeListening()
         cancelRecognizer()
         disableBtMic()
         abandonFocus()
