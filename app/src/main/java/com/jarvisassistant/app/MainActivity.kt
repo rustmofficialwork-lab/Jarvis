@@ -600,7 +600,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
 
         // Autonomous agent is used for explicit requests and multi-tool goals.
-        // The planner remains deterministic; each tool must return a real result to count as success.        val agentPlan = JarvisAgent.plan(prompt)
+        // The planner remains deterministic; each tool must return a real result to count as success.
+        val agentPlan = JarvisAgent.plan(prompt)
         val explicitAgentRequest = listOf("agent", "plan and execute", "do all steps", "autonomously", "khud se complete", "task complete karo")
             .any { norm.lowercase(Locale.ROOT).contains(it) }
         if (agentPlan.steps.isNotEmpty() && (explicitAgentRequest || agentPlan.steps.size > 1)) {
@@ -841,6 +842,17 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 object JarvisCommandRouter {
 
     private var torchOn = false
+
+    private fun launch(context: Context, intent: Intent) {
+        try {
+            if (context !is Activity) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("Jarvis", "Could not launch activity: ${intent.action}", e)
+        }
+    }
 
     private fun batteryInfo(context: Context): Pair<Int, Boolean> {
         val i = context.registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
