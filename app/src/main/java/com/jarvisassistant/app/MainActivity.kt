@@ -129,7 +129,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
             if (pendingWakeServiceStart) {
                 pendingWakeServiceStart = false
-                startWakeService()
+                if (BuildConfig.PICOVOICE_ACCESS_KEY.isNotBlank()) {
+                    startWakeService()
+                } else {
+                    responseText = "Tap the microphone to talk. For always-on “JARVIS” detection, add a Picovoice AccessKey."
+                }
             }
         }
 
@@ -197,8 +201,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             loadPreferences()
             refreshNetworkStatus()
             registerNetworkStatusListener()
-            tts = TextToSpeech(this, this)
-            tts?.setOnUtteranceProgressListener(
+            tts = TextToSpeech(this, this)            tts?.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         runOnUiThread { state = JarvisState.SPEAKING }
@@ -397,8 +400,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun bootGreeting(): String {
         val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        val part = when {
-            h < 12 -> "Good morning"
+        val part = when {            h < 12 -> "Good morning"
             h < 17 -> "Good afternoon"
             else -> "Good evening"
         }
@@ -597,8 +599,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
 
         // Autonomous agent is used for explicit requests and multi-tool goals.
-        // The planner remains deterministic; each tool must return a real result to count as success.
-        val agentPlan = JarvisAgent.plan(prompt)
+        // The planner remains deterministic; each tool must return a real result to count as success.        val agentPlan = JarvisAgent.plan(prompt)
         val explicitAgentRequest = listOf("agent", "plan and execute", "do all steps", "autonomously", "khud se complete", "task complete karo")
             .any { norm.lowercase(Locale.ROOT).contains(it) }
         if (agentPlan.steps.isNotEmpty() && (explicitAgentRequest || agentPlan.steps.size > 1)) {
@@ -797,8 +798,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         apiKey = ApiKeyStore.get(this)
         endpoint = prefs.getString("endpoint", DEFAULT_ENDPOINT).orEmpty()
             .ifBlank { DEFAULT_ENDPOINT }
-        model = prefs.getString("model", DEFAULT_MODEL).orEmpty()
-            .ifBlank { DEFAULT_MODEL }
+        model = prefs.getString("model", DEFAULT_MODEL).orEmpty()            .ifBlank { DEFAULT_MODEL }
         speechLocale = prefs.getString("speech_locale", "en-US").orEmpty()
             .ifBlank { "en-US" }
         wakeWord = prefs.getString("wake_word", "JARVIS").orEmpty()
@@ -997,8 +997,7 @@ object JarvisCommandRouter {
         }
 
         // Call
-        if (command.startsWith("call ") || command.contains("call lagao") ||
-            command.contains("phone karo") || command.contains("phone lagao")
+        if (command.startsWith("call ") || command.contains("call lagao") ||            command.contains("phone karo") || command.contains("phone lagao")
         ) {
             val contactName = command
                 .replace("call ", "")
@@ -1198,16 +1197,3 @@ object JarvisCommandRouter {
             return "Opening ${match.first}."
         }
         return "App not found: $name"
-    }
-
-    private fun launch(context: Context, intent: Intent): Boolean {
-        return try {
-            if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-            true
-        } catch (e: Exception) {
-            Log.e("JarvisRouter", "Launch failed: ${e.message}", e)
-            false
-        }
-    }
-}
