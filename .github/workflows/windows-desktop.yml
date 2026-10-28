@@ -1,0 +1,28 @@
+name: Windows Desktop Checks
+
+on:
+  pull_request:
+    branches: [main, feat/offline-wake-word]
+    paths:
+      - "desktop/windows/**"
+      - ".github/workflows/windows-desktop.yml"
+  push:
+    branches: [main, feat/offline-wake-word, feat/windows-desktop-app]
+    paths:
+      - "desktop/windows/**"
+      - ".github/workflows/windows-desktop.yml"
+
+jobs:
+  source-checks:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python source
+        run: python -m compileall -q desktop/windows
+      - name: Run configuration smoke tests
+        run: python -m unittest discover -s desktop/windows -p "test_*.py"
