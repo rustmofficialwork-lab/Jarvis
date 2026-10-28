@@ -2,9 +2,15 @@ name: JARVIS Android Build
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - feat/offline-wake-word
   push:
     branches:
       - main
+      - feat/offline-wake-word
+      - feat/windows-desktop-app
 
 permissions:
   contents: read
@@ -29,6 +35,9 @@ jobs:
 
       - name: Build with Gradle wrapper
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Run Android unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
