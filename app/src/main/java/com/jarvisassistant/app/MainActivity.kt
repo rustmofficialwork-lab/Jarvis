@@ -1210,3 +1210,5 @@ object JarvisCommandRouter {
             return "Opening ${match.first}."
         }
         return "App not found: $name"
+    }
+}
