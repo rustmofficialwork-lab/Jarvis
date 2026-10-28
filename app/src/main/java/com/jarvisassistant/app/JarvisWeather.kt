@@ -50,6 +50,9 @@ object JarvisWeather {
     }
 
     fun extractCity(prompt: String): String? {
+        // Avoid treating generic questions as city names (e.g. "what is the weather today").
+        val normalized = prompt.trim().replace(Regex("\\s+"), " ")
+        if (Regex("(?i)^(?:what is|what's|tell me|how is|how's)\\s+(?:the\\s+)?(?:weather|forecast|mausam)(?:\\s+(?:today|now|currently|right now))?[?.! ]*$").matches(normalized)) return null
         val match = Regex("(?i)\\b(?:weather|forecast|mausam|मौसम)(?:\\s+(?:today|now|ka|ki|for))?\\s+(?:in|at|for|of)\\s+([\\p{L}][\\p{L} .'-]{1,60})").find(prompt)
             ?: Regex("(?i)\\b(?:in|at)\\s+([\\p{L}][\\p{L} .'-]{1,60})\\s+(?:weather|forecast|mausam|मौसम)").find(prompt)
             ?: Regex("(?i)^\\s*([\\p{L}][\\p{L} .'-]{1,50}?)\\s+(?:ka|ki|mein)\\s+(?:weather|forecast|mausam|मौसम)(?:\\s+(?:batao|bataiye|today|now|kya hai))?[?.! ]*$").find(prompt)
