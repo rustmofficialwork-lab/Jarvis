@@ -1,0 +1,8 @@
+# Install from PowerShell with: py -m pip install -r requirements.txt
+pvporcupine>=3.0.5,<5
+pvrecorder>=1.2.7,<2
+SpeechRecognition>=3.10,<4
+PyAudio>=0.2.14
+pyttsx3>=2.90,<3
+keyring>=25,<26
+pyinstaller>=6,<7
