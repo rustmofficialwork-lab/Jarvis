@@ -1208,51 +1208,83 @@ object JarvisCommandRouter {
 
 @androidx.compose.runtime.Composable
 private fun JarvisSpeakingVisual(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "jarvis-speaking-pulse")
+    val transition = rememberInfiniteTransition(label = "jarvis-particle-orb")
     val phase by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
+        targetValue = (2f * Math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "pulse-phase"
+        label = "orb-phase"
     )
 
     Canvas(modifier = modifier) {
         val center = Offset(size.width / 2f, size.height / 2f)
-        val baseRadius = size.minDimension * 0.29f
-        val cyan = Color(0xFF00E5FF)
+        val radius = size.minDimension * 0.235f
+        val teal = Color(0xFF38E8D0)
+        val twoPi = (2f * Math.PI).toFloat()
 
-        // Three travelling rings create the holographic response effect from the sample.
-        for (i in 0..2) {
-            val progress = (phase + i / 3f) % 1f
-            val radius = baseRadius * (0.30f + progress * 0.70f)
-            val alpha = (1f - progress) * 0.55f
-            drawCircle(
-                color = cyan.copy(alpha = alpha),
-                radius = radius,
-                center = center,
-                style = Stroke(width = 2.dp.toPx())
+        // Organic, fine particle-like contours rather than smooth expanding circles.
+        for (ring in 0..3) {
+            val path = androidx.compose.ui.graphics.Path()
+            val base = radius * (1.04f + ring * 0.105f)
+            val points = 240
+            for (i in 0..points) {
+                val a = twoPi * i / points
+                val wobble =
+                    0.035f * kotlin.math.sin(a * 7f + phase * 0.8f + ring) +
+                    0.022f * kotlin.math.sin(a * 17f - phase * 1.15f + ring * 2f) +
+                    0.012f * kotlin.math.sin(a * 31f + phase * 1.7f)
+                val r = base * (1f + wobble)
+                val x = center.x + kotlin.math.cos(a) * r
+                val y = center.y + kotlin.math.sin(a) * r * 0.94f
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(
+                path = path,
+                color = teal.copy(alpha = if (ring == 1) 0.48f else 0.24f + 0.08f * kotlin.math.sin(phase + ring)),
+                style = Stroke(width = if (ring == 1) 1.35.dp.toPx() else 0.75.dp.toPx())
             )
         }
 
-        // Stable inner HUD rings and a glowing core.
-        drawCircle(
-            color = cyan.copy(alpha = 0.50f + 0.25f * (1f - phase)),
-            radius = baseRadius * 0.28f,
-            center = center,
-            style = Stroke(width = 1.5.dp.toPx())
-        )
-        drawCircle(
-            color = cyan.copy(alpha = 0.18f),
-            radius = baseRadius * 0.19f,
-            center = center
-        )
-        drawCircle(
-            color = cyan.copy(alpha = 0.80f),
-            radius = baseRadius * 0.055f,
-            center = center
-        )
+        // Small drifting points give the outer rings the dotted, energy-field look.
+        for (i in 0 until 180) {
+            val a = twoPi * ((i * 0.6180339f) % 1f)
+            val drift = kotlin.math.sin(phase * 1.3f + i * 2.17f) * radius * 0.035f
+            val r = radius * (1.05f + (i % 19) * 0.006f) + drift
+            val x = center.x + kotlin.math.cos(a) * r
+            val y = center.y + kotlin.math.sin(a) * r * 0.94f
+            val alpha = 0.12f + 0.34f * ((kotlin.math.sin(phase * 1.7f + i) + 1f) / 2f)
+            drawCircle(teal.copy(alpha = alpha), radius = if (i % 7 == 0) 1.15.dp.toPx() else 0.55.dp.toPx(), center = Offset(x, y))
+        }
+
+        // Central wireframe orb: latitude loops and curved longitude meridians.
+        val core = radius * 0.42f
+        for (latitude in -3..3) {
+            val y = latitude / 4f
+            val width = core * kotlin.math.sqrt((1f - y * y).coerceAtLeast(0f))
+            val path = androidx.compose.ui.graphics.Path()
+            for (i in 0..100) {
+                val a = twoPi * i / 100f
+                val x = center.x + kotlin.math.cos(a) * width
+                val yy = center.y + y * core * 0.88f + kotlin.math.sin(a) * core * 0.12f
+                if (i == 0) path.moveTo(x, yy) else path.lineTo(x, yy)
+            }
+            drawPath(path, teal.copy(alpha = 0.30f), style = Stroke(width = 0.7.dp.toPx()))
+        }
+        for (meridian in 0..7) {
+            val a = Math.PI.toFloat() * meridian / 8f + phase * 0.10f
+            val path = androidx.compose.ui.graphics.Path()
+            for (i in 0..100) {
+                val t = twoPi * i / 100f
+                val x = center.x + kotlin.math.sin(a) * kotlin.math.cos(t) * core
+                val y = center.y + kotlin.math.sin(t) * core * 0.88f
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path, teal.copy(alpha = 0.22f), style = Stroke(width = 0.65.dp.toPx()))
+        }
+        drawCircle(teal.copy(alpha = 0.16f), radius = core * 1.24f, center = center, style = Stroke(width = 0.8.dp.toPx()))
+        drawCircle(teal.copy(alpha = 0.08f), radius = core * 1.55f, center = center, style = Stroke(width = 1.dp.toPx()))
     }
 }
