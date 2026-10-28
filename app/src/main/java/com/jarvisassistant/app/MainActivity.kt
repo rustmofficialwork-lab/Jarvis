@@ -201,6 +201,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             loadPreferences()
             refreshNetworkStatus()
             registerNetworkStatusListener()
+            // Ensure a previously running wake-word service cannot keep the microphone active.
+            stopService(Intent(this, JarvisWakeService::class.java))
             // This screen is a silent, video-only interface. Do not initialize TTS.
 
             // Video-only mode: do not request microphone or notification permissions.
