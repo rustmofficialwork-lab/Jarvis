@@ -1,51 +1,39 @@
-<<<<<<< HEAD
-# Jarvis
-=======
-# 🤖 JARVIS - AI Android Assistant
+# JARVIS — Android and Windows desktop assistant
 
-**JARVIS** is an advanced, proactive AI assistant built natively for Android using Kotlin. It is designed to act as an intelligent agent that can listen, see, plan, and execute tasks seamlessly on your device.
+JARVIS is a personal AI assistant project with an Android app and an early native Windows desktop companion.
 
-> **Version:** 5.0.0 (Rebrand Release)
+## Platforms
 
-## ✨ Key Features
+### Android
+The Android app is built with Kotlin and Jetpack Compose. It includes voice interaction, AI-provider configuration, an agent/runtime layer, context and memory helpers, accessibility integrations, and Android-specific device features.
 
-Based on the modular architecture, JARVIS includes:
+**Build and test:** Open the project in Android Studio, sync Gradle, and run the app on an Android device. See [offline wake-word setup](docs/OFFLINE_WAKE_WORD.md) for Picovoice configuration. The Android wake-word change is under review and still needs a real-device build/test before release.
 
-*   🎙️ **Voice Engine:** Advanced speech recognition and command normalization (`JarvisVoiceEngine.kt`).
-*   👁️ **Vision Engine:** Visual context understanding and image processing (`JarvisVisionEngine.kt`).
-*   🧠 **Agent Runtime & Context:** Intelligent decision-making using memory and context engines (`JarvisAgentRuntime.kt`, `JarvisContextEngine.kt`).
-*   ⚡ **Proactive Planner:** Anticipates user needs and schedules tasks (`JarvisProactivePlanner.kt`).
-*   ♿ **Accessibility Service:** Deep system integration to automate tasks across the UI (`JarvisAccessibilityService.kt`).
-*   🔐 **Security Center:** Built-in cybersecurity audits and secure data storage (`CybersecurityAudit.kt`, `SecureVault.kt`).
-*   🛠️ **Tool System & Integration:** Extendable architecture to connect with other services (`JarvisToolSystem`).
+### Windows 10/11 desktop
+A separate Python/Tkinter companion is available in [desktop/windows](desktop/windows/README.md). It includes a JARVIS-themed chat UI, typed prompts, spoken AI replies, configurable OpenAI-compatible endpoint/model, and optional Picovoice wake-word listening.
 
-## 📂 Project Structure
+Quick start in PowerShell:
 
-The project follows standard Android Gradle conventions:
-```text
-app/src/main/java/com/jarvisassistant.app/  -> Main Kotlin Source Code
-app/src/main/res/                           -> XML Layouts, Strings, Configs
-app/src/test/java/com/jarvisassistant.app/  -> Unit Tests for Engines & Runtimes
+```powershell
+cd desktop\windows
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python jarvis_desktop.py
+```
 
-## Autonomous agent flow
+See the desktop guide for credential setup, packaging into a Windows executable, and current limitations.
 
-The app now routes explicit agent requests and multi-tool goals through `JarvisAgent` -> `JarvisAgentRuntime` -> `JarvisAgentExecutor`. The runtime is bounded to 8 steps, retries null/failed tool results, pauses at tools marked for confirmation, and supports `confirm` / `cancel agent` in the main chat. Research and weather tools return real provider output; calculator uses the offline command engine; other registered Android actions are delegated to the shared command router only after any required confirmation. Tool results that cannot be obtained are reported as failures rather than successful execution.
+## Shared behavior and current limitations
 
-Examples: `agent research latest Android security and weather in Gwalior`, `plan and execute research about solar energy`, or `research ... and weather in Bhopal`. Sensitive operations may ask for `confirm`; say `cancel agent` to abort. Agent orchestration is implemented, but Android build/device tests must be run in Android Studio before treating it as release-ready.
+- Both apps can be configured to use a compatible chat-completions endpoint, but settings and conversation history do not sync automatically yet.
+- Windows-specific UI/system actions and Android-specific accessibility/device actions are separate platform integrations; features are not automatically identical.
+- Android local command support depends on the feature and device. General AI answers require a configured provider and internet.
+- The Windows wake-word detector uses Porcupine, while command transcription currently uses Google's online speech recognition. It therefore does not provide fully offline voice transcription.
+- API keys and Picovoice AccessKeys must be configured locally and must never be committed to the repository.
+- Android and Windows build checks are not substitutes for testing microphones, wake-word detection, TTS, permissions, and app behavior on the actual devices.
 
+## Development checks
 
-### Connectivity and language behavior
-- The main HUD shows a live `ONLINE` / `OFFLINE` indicator based on Android's validated network connection.
-- Local commands and basic calculations continue to work without internet; AI fallback is only attempted while online.
-- AI prompts include a per-turn language instruction for Hindi (Devanagari), English, or Hinglish (Roman script), based on the user's message.
-- Common offline replies and spoken output follow the detected user language when the device has the corresponding text-to-speech voice installed.
-
-
-## Final validation notes
-
-- Network status uses Android's validated active network; online-dependent research and weather agent steps fail safely when offline.
-- Agent execution preserves ordered plan steps, requires confirmation for configured high-impact tools, treats common router permission/error responses as failures, and allows cancellation state to be updated while a tool is running.
-- AI replies receive an explicit per-turn Hindi, English, or Hinglish language instruction. Deterministic offline replies are localized for supported common commands; this is not a full offline translation model.
-- General AI responses still require internet connectivity and a valid provider endpoint/API key. Android speech recognition and TTS language availability depend on installed device language packs.
-- Build/test status: source-level checks and ZIP/XML integrity checks are performed in this environment. A full Gradle Android build and JUnit run require downloading Gradle 8.7 and Android dependencies; if the build host has no network, those checks cannot complete here. Do not treat the project as device-certified until built and tested on an Android device.
->>>>>>> 5b258fd (Initial commit)
+- Android: use Android Studio/Gradle and run unit tests.
+- Windows desktop: GitHub Actions compiles the Python source and runs configuration smoke tests on Windows.
