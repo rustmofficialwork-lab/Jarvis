@@ -331,11 +331,20 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
     // ---- Wake word session ----
     private fun startListeningSession() {
         if (stopped || !serviceStarted || paused || isBusy()) return
-        if (BuildConfig.PICOVOICE_ACCESS_KEY.isNotBlank() && !porcupineUnavailable) {
-            startPorcupineWakeListening()
-        } else {
-            startLegacyWakeListening()
+
+        // Android SpeechRecognizer is not a true wake-word engine: it times out on silence,
+        // repeatedly reopens the microphone, and causes the privacy indicator to flicker.
+        // Only Porcupine may own the mic for always-on wake-word detection.
+        if (BuildConfig.PICOVOICE_ACCESS_KEY.isBlank()) {
+            updateNotification("Wake word needs a Picovoice AccessKey. Open JARVIS and tap the mic to talk.")
+            Log.w(TAG, "Wake-word listening not started: Picovoice AccessKey is missing")
+            return
         }
+        if (porcupineUnavailable) {
+            updateNotification("Wake word unavailable. Check Picovoice AccessKey and restart JARVIS.")
+            return
+        }
+        startPorcupineWakeListening()
     }
 
     /** Porcupine owns microphone capture while waiting for the wake keyword. */
@@ -360,10 +369,10 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
             manager.start()
             updateNotification("Listening offline for \"JARVIS\"")
         } catch (e: Exception) {
-            Log.e(TAG, "Porcupine unavailable; falling back to Android speech recognition", e)
+            Log.e(TAG, "Porcupine could not start; disabling always-on listening instead of looping the mic", e)
             porcupineUnavailable = true
             stopPorcupineWakeListening()
-            startLegacyWakeListening()
+            updateNotification("Wake word unavailable. Check Picovoice AccessKey; tap the mic in JARVIS to talk.")
         }
     }
 
