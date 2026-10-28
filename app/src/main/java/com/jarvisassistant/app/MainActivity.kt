@@ -223,113 +223,30 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             setContent {
-                // Keep the HUD visible even if the bundled background video fails to load.
-                Box(
-                    modifier = Modifier.fillMaxSize().background(Bg)
-                ) {
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = { context ->
-                            VideoView(context).apply {
-                                setBackgroundColor(android.graphics.Color.BLACK)
-                                setVideoURI(
-                                    Uri.parse(
-                                        "android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"
-                                    )
+                // Show only the exact bundled interface video, silently, in an endless loop.
+                AndroidView(
+                    modifier = Modifier.fillMaxSize().background(Color.Black),
+                    factory = { context ->
+                        VideoView(context).apply {
+                            setBackgroundColor(android.graphics.Color.BLACK)
+                            setVideoURI(
+                                Uri.parse(
+                                    "android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"
                                 )
-                                setOnErrorListener { _, what, extra ->
-                                    Log.w("Jarvis", "HUD background video failed: $what/$extra")
-                                    true
-                                }
-                                setOnPreparedListener { player ->
-                                    player.isLooping = true
-                                    player.setVolume(0f, 0f)
-                                    player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
-                                    start()
-                                }
+                            )
+                            setOnErrorListener { _, what, extra ->
+                                Log.e("Jarvis", "Interface video failed to load: $what/$extra")
+                                true
                             }
-                        }
-                    )
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(22.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(MaterialTheme.shapes.large)
-                                .background(Color(0xCC020B14))
-                                .padding(18.dp)
-                        ) {
-                            Text(
-                                text = "J.A.R.V.I.S.",
-                                color = TextMain,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = when (state) {
-                                    JarvisState.LISTENING -> "LISTENING"
-                                    JarvisState.THINKING -> "THINKING"
-                                    JarvisState.SPEAKING -> "SPEAKING"
-                                    JarvisState.ERROR -> "NEEDS ATTENTION"
-                                    JarvisState.OFFLINE -> "OFFLINE"
-                                    else -> if (JarvisWakeService.isRunning) "WAKE SERVICE ACTIVE" else "READY"
-                                },
-                                color = if (state == JarvisState.ERROR) Color(0xFFFF7777) else Color(0xFF68F5C2),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = lastTranscript.ifBlank { "Say a command, or tap the microphone." },
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = responseText.ifBlank {
-                                    if (BuildConfig.PICOVOICE_ACCESS_KEY.isBlank())
-                                        "Wake-word mode needs a Picovoice AccessKey. Tap the mic to talk."
-                                    else
-                                        "Ready. Say “JARVIS” or tap the microphone."
-                                },
-                                color = TextMain,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Button(
-                                onClick = {
-                                    if (JarvisWakeService.isRunning) {
-                                        startService(
-                                            Intent(this@MainActivity, JarvisWakeService::class.java)
-                                                .setAction(JarvisWakeService.ACTION_STOP)
-                                        )
-                                        window.decorView.postDelayed({ startOneShotListening() }, 350L)
-                                    } else {
-                                        onHudTap()
-                                    }
-                                },
-                                modifier = Modifier.size(176.dp).clip(CircleShape)
-                            ) {
-                                Text(
-                                    text = if (state == JarvisState.LISTENING) "STOP MIC" else "TAP TO TALK",
-                                    fontWeight = FontWeight.Bold
-                                )
+                            setOnPreparedListener { player ->
+                                player.isLooping = true
+                                player.setVolume(0f, 0f)
+                                player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+                                start()
                             }
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = if (JarvisWakeService.isRunning)
-                                    "Wake-word service is active"
-                                else "Tap the button to speak",
-                                color = TextMain
-                            )
                         }
                     }
-                }
+                )
             }
         } catch (t: Throwable) {
             Log.e("Jarvis", "Startup failure", t)
