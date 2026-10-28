@@ -355,8 +355,10 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
                 when (error) {
                     SpeechRecognizer.ERROR_NO_MATCH,
                     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                        // Normal silence — quick straight retry, no backoff
-                        scheduleRestart(200L)
+                        // Silence is expected in wake-word mode. Avoid a tight
+                        // recognizer destroy/recreate loop, which makes the mic
+                        // privacy indicator flicker and wastes battery.
+                        scheduleRestart(MIN_RETRY_MS)
                     }
                     else -> {
                         Log.w(TAG, "Wake error: $error")
