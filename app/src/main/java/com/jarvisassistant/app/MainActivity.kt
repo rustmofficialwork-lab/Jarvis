@@ -36,12 +36,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +71,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -283,6 +287,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             }
                         }
                     )
+                    // Cyan holographic pulse appears only while JARVIS is speaking.
+                    if (state == JarvisState.SPEAKING) {
+                        JarvisSpeakingVisual(modifier = Modifier.fillMaxSize())
+                    }
                     Column(
                         modifier = Modifier.fillMaxSize().padding(22.dp),
                         verticalArrangement = Arrangement.SpaceBetween
@@ -1197,3 +1205,55 @@ object JarvisCommandRouter {
             return "Opening ${match.first}."
         }
         return "App not found: $name"
+
+@androidx.compose.runtime.Composable
+private fun JarvisSpeakingVisual(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "jarvis-speaking-pulse")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse-phase"
+    )
+
+    Canvas(modifier = modifier) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val baseRadius = size.minDimension * 0.29f
+        val cyan = Color(0xFF00E5FF)
+
+        // Three travelling rings create the holographic response effect from the sample.
+        for (i in 0..2) {
+            val progress = (phase + i / 3f) % 1f
+            val radius = baseRadius * (0.30f + progress * 0.70f)
+            val alpha = (1f - progress) * 0.55f
+            drawCircle(
+                color = cyan.copy(alpha = alpha),
+                radius = radius,
+                center = center,
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
+
+        // Stable inner HUD rings and a glowing core.
+        drawCircle(
+            color = cyan.copy(alpha = 0.50f + 0.25f * (1f - phase)),
+            radius = baseRadius * 0.28f,
+            center = center,
+            style = Stroke(width = 1.5.dp.toPx())
+        )
+        drawCircle(
+            color = cyan.copy(alpha = 0.18f),
+            radius = baseRadius * 0.19f
+                .coerceAtLeast(1f),
+            center = center
+        )
+        drawCircle(
+            color = cyan.copy(alpha = 0.80f),
+            radius = baseRadius * 0.055f,
+            center = center
+        )
+    }
+}
