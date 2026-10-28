@@ -15,7 +15,7 @@ object JarvisSecurity {
         return when {
             Regex("""^(?:call|dial)\b""", RegexOption.IGNORE_CASE).containsMatchIn(t) ->
                 Decision(Risk.HIGH, "placing a phone call", true)
-            Regex("""^(?:text|sms|message)\b""", RegexOption.IGNORE_CASE).containsMatchIn(t) ->
+            Regex("""^(?:(?:text|sms|message)\b|send\s+(?:a\s+)?(?:text|sms|message)\b)""", RegexOption.IGNORE_CASE).containsMatchIn(t) ->
                 Decision(Risk.HIGH, "sending or preparing a message", true)
             listOf("purchase", "buy ", "buy", "pay ", "pay", "transfer ", "transfer", "send money", "upi", "payment", "पेमेंट", "पैसे भेज", "खरीद").any { t.contains(it) } ->
                 Decision(Risk.HIGH, "a financial or purchase action", true)
