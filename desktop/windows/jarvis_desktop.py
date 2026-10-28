@@ -111,6 +111,8 @@ class JarvisDesktop:
         self.stop_event = threading.Event()
         self.wake_thread: threading.Thread | None = None
         self.busy = False
+        # Serialize typed and voice requests so history and TTS cannot race.
+        self.request_lock = threading.Lock()
 
         try:
             import keyring
@@ -196,11 +198,19 @@ class JarvisDesktop:
         prompt = self.prompt_var.get().strip()
         if not prompt or self.busy:
             return
+        if not self.request_lock.acquire(blocking=False):
+            self._set_status("JARVIS is already answering; please wait.")
+            return
         self.prompt_var.set("")
         self._append("YOU", prompt)
         self.busy = True
         self._set_status("Thinking…")
-        threading.Thread(target=self._answer_worker, args=(prompt,), daemon=True).start()
+        try:
+            threading.Thread(target=self._answer_worker, args=(prompt,), daemon=True).start()
+        except Exception:
+            self.busy = False
+            self.request_lock.release()
+            raise
 
     def _answer_worker(self, prompt: str):
         try:
@@ -224,6 +234,8 @@ class JarvisDesktop:
                 self.events.put(("status", f"Reply shown; speech output unavailable: {exc}"))
         except Exception as exc:
             self.events.put(("error", str(exc)))
+        finally:
+            self.request_lock.release()
 
     def toggle_listening(self):
         if self.wake_thread and self.wake_thread.is_alive():
@@ -301,6 +313,9 @@ class JarvisDesktop:
             self.events.put(("listener_stopped", None))
 
     def _answer_voice(self, prompt: str):
+        if not self.request_lock.acquire(blocking=False):
+            self.events.put(("status", "JARVIS is already answering; the voice request was skipped."))
+            return
         try:
             answer = chat_completion(
                 self.settings.get("endpoint", DEFAULT_ENDPOINT),
@@ -322,6 +337,8 @@ class JarvisDesktop:
                 self.events.put(("status", f"Reply shown; speech output unavailable: {exc}"))
         except Exception as exc:
             self.events.put(("error", str(exc)))
+        finally:
+            self.request_lock.release()
 
     def open_settings(self):
         window = tk.Toplevel(self.root)
