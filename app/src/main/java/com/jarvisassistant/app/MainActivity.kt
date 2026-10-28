@@ -241,7 +241,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             setOnPreparedListener { player ->
                                 player.isLooping = true
                                 player.setVolume(0f, 0f)
-                                player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT)
+                                player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
                                 start()
                             }
                         }
