@@ -91,7 +91,7 @@ import java.util.concurrent.Future
 
 private val Bg = Color(0xFF02060C)
 private val TextMain = Color(0xFFCDF4FF)
-private const val DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+private const val DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
 private const val DEFAULT_MODEL = "openrouter/free"
 private var bootGreeted = false
 
