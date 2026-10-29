@@ -92,7 +92,7 @@ import java.util.concurrent.Future
 private val Bg = Color(0xFF02060C)
 private val TextMain = Color(0xFFCDF4FF)
 private const val DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
-private const val DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+private const val DEFAULT_MODEL = "openrouter/free"
 private var bootGreeted = false
 
 enum class JarvisState {
@@ -795,7 +795,14 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         apiKey = ApiKeyStore.get(this)
         endpoint = prefs.getString("endpoint", DEFAULT_ENDPOINT).orEmpty()
             .ifBlank { DEFAULT_ENDPOINT }
-        model = prefs.getString("model", DEFAULT_MODEL).orEmpty()            .ifBlank { DEFAULT_MODEL }
+        val savedModel = prefs.getString("model", null)?.trim().orEmpty()
+        // Migrate the previous text-only default so image requests use a vision-capable free model.
+        model = if (savedModel.isBlank() ||
+            savedModel == "nvidia/nemotron-3-ultra-550b-a55b:free"
+        ) DEFAULT_MODEL else savedModel
+        if (savedModel != model) {
+            prefs.edit().putString("model", model).apply()
+        }
         speechLocale = prefs.getString("speech_locale", "en-US").orEmpty()
             .ifBlank { "en-US" }
         wakeWord = prefs.getString("wake_word", "JARVIS").orEmpty()
