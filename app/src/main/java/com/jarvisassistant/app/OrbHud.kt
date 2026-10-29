@@ -96,14 +96,53 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
                 size = androidx.compose.ui.geometry.Size(radius * 3.44f, radius * 3.44f),
                 style = Stroke(width = 2f)
             )
+            // Molten orange shell with a dark, hollow-looking core.
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFF5B0), Color(0xFFFFB01F), Color(0xFFFF6500), Color(0xFF6A2100)),
-                    center = androidx.compose.ui.geometry.Offset(cx - radius * 0.2f, cy - radius * 0.22f),
-                    radius = radius * 1.22f
+                    colors = listOf(Color(0xFFFFE7A0), Color(0xFFFFA11A), Color(0xFFFF5A00), Color(0xFF541600)),
+                    center = androidx.compose.ui.geometry.Offset(cx - radius * 0.16f, cy - radius * 0.2f),
+                    radius = radius * 1.18f
                 ),
                 radius = radius * pulse,
                 center = androidx.compose.ui.geometry.Offset(cx, cy)
+            )
+            // Hundreds of deterministic glowing specks create the particle-mesh look.
+            for (i in 0 until 560) {
+                val angle = i * 2.3999632 + orbit * 0.0045
+                val spread = kotlin.math.sqrt(((i * 97 % 563) / 563.0)).toFloat()
+                val px = cx + kotlin.math.cos(angle).toFloat() * radius * 0.97f * spread
+                val py = cy + kotlin.math.sin(angle).toFloat() * radius * 0.97f * spread
+                val shimmer = 0.28f + ((i * 13 % 67) / 100f)
+                drawCircle(
+                    color = if (i % 11 == 0) Color(0xFFFFE8A0).copy(alpha = shimmer)
+                    else Color(0xFFFF6A00).copy(alpha = shimmer),
+                    radius = if (i % 9 == 0) 1.8f else 0.75f + (i % 3) * 0.35f,
+                    center = androidx.compose.ui.geometry.Offset(px, py)
+                )
+            }
+            // Dark core and sweeping curved energy ribbons, like the selected reference.
+            drawCircle(
+                color = Color(0xFF170600).copy(alpha = 0.74f),
+                radius = radius * 0.67f,
+                center = androidx.compose.ui.geometry.Offset(cx + radius * 0.05f, cy + radius * 0.08f)
+            )
+            drawArc(
+                color = Color(0xFFFFB34D).copy(alpha = 0.82f),
+                startAngle = 202f + orbit * 0.45f,
+                sweepAngle = 215f,
+                useCenter = false,
+                topLeft = androidx.compose.ui.geometry.Offset(cx - radius * 0.96f, cy - radius * 0.78f),
+                size = androidx.compose.ui.geometry.Size(radius * 1.92f, radius * 1.56f),
+                style = Stroke(width = 2.4f)
+            )
+            drawArc(
+                color = Color(0xFFFF7A00).copy(alpha = 0.78f),
+                startAngle = 25f - orbit * 0.32f,
+                sweepAngle = 248f,
+                useCenter = false,
+                topLeft = androidx.compose.ui.geometry.Offset(cx - radius * 0.88f, cy - radius * 0.52f),
+                size = androidx.compose.ui.geometry.Size(radius * 1.76f, radius * 1.04f),
+                style = Stroke(width = 1.7f)
             )
             drawCircle(
                 color = Color(0xFFFFF4B0).copy(alpha = 0.9f),
