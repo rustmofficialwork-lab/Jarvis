@@ -15,6 +15,6 @@ services:
       - key: DATABASE_PATH
         value: /data/jarvis.sqlite3
       - key: MAX_REQUEST_BYTES
-        value: "1048576"
+        value: "12582912"
       - key: UPSTREAM_TIMEOUT_SECONDS
         value: "45"
