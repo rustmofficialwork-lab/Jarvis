@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: jarvis-backend
+    runtime: docker
+    rootDir: backend
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      - key: JARVIS_CLIENT_TOKEN
+        generateValue: true
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: openrouter/free
+      - key: DATABASE_PATH
+        value: /data/jarvis.sqlite3
+      - key: MAX_REQUEST_BYTES
+        value: "1048576"
+      - key: UPSTREAM_TIMEOUT_SECONDS
+        value: "45"
