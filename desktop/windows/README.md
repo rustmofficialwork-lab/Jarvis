@@ -27,11 +27,11 @@ python jarvis_desktop.py
 
 In the app, enter:
 - **Picovoice AccessKey** — from https://console.picovoice.ai/
-- **AI endpoint** — for example, `https://api.openai.com/v1/chat/completions`
-- **Model** — a model supported by your endpoint
-- **AI API key** — the key for that endpoint
+- **AI endpoint** — default: `https://jarvis-backend-zqlw.onrender.com/v1/chat/completions`
+- **Model** — default: `openrouter/free`
+- **AI API key** — paste your JARVIS backend client token here (not your OpenRouter secret key). The OpenRouter key stays on the backend.
 
-Press **Save settings**, then **Start wake listening**. Say “Jarvis”, wait for the listening status, then speak a command. You can also send a typed message without enabling the microphone.
+Press **Save settings**. To test without a Picovoice key, type a message and press **Send**; wake listening requires a separate Picovoice AccessKey. The main window shows the animated orange particle orb. Say “Jarvis”, wait for the listening status, then speak a command. You can also send a typed message without enabling the microphone.
 
 Keys are stored using the Windows Credential Manager through Python's `keyring` package. The endpoint and model are stored in the current user's AppData folder. Do not put keys in source files, screenshots, or Git commits.
 
