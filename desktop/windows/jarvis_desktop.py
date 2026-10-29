@@ -185,53 +185,83 @@ class JarvisDesktop:
     def _animate_orb(self):
         if not self.root.winfo_exists():
             return
-        self.orb_phase = (self.orb_phase + 2.2) % 360.0
+        # Smooth, continuous motion without redrawing thousands of expensive objects.
+        self.orb_phase = (self.orb_phase + 1.6) % 360.0
         self._draw_orb()
-        self.root.after(50, self._animate_orb)
+        self.root.after(40, self._animate_orb)
 
     def _draw_orb(self):
         if not hasattr(self, "orb_canvas"):
             return
+        import math
         canvas = self.orb_canvas
         width = max(canvas.winfo_width(), 300)
         height = max(canvas.winfo_height(), 220)
         canvas.delete("all")
         cx, cy = width / 2.0, height / 2.0
-        radius = min(width * 0.30, height * 0.46, 175)
-        phase = self.orb_phase * 0.01745329252
-        # Soft orange aura.
-        for ring in range(10, 0, -1):
-            r = radius * (1.0 + ring * 0.035)
-            color = "#160900" if ring > 6 else ("#241000" if ring > 3 else "#351300")
+        phase = math.radians(self.orb_phase)
+        pulse = 1.0 + 0.018 * math.sin(phase * 1.7)
+        radius = min(width * 0.245, height * 0.405, 225) * pulse
+
+        # Deep black background with a layered amber aura around the orb.
+        for ring in range(18, 0, -1):
+            r = radius * (0.58 + ring * 0.045)
+            shade = max(0, 30 - ring)
+            color = f"#{shade:02x}{max(0, shade//3):02x}00"
             canvas.create_oval(cx-r, cy-r, cx+r, cy+r, fill=color, outline="")
-        # Bright particle shell with subtle rotation and turbulence.
-        import math
-        for i in range(620):
-            angle = i * 2.3999632297 + phase * (0.22 + (i % 7) * 0.015)
-            spread = math.sqrt(((i * 97) % 631) / 631.0)
-            wobble = 0.91 + 0.07 * math.sin(angle * 3.0 + phase * 1.7)
+
+        # Sparse drifting embers around the sphere.
+        for i in range(86):
+            angle = i * 2.399963 + phase * (0.12 + (i % 5) * 0.025)
+            distance = radius * (1.08 + ((i * 43) % 100) / 100 * 0.58)
+            sx = cx + math.cos(angle) * distance
+            sy = cy + math.sin(angle) * distance * 0.88
+            twinkle = (i + int(self.orb_phase * 2)) % 7
+            if twinkle in (0, 1):
+                size = 1.2 if i % 3 else 2.0
+                canvas.create_oval(sx-size, sy-size, sx+size, sy+size,
+                                   fill="#ff6a08" if twinkle else "#ffb34d", outline="")
+
+        # Dense, rotating particle shell. Keep the centre dark like the selected reference.
+        colors = ["#ff3b00", "#ff5100", "#ff6a00", "#ff8b12", "#ffb33c", "#ffe0a0"]
+        for i in range(820):
+            angle = i * 2.3999632297 + phase * (0.20 + (i % 11) * 0.009)
+            spread = math.sqrt(((i * 97) % 823) / 823.0)
+            wobble = 0.94 + 0.045 * math.sin(angle * 3.0 + phase * 1.3)
             px = cx + math.cos(angle) * radius * spread * wobble
             py = cy + math.sin(angle) * radius * spread * wobble
-            # Dark interior leaves the reference's hollow energy-core appearance.
-            core_factor = ((px-cx)/(radius*0.70))**2 + ((py-cy)/(radius*0.70))**2
-            if core_factor < 0.78 and (i % 5 != 0):
+            core = ((px-cx)/(radius*0.67))**2 + ((py-cy)/(radius*0.67))**2
+            if core < 0.92 and i % 7 != 0:
                 continue
-            colors = ["#ff4b00", "#ff6500", "#ff8a12", "#ffb34d", "#ffd28a"]
-            color = colors[(i * 13 + int(self.orb_phase)) % len(colors)]
-            dot = 1 if i % 4 else 2
+            color = colors[(i * 13 + int(self.orb_phase * 0.6)) % len(colors)]
+            dot = 0.8 if i % 5 else 1.7
             canvas.create_oval(px-dot, py-dot, px+dot, py+dot, fill=color, outline="")
-        # Flowing ribbons around the dark center.
-        for idx, (rx, ry, start, extent) in enumerate([
-            (0.94, 0.62, 205 + self.orb_phase * 0.55, 230),
-            (0.86, 0.48, 22 - self.orb_phase * 0.42, 250),
-            (0.70, 0.86, 125 + self.orb_phase * 0.30, 210),
-        ]):
-            inset_x, inset_y = radius * rx, radius * ry
-            canvas.create_arc(cx-inset_x, cy-inset_y, cx+inset_x, cy+inset_y,
+
+        # Multiple luminous curved energy ribbons rotate around the particle shell.
+        ribbons = [
+            (0.94, 0.60, 218 + self.orb_phase * 0.58, 232, "#ffb84f", 2),
+            (0.87, 0.47, 24 - self.orb_phase * 0.43, 248, "#ff6a0a", 2),
+            (0.68, 0.84, 122 + self.orb_phase * 0.31, 218, "#ff8a19", 1),
+            (0.98, 0.72, 305 - self.orb_phase * 0.24, 110, "#ff4a00", 1),
+        ]
+        for rx, ry, start, extent, color, line_width in ribbons:
+            xrad, yrad = radius * rx, radius * ry
+            canvas.create_arc(cx-xrad, cy-yrad, cx+xrad, cy+yrad,
                               start=start, extent=extent, style="arc",
-                              outline="#ff8a18" if idx else "#ffc06a",
-                              width=2 if idx == 0 else 1)
-        canvas.create_oval(cx-radius*0.13, cy-radius*0.13, cx+radius*0.13, cy+radius*0.13,
+                              outline=color, width=line_width)
+
+        # Fine bright rim and small moving highlights make the sphere feel energized.
+        canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
+                           outline="#ff8a20", width=1)
+        for j in range(7):
+            a = phase * 1.25 + j * (math.tau / 7)
+            hx = cx + math.cos(a) * radius * 0.985
+            hy = cy + math.sin(a) * radius * 0.985
+            canvas.create_oval(hx-2, hy-2, hx+2, hy+2,
+                               fill="#ffe2a0", outline="#ff6a00")
+        # A subtle warm core glint; most of the centre remains dark.
+        core_r = radius * (0.025 + 0.004 * math.sin(phase * 2))
+        canvas.create_oval(cx-core_r, cy-core_r, cx+core_r, cy+core_r,
                            fill="#ff9a25", outline="#ffe1a0", width=1)
 
     def _load_secrets(self):
