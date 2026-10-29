@@ -234,6 +234,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             loadPreferences()
+            // Restore spoken responses for the orb UI; TTS is initialized asynchronously.
+            if (tts == null) tts = TextToSpeech(this, this)
             if (!imageReceiverRegistered) {
                 ContextCompat.registerReceiver(
                     this, imageRequestReceiver,
@@ -311,16 +313,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) return
         tts?.let { t ->
-            val ukLocale = Locale("en", "GB")
-            t.setLanguage(ukLocale)
-            val voices = t.voices
-            val maleVoice = voices?.firstOrNull {
-                it.locale == ukLocale && !it.isNetworkConnectionRequired &&
-                    it.name.contains("male", ignoreCase = true)
-            } ?: voices?.firstOrNull {
-                it.locale == ukLocale && !it.isNetworkConnectionRequired
+            val preferredLocale = Locale.forLanguageTag(speechLocale)
+            val localeResult = t.setLanguage(preferredLocale)
+            if (localeResult == TextToSpeech.LANG_MISSING_DATA ||
+                localeResult == TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+                t.setLanguage(Locale("en", "IN"))
             }
-            if (maleVoice != null) t.voice = maleVoice
+            val voices = t.voices
+            val localVoice = voices?.firstOrNull {
+                it.locale.language == preferredLocale.language && !it.isNetworkConnectionRequired
+            } ?: voices?.firstOrNull {
+                it.locale.language == "en" && !it.isNetworkConnectionRequired
+            }
+            if (localVoice != null) t.voice = localVoice
             t.setPitch(0.85f)
             t.setSpeechRate(speechRate)
 
