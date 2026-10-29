@@ -30,9 +30,12 @@ import android.telephony.SmsManager
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.LayoutInflater
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.ComposeView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -229,10 +232,55 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             }
 
-            // Use a native PlayerView instead of embedding PlayerView inside Compose AndroidView.
-            // Media3 documents surface/layout synchronization issues for that combination on API 34.
-            setContentView(R.layout.view_jarvis_video)
-            interfacePlayerView = findViewById(R.id.jarvis_video_view)
+            // Keep the native video surface, with a transparent Compose overlay for edge-swipe settings.
+            // The overlay contains only the narrow swipe handle until settings are explicitly opened.
+            val root = FrameLayout(this)
+            val videoView = layoutInflater.inflate(R.layout.view_jarvis_video, root, false)
+            root.addView(
+                videoView,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
+            interfacePlayerView = videoView.findViewById(R.id.jarvis_video_view)
+
+            val overlay = ComposeView(this).apply {
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            }
+            root.addView(
+                overlay,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
+            setContentView(root)
+
+            overlay.setContent {
+                Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                    EdgeSwipeStrip(onOpen = { showSettings = true })
+                    SettingsDrawer(
+                        visible = showSettings,
+                        apiKey = apiKey,
+                        endpoint = endpoint,
+                        model = model,
+                        wakeWord = wakeWord,
+                        speechLocale = speechLocale,
+                        speechRate = speechRate,
+                        testStatus = testStatus,
+                        prefs = prefs,
+                        onSaveText = { key, url, selectedModel, wake -> saveTextSettings(key, url, selectedModel, wake) },
+                        onLocaleChange = { onLocaleChosen(it) },
+                        onRateChange = { onRateChosen(it) },
+                        onTestApi = { key, url, selectedModel -> testApi(key, url, selectedModel) },
+                        onClearHistory = { history = emptyList() },
+                        onStartBg = { requestStartBg() },
+                        onStopBg = { stopWakeService() },
+                        onClose = { showSettings = false }
+                    )
+                }
+            }
         } catch (t: Throwable) {
             Log.e("Jarvis", "Startup failure", t)
             state = JarvisState.ERROR
