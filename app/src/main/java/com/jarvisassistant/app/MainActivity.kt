@@ -292,6 +292,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
             overlay.setContent {
                 Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                    OrbHud(state = state, onMicTap = { onHudTap() }, modifier = androidx.compose.ui.Modifier.fillMaxSize())
                     EdgeSwipeStrip(onOpen = { showSettings = true })
                     SettingsDrawer(
                         visible = showSettings,
