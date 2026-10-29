@@ -663,9 +663,18 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
             }
         } else null
 
+        val memoryContext = JarvisMemoryManager(this).contextFor(rawText, fallbackItems = 0)
+        val aiContext = buildString {
+            append(JarvisContextEngine.promptContext(this@JarvisWakeService))
+            if (memoryContext.isNotBlank()) {
+                appendLine()
+                appendLine("Relevant saved memories (may be outdated; use only if relevant):")
+                append(memoryContext)
+            }
+        }
         val answer = try {
             AiProvider.answer(
-                endpoint, model, key, aiPrompt, emptyList(), JarvisContextEngine.promptContext(this),
+                endpoint, model, key, aiPrompt, emptyList(), aiContext,
                 listOfNotNull(imageAttachment),
                 InternetResearch.shouldSearch(rawText),
                 imageAttachment != null,
