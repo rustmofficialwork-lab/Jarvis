@@ -10,7 +10,6 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
-import android.media.MediaPlayer
 import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.Network
@@ -31,10 +30,18 @@ import android.telephony.SmsManager
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
-import android.widget.VideoView
+import android.view.LayoutInflater
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -93,6 +100,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private val prefs by lazy { getSharedPreferences("jarvis", Context.MODE_PRIVATE) }
 
     private var tts: TextToSpeech? = null
+    private var interfacePlayer: ExoPlayer? = null
     private var oneShotRecognizer: SpeechRecognizer? = null
 
     private var lastTranscript by mutableStateOf("")
@@ -189,14 +197,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             window.statusBarColor = android.graphics.Color.BLACK
             window.navigationBarColor = android.graphics.Color.BLACK
 
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                )
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
 
             loadPreferences()
             refreshNetworkStatus()
@@ -222,30 +228,35 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             }
 
+            // Use Media3 rather than the platform VideoView so playback errors and
+            // aspect-ratio scaling are handled consistently across Android devices.
+            interfacePlayer = ExoPlayer.Builder(this).build().apply {
+                repeatMode = Player.REPEAT_MODE_ONE
+                volume = 0f
+                addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.e("Jarvis", "Bundled interface video playback failed", error)
+                    }
+                })
+                setMediaItem(
+                    MediaItem.fromUri(
+                        Uri.parse("android.resource://$packageName/${R.raw.jarvis_hud_bg}")
+                    )
+                )
+                prepare()
+                playWhenReady = true
+            }
+
             setContent {
-                // Show only the exact bundled interface video, silently, in an endless loop.
                 AndroidView(
                     modifier = Modifier.fillMaxSize().background(Color.Black),
                     factory = { context ->
-                        VideoView(context).apply {
-                            setBackgroundColor(android.graphics.Color.BLACK)
-                            setVideoURI(
-                                Uri.parse(
-                                    "android.resource://${context.packageName}/${R.raw.jarvis_hud_bg}"
-                                )
-                            )
-                            setOnErrorListener { _, what, extra ->
-                                Log.e("Jarvis", "Interface video failed to load: $what/$extra")
-                                true
-                            }
-                            setOnPreparedListener { player ->
-                                player.isLooping = true
-                                player.setVolume(0f, 0f)
-                                player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
-                                start()
-                            }
+                        (LayoutInflater.from(context)
+                            .inflate(R.layout.view_jarvis_video, null, false) as PlayerView).apply {
+                            player = interfacePlayer
                         }
-                    }
+                    },
+                    update = { view -> view.player = interfacePlayer }
                 )
             }
         } catch (t: Throwable) {
@@ -716,6 +727,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         requestGeneration++
         activeTask?.cancel(true)
         worker.shutdownNow()
+        interfacePlayer?.release()
+        interfacePlayer = null
         super.onDestroy()
     }
 }
