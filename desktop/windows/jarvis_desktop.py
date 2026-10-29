@@ -28,13 +28,22 @@ SYSTEM_PROMPT = (
 
 
 def load_settings() -> dict:
+    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN"}
     try:
         data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
         if isinstance(data, dict):
-            return data
+            settings = {**defaults, **data}
+            # Older installs used OpenRouter directly. Migrate them to the secured JARVIS gateway.
+            if settings.get("endpoint", "").strip() == "https://openrouter.ai/api/v1/chat/completions":
+                settings["endpoint"] = DEFAULT_ENDPOINT
+                try:
+                    save_settings(settings)
+                except OSError:
+                    pass
+            return settings
     except (OSError, ValueError):
         pass
-    return {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN"}
+    return defaults
 
 
 def save_settings(data: dict) -> None:
@@ -439,7 +448,7 @@ class JarvisDesktop:
         fields = [
             ("AI endpoint (HTTPS)", "endpoint", self.settings.get("endpoint", DEFAULT_ENDPOINT)),
             ("Model", "model", self.settings.get("model", DEFAULT_MODEL)),
-            ("AI API key", "ai_key", self.api_key_var.get()),
+            ("JARVIS backend client token (not OpenRouter key)", "ai_key", self.api_key_var.get()),
             ("Picovoice AccessKey", "picovoice_key", self.picovoice_var.get()),
         ]
         entries = {}
