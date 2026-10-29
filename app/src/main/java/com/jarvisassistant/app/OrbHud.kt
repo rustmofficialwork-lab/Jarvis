@@ -151,7 +151,7 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
             )
             for (i in 0..19) {
                 val a = Math.toRadians((i * 18.0 + orbit).toDouble())
-                val r = radius * (1.45 + (i % 4) * 0.12)
+                val r = radius * (1.45f + (i % 4) * 0.12f)
                 val x = cx + kotlin.math.cos(a).toFloat() * r
                 val y = cy + kotlin.math.sin(a).toFloat() * r
                 drawCircle(color = orange.copy(alpha = 0.45f + (i % 3) * 0.18f), radius = 2.2f + (i % 3), center = androidx.compose.ui.geometry.Offset(x, y))
