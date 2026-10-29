@@ -1,7 +1,6 @@
 import os
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -16,7 +15,11 @@ from app.main import app  # noqa: E402
 
 class BackendApiTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Entering TestClient as a context manager runs FastAPI's lifespan,
+        # which initializes the SQLite schema before each test.
         self.client = TestClient(app)
+        self.client.__enter__()
+        self.addCleanup(self.client.__exit__, None, None, None)
         self.headers = {"Authorization": f"Bearer {os.environ['JARVIS_CLIENT_TOKEN']}"}
 
     def test_health_is_public_and_minimal(self) -> None:
