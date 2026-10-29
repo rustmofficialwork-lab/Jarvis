@@ -106,44 +106,50 @@ Never claim an action succeeded unless it did; if something cannot be done, say 
             )
         }
 
+        // Image attachments are in-memory data URLs produced by ImageVision.
+        // Other attachment strings remain plain-text references; never imply they were read.
+        val imageAttachments = attachments.filter { it.startsWith("data:image/") }.take(2)
+        val textAttachments = attachments.filterNot { it.startsWith("data:image/") }
         val finalPrompt = buildString {
             append(prompt)
 
-            if (attachments.isNotEmpty()) {
+            if (textAttachments.isNotEmpty()) {
                 appendLine()
                 appendLine()
                 appendLine("Attachment references supplied by the app:")
-                attachments.forEachIndexed { index, attachment ->
+                textAttachments.forEachIndexed { index, attachment ->
                     appendLine("${index + 1}. $attachment")
                 }
-                appendLine(
-                    "If an attachment's contents are not included, " +
-                    "do not pretend you have read them."
-                )
+                appendLine("If an attachment's contents are not included, do not pretend you have read them.")
             }
 
-            if (useVision) {
+            if (useVision && imageAttachments.isEmpty()) {
                 appendLine()
-                append(
-                    "Vision was requested, but image processing requires " +
-                    "image data in the API request."
-                )
+                append("No image data was attached to this request. Ask the user to select an image rather than guessing.")
             }
 
             if (useTools) {
                 appendLine()
-                append(
-                    "Do not claim to have executed app tools unless " +
-                    "the app actually executed them."
-                )
+                append("Do not claim to have executed app tools unless the app actually executed them.")
             }
         }
 
-        messages.put(
-            JSONObject()
-                .put("role", "user")
-                .put("content", finalPrompt)
-        )
+        val userMessage = JSONObject().put("role", "user")
+        if (imageAttachments.isNotEmpty()) {
+            val multimodalContent = JSONArray()
+            multimodalContent.put(JSONObject().put("type", "text").put("text", finalPrompt))
+            imageAttachments.forEach { imageDataUrl ->
+                multimodalContent.put(
+                    JSONObject()
+                        .put("type", "image_url")
+                        .put("image_url", JSONObject().put("url", imageDataUrl))
+                )
+            }
+            userMessage.put("content", multimodalContent)
+        } else {
+            userMessage.put("content", finalPrompt)
+        }
+        messages.put(userMessage)
 
         if (isCancelled()) {
             throw InterruptedException("Request cancelled.")
