@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private var tts: TextToSpeech? = null
     private var interfacePlayer: ExoPlayer? = null
+    private var interfacePlayerView: PlayerView? = null
     private var oneShotRecognizer: SpeechRecognizer? = null
 
     private var lastTranscript by mutableStateOf("")
@@ -228,37 +229,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             }
 
-            // Use Media3 rather than the platform VideoView so playback errors and
-            // aspect-ratio scaling are handled consistently across Android devices.
-            interfacePlayer = ExoPlayer.Builder(this).build().apply {
-                repeatMode = Player.REPEAT_MODE_ONE
-                volume = 0f
-                addListener(object : Player.Listener {
-                    override fun onPlayerError(error: PlaybackException) {
-                        Log.e("Jarvis", "Bundled interface video playback failed", error)
-                    }
-                })
-                setMediaItem(
-                    MediaItem.fromUri(
-                        Uri.parse("android.resource://$packageName/${R.raw.jarvis_hud_bg}")
-                    )
-                )
-                prepare()
-                playWhenReady = true
-            }
-
-            setContent {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize().background(Color.Black),
-                    factory = { context ->
-                        (LayoutInflater.from(context)
-                            .inflate(R.layout.view_jarvis_video, null, false) as PlayerView).apply {
-                            player = interfacePlayer
-                        }
-                    },
-                    update = { view -> view.player = interfacePlayer }
-                )
-            }
+            // Use a native PlayerView instead of embedding PlayerView inside Compose AndroidView.
+            // Media3 documents surface/layout synchronization issues for that combination on API 34.
+            setContentView(R.layout.view_jarvis_video)
+            interfacePlayerView = findViewById(R.id.jarvis_video_view)
         } catch (t: Throwable) {
             Log.e("Jarvis", "Startup failure", t)
             state = JarvisState.ERROR
@@ -707,6 +681,39 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     fun requestCameraPermission() = cameraPermission.launch(Manifest.permission.CAMERA)
     fun requestContactsPermission() = contactsPermission.launch(Manifest.permission.READ_CONTACTS)
     fun requestCallPermission() = callPermission.launch(Manifest.permission.CALL_PHONE)
+
+    override fun onStart() {
+        super.onStart()
+        try {
+            val player = ExoPlayer.Builder(this).build().apply {
+                repeatMode = Player.REPEAT_MODE_ONE
+                volume = 0f
+                addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.e("Jarvis", "Bundled interface video playback failed", error)
+                    }
+                })
+                setMediaItem(
+                    MediaItem.fromUri(
+                        Uri.parse("android.resource://$packageName/${R.raw.jarvis_hud_bg}")
+                    )
+                )
+                prepare()
+                playWhenReady = true
+            }
+            interfacePlayer = player
+            interfacePlayerView?.player = player
+        } catch (t: Throwable) {
+            Log.e("Jarvis", "Could not start interface video", t)
+        }
+    }
+
+    override fun onStop() {
+        interfacePlayerView?.player = null
+        interfacePlayer?.release()
+        interfacePlayer = null
+        super.onStop()
+    }
 
     override fun onResume() {
         super.onResume()
