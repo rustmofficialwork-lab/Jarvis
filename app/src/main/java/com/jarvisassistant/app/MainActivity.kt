@@ -151,10 +151,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
             if (pendingWakeServiceStart) {
                 pendingWakeServiceStart = false
-                if (BuildConfig.PICOVOICE_ACCESS_KEY.isNotBlank()) {
-                    startWakeService()
-                } else {
-                    responseText = "Tap the microphone to talk. For always-on “JARVIS” detection, add a Picovoice AccessKey."
+                // Always start the listener after the user grants microphone access.
+                // Without Picovoice, JarvisWakeService uses Android SpeechRecognizer
+                // as a free fallback for wake-word detection.
+                startWakeService()
+                if (BuildConfig.PICOVOICE_ACCESS_KEY.isBlank()) {
+                    responseText = "JARVIS listening enabled using Android speech recognition. Internet may be required."
                 }
             }
         }
