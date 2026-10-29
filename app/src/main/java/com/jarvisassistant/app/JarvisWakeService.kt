@@ -636,10 +636,10 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
 
         // 3) AI fallback
         val key = ApiKeyStore.get(this)
-        val endpoint = prefs.getString("endpoint", "https://api.openai.com/v1/chat/completions")
-            .orEmpty().ifBlank { "https://api.openai.com/v1/chat/completions" }
-        val model = prefs.getString("model", "gpt-4o-mini")
-            .orEmpty().ifBlank { "gpt-4o-mini" }
+        val endpoint = prefs.getString("endpoint", "https://openrouter.ai/api/v1/chat/completions")
+            .orEmpty().ifBlank { "https://openrouter.ai/api/v1/chat/completions" }
+        val model = prefs.getString("model", "nvidia/nemotron-3-ultra-550b-a55b:free")
+            .orEmpty().ifBlank { "nvidia/nemotron-3-ultra-550b-a55b:free" }
 
         if (key.isBlank()) {
             return t(
@@ -665,7 +665,7 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
 
         val answer = try {
             AiProvider.answer(
-                endpoint, model, key, aiPrompt, emptyList(), "",
+                endpoint, model, key, aiPrompt, emptyList(), JarvisContextEngine.promptContext(this),
                 listOfNotNull(imageAttachment),
                 InternetResearch.shouldSearch(rawText),
                 imageAttachment != null,
