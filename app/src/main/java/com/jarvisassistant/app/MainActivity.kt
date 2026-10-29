@@ -265,33 +265,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
             }
 
-            // Keep the native video surface, with a transparent Compose overlay for edge-swipe settings.
-            // The overlay contains only the narrow swipe handle until settings are explicitly opened.
-            val root = FrameLayout(this)
-            val videoView = layoutInflater.inflate(R.layout.view_jarvis_video, root, false)
-            root.addView(
-                videoView,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            )
-            interfacePlayerView = videoView.findViewById(R.id.jarvis_video_view)
-
+            // Fullscreen animated orange orb HUD. The old bundled video is no longer used as a background.
             val overlay = ComposeView(this).apply {
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setBackgroundColor(android.graphics.Color.BLACK)
             }
-            root.addView(
+            setContentView(
                 overlay,
-                FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
             )
-            setContentView(root)
 
             overlay.setContent {
-                Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                Box(modifier = androidx.compose.ui.Modifier.fillMaxSize().background(Color.Black)) {
                     OrbHud(state = state, onMicTap = { onHudTap() }, modifier = androidx.compose.ui.Modifier.fillMaxSize())
                     EdgeSwipeStrip(onOpen = { showSettings = true })
                     SettingsDrawer(
@@ -821,34 +808,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     override fun onStart() {
         super.onStart()
-        try {
-            val player = ExoPlayer.Builder(this).build().apply {
-                repeatMode = Player.REPEAT_MODE_ONE
-                volume = 0f
-                addListener(object : Player.Listener {
-                    override fun onPlayerError(error: PlaybackException) {
-                        Log.e("Jarvis", "Bundled interface video playback failed", error)
-                    }
-                })
-                setMediaItem(
-                    MediaItem.fromUri(
-                        Uri.parse("android.resource://$packageName/${R.raw.jarvis_hud_bg}")
-                    )
-                )
-                prepare()
-                playWhenReady = true
-            }
-            interfacePlayer = player
-            interfacePlayerView?.player = player
-        } catch (t: Throwable) {
-            Log.e("Jarvis", "Could not start interface video", t)
-        }
+        // The orb is drawn natively; no bundled interface video is played.
     }
 
     override fun onStop() {
-        interfacePlayerView?.player = null
-        interfacePlayer?.release()
-        interfacePlayer = null
         super.onStop()
     }
 
@@ -875,8 +838,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         requestGeneration++
         activeTask?.cancel(true)
         worker.shutdownNow()
-        interfacePlayer?.release()
-        interfacePlayer = null
         super.onDestroy()
     }
 }
