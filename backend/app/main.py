@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/jarvis.sqlite3")
-MAX_REQUEST_BYTES = max(16_384, int(os.getenv("MAX_REQUEST_BYTES", "1048576")))
+MAX_REQUEST_BYTES = max(16_384, int(os.getenv("MAX_REQUEST_BYTES", "12582912")))
 UPSTREAM_TIMEOUT_SECONDS = max(5, min(90, int(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "45"))))
 
 
