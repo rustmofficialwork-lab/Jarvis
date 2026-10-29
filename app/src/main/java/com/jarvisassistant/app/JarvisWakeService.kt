@@ -638,8 +638,8 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
         val key = ApiKeyStore.get(this)
         val endpoint = prefs.getString("endpoint", "https://openrouter.ai/api/v1/chat/completions")
             .orEmpty().ifBlank { "https://openrouter.ai/api/v1/chat/completions" }
-        val model = prefs.getString("model", "nvidia/nemotron-3-ultra-550b-a55b:free")
-            .orEmpty().ifBlank { "nvidia/nemotron-3-ultra-550b-a55b:free" }
+        val model = prefs.getString("model", "openrouter/free")
+            .orEmpty().ifBlank { "openrouter/free" }
 
         if (key.isBlank()) {
             return t(
