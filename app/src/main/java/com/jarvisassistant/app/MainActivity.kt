@@ -394,6 +394,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun onLocaleChosen(tag: String) {
         speechLocale = tag
         prefs.edit().putString("speech_locale", tag).apply()
+        tts?.let { engine ->
+            val selected = Locale.forLanguageTag(tag)
+            val result = engine.setLanguage(selected)
+            if (result == TextToSpeech.LANG_MISSING_DATA ||
+                result == TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+                testStatus = "TTS language $tag is unavailable; install its Android speech data."
+            }
+        }
         if (JarvisWakeService.isRunning) startWakeService()
     }
 
@@ -789,8 +798,14 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun loadPreferences() {
         apiKey = ApiKeyStore.get(this)
-        endpoint = prefs.getString("endpoint", DEFAULT_ENDPOINT).orEmpty()
-            .ifBlank { DEFAULT_ENDPOINT }
+        val savedEndpoint = prefs.getString("endpoint", null).orEmpty().trim()
+        // Migrate installs that saved the old direct-provider URL; the app now uses the secured gateway.
+        endpoint = if (savedEndpoint.isBlank() ||
+            savedEndpoint == "https://openrouter.ai/api/v1/chat/completions"
+        ) DEFAULT_ENDPOINT else savedEndpoint
+        if (savedEndpoint != endpoint) {
+            prefs.edit().putString("endpoint", endpoint).apply()
+        }
         val savedModel = prefs.getString("model", null)?.trim().orEmpty()
         // Migrate the previous text-only default so image requests use a vision-capable free model.
         model = if (savedModel.isBlank() ||
