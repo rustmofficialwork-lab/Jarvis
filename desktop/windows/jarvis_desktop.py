@@ -18,8 +18,8 @@ APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
-DEFAULT_ENDPOINT = "https://api.openai.com/v1/chat/completions"
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
+DEFAULT_MODEL = "openrouter/free"
 SYSTEM_PROMPT = (
     'You are J.A.R.V.I.S., a calm, polished personal AI butler with subtle dry wit. '
     'Support Hindi, English, and Hinglish. Match the language and script used by the user. '
@@ -135,43 +135,104 @@ class JarvisDesktop:
         except tk.TclError:
             pass
         style.configure("TButton", padding=8, font=("Segoe UI", 10))
-        style.configure("TLabel", background="#07111b", foreground="#d7f4ff", font=("Segoe UI", 10))
+        style.configure("TLabel", background="#050505", foreground="#f2d1b2", font=("Segoe UI", 10))
         style.configure("TEntry", padding=6)
         style.configure("TCombobox", padding=5)
 
-        header = tk.Frame(self.root, bg="#07111b")
-        header.pack(fill="x", padx=24, pady=(20, 8))
-        tk.Label(header, text="J.A.R.V.I.S.", bg="#07111b", fg="#5de2e7",
-                 font=("Segoe UI Semibold", 24)).pack(anchor="w")
-        tk.Label(header, text="DESKTOP ASSISTANT  •  WINDOWS 11", bg="#07111b", fg="#7897aa",
-                 font=("Consolas", 9)).pack(anchor="w", pady=(2, 0))
+        self.root.configure(bg="#050505")
+        header = tk.Frame(self.root, bg="#050505")
+        header.pack(fill="x", padx=24, pady=(12, 2))
+        tk.Label(header, text="J.A.R.V.I.S.", bg="#050505", fg="#ff8a18",
+                 font=("Segoe UI Semibold", 21)).pack(anchor="center")
+        tk.Label(header, text="PERSONAL AI • DESKTOP INTERFACE", bg="#050505", fg="#80502e",
+                 font=("Consolas", 9)).pack(anchor="center", pady=(1, 0))
 
-        self.status_var = tk.StringVar(value="Ready — configure your AI key and Picovoice key below.")
-        tk.Label(self.root, textvariable=self.status_var, bg="#0c1d2b", fg="#8ce9ed",
-                 anchor="w", padx=14, pady=10).pack(fill="x", padx=24, pady=(8, 12))
+        # Large animated canvas: particle sphere and flowing energy ribbons, matching the chosen orange orb.
+        self.orb_canvas = tk.Canvas(self.root, bg="#000000", highlightthickness=0, height=290)
+        self.orb_canvas.pack(fill="both", expand=True, padx=18, pady=(4, 2))
+        self.orb_phase = 0.0
+        self.orb_canvas.bind("<Configure>", lambda _event: self._draw_orb())
 
-        self.chat = tk.Text(self.root, bg="#0b1925", fg="#e4f4ff", insertbackground="#e4f4ff",
-                            relief="flat", wrap="word", padx=14, pady=12,
-                            font=("Segoe UI", 11), state="disabled")
-        self.chat.pack(fill="both", expand=True, padx=24, pady=(0, 12))
-        self.chat.tag_configure("speaker", foreground="#5de2e7", font=("Segoe UI Semibold", 10))
+        self.status_var = tk.StringVar(value="Ready — configure your AI endpoint and client token in Settings.")
+        tk.Label(self.root, textvariable=self.status_var, bg="#100a06", fg="#ffb36b",
+                 anchor="center", padx=12, pady=8).pack(fill="x", padx=24, pady=(4, 8))
+
+        self.chat = tk.Text(self.root, bg="#0b0908", fg="#f5e7db", insertbackground="#f5e7db",
+                            relief="flat", wrap="word", padx=12, pady=8,
+                            font=("Segoe UI", 10), height=5, state="disabled")
+        self.chat.pack(fill="both", expand=True, padx=24, pady=(0, 8))
+        self.chat.tag_configure("speaker", foreground="#ff9a3d", font=("Segoe UI Semibold", 10))
         self.chat.tag_configure("error", foreground="#ff9d9d")
 
-        entry_row = tk.Frame(self.root, bg="#07111b")
-        entry_row.pack(fill="x", padx=24, pady=(0, 12))
+        entry_row = tk.Frame(self.root, bg="#050505")
+        entry_row.pack(fill="x", padx=24, pady=(0, 8))
         self.prompt_var = tk.StringVar()
         self.prompt_entry = ttk.Entry(entry_row, textvariable=self.prompt_var)
         self.prompt_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.prompt_entry.bind("<Return>", lambda _event: self.send_text())
         ttk.Button(entry_row, text="Send", command=self.send_text).pack(side="right")
 
-        controls = tk.Frame(self.root, bg="#07111b")
-        controls.pack(fill="x", padx=24, pady=(0, 20))
+        controls = tk.Frame(self.root, bg="#050505")
+        controls.pack(fill="x", padx=24, pady=(0, 12))
         self.listen_button = ttk.Button(controls, text="Start wake listening", command=self.toggle_listening)
         self.listen_button.pack(side="left")
         ttk.Button(controls, text="Settings", command=self.open_settings).pack(side="left", padx=8)
         ttk.Button(controls, text="Clear chat", command=self.clear_chat).pack(side="right")
         self._append("JARVIS", "Ready when you are. Type a message or configure wake-word listening in Settings.")
+        self._draw_orb()
+        self.root.after(50, self._animate_orb)
+
+    def _animate_orb(self):
+        if not self.root.winfo_exists():
+            return
+        self.orb_phase = (self.orb_phase + 2.2) % 360.0
+        self._draw_orb()
+        self.root.after(50, self._animate_orb)
+
+    def _draw_orb(self):
+        if not hasattr(self, "orb_canvas"):
+            return
+        canvas = self.orb_canvas
+        width = max(canvas.winfo_width(), 300)
+        height = max(canvas.winfo_height(), 220)
+        canvas.delete("all")
+        cx, cy = width / 2.0, height / 2.0
+        radius = min(width * 0.30, height * 0.46, 175)
+        phase = self.orb_phase * 0.01745329252
+        # Soft orange aura.
+        for ring in range(10, 0, -1):
+            r = radius * (1.0 + ring * 0.035)
+            color = "#160900" if ring > 6 else ("#241000" if ring > 3 else "#351300")
+            canvas.create_oval(cx-r, cy-r, cx+r, cy+r, fill=color, outline="")
+        # Bright particle shell with subtle rotation and turbulence.
+        import math
+        for i in range(620):
+            angle = i * 2.3999632297 + phase * (0.22 + (i % 7) * 0.015)
+            spread = math.sqrt(((i * 97) % 631) / 631.0)
+            wobble = 0.91 + 0.07 * math.sin(angle * 3.0 + phase * 1.7)
+            px = cx + math.cos(angle) * radius * spread * wobble
+            py = cy + math.sin(angle) * radius * spread * wobble
+            # Dark interior leaves the reference's hollow energy-core appearance.
+            core_factor = ((px-cx)/(radius*0.70))**2 + ((py-cy)/(radius*0.70))**2
+            if core_factor < 0.78 and (i % 5 != 0):
+                continue
+            colors = ["#ff4b00", "#ff6500", "#ff8a12", "#ffb34d", "#ffd28a"]
+            color = colors[(i * 13 + int(self.orb_phase)) % len(colors)]
+            dot = 1 if i % 4 else 2
+            canvas.create_oval(px-dot, py-dot, px+dot, py+dot, fill=color, outline="")
+        # Flowing ribbons around the dark center.
+        for idx, (rx, ry, start, extent) in enumerate([
+            (0.94, 0.62, 205 + self.orb_phase * 0.55, 230),
+            (0.86, 0.48, 22 - self.orb_phase * 0.42, 250),
+            (0.70, 0.86, 125 + self.orb_phase * 0.30, 210),
+        ]):
+            inset_x, inset_y = radius * rx, radius * ry
+            canvas.create_arc(cx-inset_x, cy-inset_y, cx+inset_x, cy+inset_y,
+                              start=start, extent=extent, style="arc",
+                              outline="#ff8a18" if idx else "#ffc06a",
+                              width=2 if idx == 0 else 1)
+        canvas.create_oval(cx-radius*0.13, cy-radius*0.13, cx+radius*0.13, cy+radius*0.13,
+                           fill="#ff9a25", outline="#ffe1a0", width=1)
 
     def _load_secrets(self):
         if self.keyring:
