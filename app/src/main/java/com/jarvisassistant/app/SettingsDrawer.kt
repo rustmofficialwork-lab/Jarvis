@@ -174,6 +174,8 @@ fun BoxScope.SettingsDrawer(
     onClose: () -> Unit
 ) {
     var keyInput by remember(apiKey) { mutableStateOf(apiKey) }
+    var endpointInput by remember(endpoint) { mutableStateOf(endpoint) }
+    var modelInput by remember(model) { mutableStateOf(model) }
     var showKey by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
     
@@ -271,11 +273,26 @@ fun BoxScope.SettingsDrawer(
 
                     SectionTitle("Assistant")
 
-                    // Sirf API Key ka field rakha hai
+                    OutlinedTextField(
+                        value = endpointInput,
+                        onValueChange = { endpointInput = it },
+                        label = { Text("API endpoint URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = modelInput,
+                        onValueChange = { modelInput = it },
+                        label = { Text("Model") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     OutlinedTextField(
                         value = keyInput,
                         onValueChange = { keyInput = it },
-                        label = { Text("API key") },
+                        label = { Text("API key / JARVIS client token") },
                         singleLine = true,
                         visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
@@ -287,7 +304,7 @@ fun BoxScope.SettingsDrawer(
                     )
 
                     Text(
-                        "Stored on this phone only (not encrypted).",
+                        "For the Render gateway, use its /v1/chat/completions URL and your JARVIS client token. Do not paste your OpenRouter secret here. The key is stored encrypted on this phone.",
                         color = Ink.copy(alpha = 0.5f),
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -295,8 +312,7 @@ fun BoxScope.SettingsDrawer(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(
                             onClick = {
-                                // Baki values ko as it is bhej rahe hain taaki error na aaye
-                                onSaveText(keyInput.trim(), endpoint, model, wakeWord)
+                                onSaveText(keyInput.trim(), endpointInput.trim(), modelInput.trim(), wakeWord)
                                 saved = true
                             },
                             modifier = Modifier.weight(1f),
@@ -306,7 +322,7 @@ fun BoxScope.SettingsDrawer(
                         }
 
                         OutlinedButton(
-                            onClick = { onTestApi(keyInput.trim(), endpoint, model) },
+                            onClick = { onTestApi(keyInput.trim(), endpointInput.trim(), modelInput.trim()) },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
