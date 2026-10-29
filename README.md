@@ -1,16 +1,16 @@
 # JARVIS — Android and Windows desktop assistant
 
-JARVIS is a personal AI assistant project with an Android app and an early native Windows desktop companion.
+JARVIS is a personal assistant project with an Android app, a separate Windows desktop companion, and a shared AI gateway backend.
 
 ## Platforms
 
 ### Android
-The Android app is built with Kotlin and Jetpack Compose. It includes voice interaction, AI-provider configuration, an agent/runtime layer, context and memory helpers, accessibility integrations, and Android-specific device features.
+The Android app uses Kotlin and Jetpack Compose. It includes voice interaction, AI-provider configuration, agent/runtime helpers, context and memory components, accessibility integrations, image text extraction, and Android device actions.
 
-**Build and test:** Open the project in Android Studio, sync Gradle, and run the app on an Android device. See [offline wake-word setup](docs/OFFLINE_WAKE_WORD.md) for Picovoice configuration. The Android wake-word change is under review and still needs a real-device build/test before release.
+**Build/test:** Android CI builds the debug APK and runs JVM unit tests. These checks do not replace real-device testing for microphone/wake-word behavior, speech recognition, text-to-speech, permissions, camera/torch, phone actions, or accessibility features. See [offline wake-word setup](docs/OFFLINE_WAKE_WORD.md) for configuration details.
 
 ### Windows 10/11 desktop
-A separate Python/Tkinter companion is available in [desktop/windows](desktop/windows/README.md). It includes a JARVIS-themed chat UI, typed prompts, spoken AI replies, configurable OpenAI-compatible endpoint/model, and optional Picovoice wake-word listening.
+The separate Python/Tkinter companion in [desktop/windows](desktop/windows/README.md) includes typed chat, spoken AI replies, an animated orange orb, configurable endpoint/model, and optional Picovoice wake-word listening.
 
 Quick start in PowerShell:
 
@@ -22,18 +22,21 @@ pip install -r requirements.txt
 python jarvis_desktop.py
 ```
 
-See the desktop guide for credential setup, packaging into a Windows executable, and current limitations.
+Windows CI compiles Python source, runs configuration smoke tests, and packages a standalone executable. It does not exercise microphone hardware or validate real backend credentials.
 
-## Shared behavior and current limitations
+## Shared backend and limitations
 
-- Both apps can be configured to use a compatible chat-completions endpoint, but settings and conversation history do not sync automatically yet.
-- Windows-specific UI/system actions and Android-specific accessibility/device actions are separate platform integrations; features are not automatically identical.
-- Android local command support depends on the feature and device. General AI answers require a configured provider and internet.
-- The Windows wake-word detector uses Porcupine, while command transcription currently uses Google's online speech recognition. It therefore does not provide fully offline voice transcription.
-- API keys and Picovoice AccessKeys must be configured locally and must never be committed to the repository.
-- Android and Windows build checks are not substitutes for testing microphones, wake-word detection, TTS, permissions, and app behavior on the actual devices.
+- Both clients default to the JARVIS backend endpoint and can be configured to use a compatible chat-completions endpoint. Use the **JARVIS client token** in the client; keep the OpenRouter secret only in the backend environment.
+- Settings and conversation history do not automatically sync between Android and Windows.
+- Windows system actions and Android device/accessibility actions are separate platform integrations; features are not identical across platforms.
+- Android speech recognition and Windows speech transcription may require internet and permissions. Windows wake-word listening requires a configured Picovoice AccessKey; typed chat does not.
+- General AI responses require internet, a working backend client token, a valid server-side OpenRouter key, and an available upstream model. The free-model router can have rate limits or model capability differences.
+- Backend SQLite memory may not survive service restarts unless persistent storage is configured. The current backend memory API is a single shared collection per deployment, not per-user accounts.
+- Build/unit tests are not proof that every live integration works on a real device. Test AI chat, memory, audio, permissions, and platform actions before relying on them.
+- Never commit API keys or Picovoice AccessKeys.
 
 ## Development checks
 
-- Android: use Android Studio/Gradle and run unit tests.
-- Windows desktop: GitHub Actions compiles the Python source and runs configuration smoke tests on Windows.
+- Android: Gradle debug build and JVM unit tests in GitHub Actions.
+- Windows desktop: Python compilation, configuration smoke tests, and executable packaging in GitHub Actions.
+- Backend: run `python -m unittest discover -s tests -v` from `backend`.
