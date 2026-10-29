@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -144,18 +145,14 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
             Spacer(Modifier.height(22.dp))
             Box(
                 modifier = Modifier.size(width = 112.dp, height = 66.dp)
+                    .clickable(onClick = onMicTap)
                     .clip(CircleShape)
                     .background(Brush.verticalGradient(listOf(Color(0xFFFFB02E), Color(0xFF9B3C00))))
                     .background(Color(0xFF120900)),
                 contentAlignment = Alignment.Center
             ) {
                 Text("🎙", modifier = Modifier.padding(10.dp), fontSize = 28.sp, textAlign = TextAlign.Center)
-                androidx.compose.foundation.layout.Box(
-                    Modifier.fillMaxSize().clip(CircleShape)
-                        .background(Color.Transparent)
-                        .then(Modifier),
-                    contentAlignment = Alignment.Center
-                ) {}
+
             }
             Text(
                 when (state) {
