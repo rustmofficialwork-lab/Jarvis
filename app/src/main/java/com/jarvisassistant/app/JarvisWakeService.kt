@@ -18,6 +18,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.net.ConnectivityManager
+import android.net.Uri
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
@@ -597,6 +598,24 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
 
     /** Runs off the main thread. Returns (text, success). */
     private fun runPipeline(rawText: String, aiPrompt: String): Pair<String, Boolean> {
+        val normalizedCommand = CommandNormalizer.normalize(rawText, wakeWord).lowercase(Locale.ROOT)
+        val imageRequest = listOf(
+            "analyze image", "analyse image", "describe image", "analyze this photo",
+            "what is in this picture", "what's in this picture", "image samjho",
+            "photo samjho", "is photo ko samjho", "picture mein kya"
+        ).any(normalizedCommand::contains)
+        val selectedImageUri = prefs.getString("selected_image_uri", "").orEmpty()
+        val selectImageCommand = normalizedCommand in setOf(
+            "select image", "choose image", "pick image", "image select", "gallery kholo"
+        )
+        if (selectImageCommand || (imageRequest && selectedImageUri.isBlank())) {
+            sendBroadcast(Intent("com.jarvisassistant.app.JARVIS_PICK_IMAGE").setPackage(packageName))
+            return t(
+                "Opening the image picker. Select a picture, then ask me to analyse it.",
+                "Image picker khol raha hoon, Sir. Photo select karke mujhe uska analysis boliye."
+            ) to false
+        }
+
         // 1) Shared router (same commands as in-app)
         val localReply = try {
             JarvisCommandRouter.handle(this, rawText, wakeWord)
@@ -636,13 +655,24 @@ class JarvisWakeService : Service(), TextToSpeech.OnInitListener {
             } to false
         }
 
+        val imageAttachment = if (imageRequest && selectedImageUri.isNotBlank()) {
+            try {
+                ImageVision.encode(this, Uri.parse(selectedImageUri))
+            } catch (e: Exception) {
+                return "I couldn't read the selected image. Please choose it again in JARVIS settings." to false
+            }
+        } else null
+
         val answer = try {
             AiProvider.answer(
-                endpoint, model, key, aiPrompt, emptyList(), "", emptyList(),
-                false, false, false
+                endpoint, model, key, aiPrompt, emptyList(), "",
+                listOfNotNull(imageAttachment),
+                InternetResearch.shouldSearch(rawText),
+                imageAttachment != null,
+                false
             ) { aiCancelled }
         } catch (e: Exception) {
-            return "AI request failed: ${e.message ?: "Check internet."}" to false
+            return "AI request failed: ${e.message ?: "Check internet and ensure the selected model supports images."}" to false
         }
         return answer to true
     }
