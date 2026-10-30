@@ -105,6 +105,24 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         "open google": ("url", "https://www.google.com", "Opening Google."),
         "open youtube": ("url", "https://www.youtube.com", "Opening YouTube."),
     }
+    media_actions = {
+        "volume up": ("volume_up", "Volume increased."),
+        "increase volume": ("volume_up", "Volume increased."),
+        "volume down": ("volume_down", "Volume decreased."),
+        "decrease volume": ("volume_down", "Volume decreased."),
+        "mute": ("volume_mute", "Volume mute toggled."),
+        "unmute": ("volume_mute", "Volume mute toggled."),
+        "play pause": ("play_pause", "Media playback toggled."),
+        "pause music": ("play_pause", "Media playback toggled."),
+        "resume music": ("play_pause", "Media playback toggled."),
+        "next track": ("next_track", "Skipping to the next track."),
+        "previous track": ("previous_track", "Going to the previous track."),
+    }
+    if normalized in media_actions:
+        key_name, response = media_actions[normalized]
+        if not press_windows_media_key(key_name):
+            raise RuntimeError("Windows media controls are available only on Windows.")
+        return response
     action = actions.get(normalized)
     if action is None:
         return None
@@ -115,6 +133,30 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         if browse(target) is False:
             raise RuntimeError("Windows could not open the requested website.")
     return response
+
+
+def press_windows_media_key(key_name: str, keybd_event=None, platform_name=None) -> bool:
+    """Send one fixed Windows multimedia key; never accepts arbitrary key codes."""
+    import ctypes
+    import os as _os
+
+    if (platform_name or _os.name) != "nt":
+        return False
+    keys = {
+        "volume_up": 0xAF,
+        "volume_down": 0xAE,
+        "volume_mute": 0xAD,
+        "play_pause": 0xB3,
+        "next_track": 0xB0,
+        "previous_track": 0xB1,
+    }
+    code = keys.get(key_name)
+    if code is None:
+        return False
+    sender = keybd_event or ctypes.windll.user32.keybd_event
+    sender(code, 0, 0, 0)
+    sender(code, 0, 2, 0)
+    return True
 
 
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
