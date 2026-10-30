@@ -411,7 +411,7 @@ def filter_memory_history(history: list[dict]) -> list[dict]:
         if role == "user":
             normalized = " ".join(content.casefold().split())
             is_memory = bool(re.match(
-                r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\\b",
+                r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\b",
                 normalized,
             )) or normalized in recall
             skip_reply = is_memory
