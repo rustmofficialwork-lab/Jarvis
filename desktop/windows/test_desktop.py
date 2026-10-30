@@ -82,6 +82,30 @@ class InterruptibleSpeechTests(unittest.TestCase):
         speak.assert_called_once_with("Namaste", app.speech_stop_event)
         self.assertEqual([item["role"] for item in app.history], ["user", "assistant"])
 
+    def test_stop_requested_during_voice_generation_is_not_cleared_before_speech(self):
+        from unittest.mock import patch
+        import queue
+        import threading
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        app.settings = {"endpoint": "https://example.com/chat", "model": "test-model"}
+        app.ai_api_key = "test-key"
+        app.history = []
+        app.request_lock = threading.Lock()
+        app.speech_stop_event = threading.Event()
+        app.speech_stop_event.set()
+        observed = []
+        def fake_speak(_text, stop_event):
+            observed.append(stop_event.is_set())
+            return False
+        with (
+            patch.object(jarvis_desktop, "chat_completion", return_value="Namaste"),
+            patch.object(jarvis_desktop, "save_chat_history"),
+            patch.object(jarvis_desktop, "speak_text_interruptibly", side_effect=fake_speak),
+        ):
+            app._answer_voice("hello JARVIS")
+        self.assertEqual(observed, [True])
+
 
 class ChatCompletionValidationTests(unittest.TestCase):
     def test_rejects_non_https_endpoint(self):
