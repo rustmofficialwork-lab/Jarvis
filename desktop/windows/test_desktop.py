@@ -222,6 +222,9 @@ class ServiceStatusTests(unittest.TestCase):
         by_name = {name: ready for name, ready, _detail in statuses}
         self.assertTrue(by_name["AI CHAT"])
         self.assertTrue(by_name["VOICE ENGINE"])
+        details = {name: detail for name, _ready, detail in statuses}
+        self.assertEqual(details["AI CHAT"], "CONFIGURED")
+        self.assertEqual(details["VOICE ENGINE"], "CONFIGURED")
 
 
 class WindowsMediaKeyTests(unittest.TestCase):
