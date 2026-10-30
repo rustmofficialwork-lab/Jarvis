@@ -274,6 +274,7 @@ class SettingsPersistenceTests(unittest.TestCase):
             "model": "test-model",
             "language": "hi-IN",
             "start_with_windows": True,
+            "share_memory_with_ai": False,
         }
         jarvis_desktop.save_settings(settings, path)
         self.assertEqual(jarvis_desktop.load_settings(path), settings)
