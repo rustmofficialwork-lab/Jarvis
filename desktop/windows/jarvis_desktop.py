@@ -392,6 +392,40 @@ def validate_chat_configuration(endpoint: str, model: str) -> tuple[str, str]:
     return endpoint, model
 
 
+def filter_memory_history(history: list[dict]) -> list[dict]:
+    """Keep explicit memory-management exchanges out of online chat history."""
+    import re
+    filtered = []
+    skip_reply = False
+    recall = {
+        "what do you remember", "what do you remember about me",
+        "tumhe kya yaad hai", "mujhe kya yaad hai", "meri memories dikhao",
+        "show my memories", "show memories", "forget all memories",
+        "sab memories bhool jao", "saari yaadein delete karo",
+    }
+    for item in history[-16:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = str(item.get("content", ""))
+        if role == "user":
+            normalized = " ".join(content.casefold().split())
+            is_memory = bool(re.match(
+                r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\\b",
+                normalized,
+            )) or normalized in recall
+            skip_reply = is_memory
+            if is_memory:
+                continue
+        elif role == "assistant" and skip_reply:
+            skip_reply = False
+            continue
+        else:
+            skip_reply = False
+        filtered.append(item)
+    return filtered
+
+
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     history: list[dict], memories: list[str] | None = None) -> str:
     endpoint, model = validate_chat_configuration(endpoint, model)
@@ -415,7 +449,7 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     + "\n".join(f"- {item}" for item in safe_memories)
                 ),
             })
-    messages.extend(history[-16:])
+    messages.extend(filter_memory_history(history))
     messages.append({"role": "user", "content": prompt})
     payload = json.dumps({
         "model": model.strip(),
