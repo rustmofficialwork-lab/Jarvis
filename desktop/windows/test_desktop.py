@@ -665,5 +665,26 @@ class CancellableVoiceCaptureTests(unittest.TestCase):
         self.assertIsNone(command)
 
 
+    def test_preexisting_stop_does_not_open_or_read_microphone(self):
+        import threading
+
+        class WaitTimeoutError(Exception):
+            pass
+
+        stop_event = threading.Event()
+        stop_event.set()
+
+        class FakeRecognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                raise AssertionError("Microphone listen must not start after stop.")
+            def recognize_google(self, audio, language):
+                raise AssertionError("Cloud recognition must not start after stop.")
+
+        command = jarvis_desktop.listen_for_voice_command(
+            FakeRecognizer(), object(), stop_event, "en-IN", WaitTimeoutError,
+        )
+        self.assertIsNone(command)
+
+
 if __name__ == "__main__":
     unittest.main()
