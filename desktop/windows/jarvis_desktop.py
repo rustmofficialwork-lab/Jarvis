@@ -29,28 +29,37 @@ SYSTEM_PROMPT = (
 )
 
 
-def load_settings() -> dict:
+def load_settings(path: Path = SETTINGS_FILE) -> dict:
     defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN"}
     try:
-        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            settings = {**defaults, **data}
-            # Older installs used OpenRouter directly. Migrate them to the secured JARVIS gateway.
-            if settings.get("endpoint", "").strip() == "https://openrouter.ai/api/v1/chat/completions":
-                settings["endpoint"] = DEFAULT_ENDPOINT
-                try:
-                    save_settings(settings)
-                except OSError:
-                    pass
-            return settings
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return defaults
+        # Accept only expected, correctly typed preferences; ignore malformed values.
+        settings = {
+            "endpoint": data.get("endpoint") if isinstance(data.get("endpoint"), str) else DEFAULT_ENDPOINT,
+            "model": data.get("model") if isinstance(data.get("model"), str) else DEFAULT_MODEL,
+            "language": data.get("language") if data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
+            "start_with_windows": data.get("start_with_windows") is True,
+        }
+        # Older installs used OpenRouter directly. Migrate them to the secured JARVIS gateway.
+        if settings["endpoint"].strip() == "https://openrouter.ai/api/v1/chat/completions":
+            settings["endpoint"] = DEFAULT_ENDPOINT
+            try:
+                save_settings(settings, path)
+            except OSError:
+                pass
+        return settings
     except (OSError, ValueError):
-        pass
-    return defaults
+        return defaults
 
 
-def save_settings(data: dict) -> None:
-    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+def save_settings(data: dict, path: Path = SETTINGS_FILE) -> None:
+    """Atomically persist non-secret preferences; credentials belong in Credential Manager."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    temporary.replace(path)
 
 
 def load_chat_history(path: Path = HISTORY_FILE) -> list[dict]:
