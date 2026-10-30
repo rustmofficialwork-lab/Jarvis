@@ -545,11 +545,13 @@ class JarvisDesktop:
             importlib.util.find_spec(module) is not None
             for module in ("pvporcupine", "pvrecorder", "speech_recognition", "pyttsx3")
         )
+        memory_store = getattr(self, "memory_store", None)
+        memory_detail = f"{len(memory_store.list())} SAVED LOCALLY" if memory_store else "LOCAL STORE"
         return [
             ("AI CHAT", ai_ready, "CONFIGURED" if ai_ready else "ADD API TOKEN"),
             ("VOICE ENGINE", voice_key_ready and voice_packages,
              "CONFIGURED" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
-            ("MEMORY", True, f"{len(self.memory_store.list())} SAVED LOCALLY"),
+            ("MEMORY", True, memory_detail),
             ("SYSTEM CONTROL", os.name == "nt",
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
         ]
