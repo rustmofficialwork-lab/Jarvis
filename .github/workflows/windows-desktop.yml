@@ -40,7 +40,7 @@ jobs:
         run: python -m pip install -r desktop/windows/requirements.txt
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all pystray --collect-all PIL --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all pystray --collect-all PIL --collect-all vosk --name JARVIS jarvis_desktop.py
       - name: Upload JARVIS Windows executable
         uses: actions/upload-artifact@v4
         with:
