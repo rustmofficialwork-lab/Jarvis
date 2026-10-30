@@ -240,6 +240,19 @@ class ChatHistoryTests(unittest.TestCase):
         path.write_text("{broken", encoding="utf-8")
         self.assertEqual(jarvis_desktop.load_chat_history(path), [])
 
+    def test_history_with_unhashable_role_is_ignored(self):
+        import json
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "history.json"
+        path.write_text(json.dumps([{"role": ["user"], "content": "bad"}]), encoding="utf-8")
+        self.assertEqual(jarvis_desktop.load_chat_history(path), [])
+
+    def test_save_history_skips_unhashable_roles(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "history.json"
+        jarvis_desktop.save_chat_history([{"role": {"bad": "role"}, "content": "skip"}], path)
+        self.assertEqual(jarvis_desktop.load_chat_history(path), [])
+
     def test_history_rejects_invalid_roles_and_limits_entries(self):
         import tempfile
         path = Path(tempfile.mkdtemp()) / "history.json"
