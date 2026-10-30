@@ -774,9 +774,11 @@ class JarvisDesktop:
                 access_key=self.picovoice_access_key.strip(), 
                 keywords=["jarvis"],
             )
-            recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
             self.events.put(("status", "Listening locally for “Jarvis”. Windows may show its microphone indicator."))
             while not self.stop_event.is_set():
+                # Release Porcupine's microphone handle before SpeechRecognition opens it.
+                if recorder is None:
+                    recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
                 recorder.start()
                 try:
                     detected = False
@@ -787,6 +789,8 @@ class JarvisDesktop:
                     recorder.stop()
                     if not detected or self.stop_event.is_set():
                         break
+                    recorder.delete()
+                    recorder = None
                     self.events.put(("status", "Wake word detected — speak your command now."))
                     recognizer = sr.Recognizer()
                     try:
