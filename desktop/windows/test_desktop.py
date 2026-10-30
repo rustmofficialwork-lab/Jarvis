@@ -106,5 +106,29 @@ class LocalCommandTests(unittest.TestCase):
         self.assertEqual(calls, [])
 
 
+class ServiceStatusTests(unittest.TestCase):
+    def test_service_status_does_not_claim_unconfigured_ai_or_voice_ready(self):
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.ai_api_key = ""
+        app.picovoice_access_key = ""
+        statuses = app._get_service_statuses()
+        by_name = {name: ready for name, ready, _detail in statuses}
+        self.assertFalse(by_name["AI CHAT"])
+        self.assertFalse(by_name["VOICE ENGINE"])
+        self.assertTrue(by_name["MEMORY"])
+        self.assertEqual(len(statuses), 4)
+
+    def test_configured_ai_and_voice_readiness_uses_installed_packages(self):
+        from unittest.mock import patch
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.ai_api_key = "test-token"
+        app.picovoice_access_key = "test-key"
+        with patch("importlib.util.find_spec", return_value=object()):
+            statuses = app._get_service_statuses()
+        by_name = {name: ready for name, ready, _detail in statuses}
+        self.assertTrue(by_name["AI CHAT"])
+        self.assertTrue(by_name["VOICE ENGINE"])
+
+
 if __name__ == "__main__":
     unittest.main()
