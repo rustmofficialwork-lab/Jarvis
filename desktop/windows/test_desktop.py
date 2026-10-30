@@ -612,6 +612,44 @@ class ApplicationShutdownTests(unittest.TestCase):
         self.assertTrue(app.root.destroyed)
 
 
+class WakeRecorderCleanupTests(unittest.TestCase):
+    def test_release_stops_active_recorder_before_deleting_it(self):
+        calls = []
+
+        class FakeRecorder:
+            is_recording = True
+            def stop(self):
+                calls.append("stop")
+            def delete(self):
+                calls.append("delete")
+
+        jarvis_desktop.release_wake_recorder(FakeRecorder())
+        self.assertEqual(calls, ["stop", "delete"])
+
+    def test_release_still_deletes_recorder_if_stop_fails(self):
+        calls = []
+
+        class FakeRecorder:
+            is_recording = True
+            def stop(self):
+                calls.append("stop")
+                raise OSError("device disconnected")
+            def delete(self):
+                calls.append("delete")
+
+        jarvis_desktop.release_wake_recorder(FakeRecorder())
+        self.assertEqual(calls, ["stop", "delete"])
+
+    def test_release_handles_missing_recorder_and_delete_failure(self):
+        class FakeRecorder:
+            is_recording = False
+            def delete(self):
+                raise OSError("device already released")
+
+        self.assertIsNone(jarvis_desktop.release_wake_recorder(None))
+        self.assertIsNone(jarvis_desktop.release_wake_recorder(FakeRecorder()))
+
+
 class VoiceRecognizerTimeoutTests(unittest.TestCase):
     def test_online_recognition_timeout_is_bounded(self):
         class FakeRecognizer:
