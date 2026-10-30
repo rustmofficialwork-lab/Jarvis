@@ -324,6 +324,18 @@ class LocalCommandTests(unittest.TestCase):
             [(["explorer.exe", str(Path.home() / "Downloads")], {"shell": False})],
         )
 
+    def test_downloads_folder_alias_opens_same_fixed_user_folder_without_shell(self):
+        calls = []
+        result = jarvis_desktop.run_local_command(
+            "open downloads folder",
+            popen=lambda args, **kwargs: calls.append((args, kwargs)),
+        )
+        self.assertEqual(result, "Opening Downloads.")
+        self.assertEqual(
+            calls,
+            [(["explorer.exe", str(Path.home() / "Downloads")], {"shell": False})],
+        )
+
     def test_allowlisted_website_uses_fixed_url(self):
         opened = []
         result = jarvis_desktop.run_local_command(
