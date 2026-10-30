@@ -44,6 +44,19 @@ jobs:
       - name: Upload JARVIS Windows executable
         uses: actions/upload-artifact@v4
         with:
-          name: JARVIS-Windows-x64
+          name: JARVIS-Windows-Portable-x64
           path: desktop/windows/dist/JARVIS.exe
+          if-no-files-found: error
+
+      - name: Create Windows installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
+        with:
+          path: desktop/windows/installer/JARVIS.iss
+          options: /O+ /DMyAppVersion=1.0.0
+
+      - name: Upload JARVIS Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-Windows-Installer-x64
+          path: desktop/windows/dist-installer/JARVIS-Setup-x64.exe
           if-no-files-found: error
