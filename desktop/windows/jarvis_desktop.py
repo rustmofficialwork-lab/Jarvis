@@ -130,7 +130,7 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
 
     launch = popen or subprocess.Popen
     browse = open_url or webbrowser.open
-    normalized = " ".join(command.casefold().strip().rstrip(" .!?").split())
+    normalized = " ".join(command.casefold().strip().rstrip(" .!?।॥").split())
     actions = {
         "open notepad": ("app", ["notepad.exe"], "Opening Notepad."),
         "start notepad": ("app", ["notepad.exe"], "Opening Notepad."),
