@@ -804,6 +804,9 @@ class JarvisDesktop:
                         self.events.put(("status", "Sorry, I couldn't understand that. Listening again."))
                     except sr.RequestError as exc:
                         self.events.put(("status", f"Speech recognition needs internet; wake-word listening will continue: {exc}"))
+                    except OSError as exc:
+                        self.events.put(("status", f"Microphone unavailable ({exc}). Retrying in 2 seconds…"))
+                        self.stop_event.wait(2)
                 finally:
                     if recorder.is_recording:
                         recorder.stop()
