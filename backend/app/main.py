@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
@@ -61,6 +61,14 @@ app = FastAPI(
 class MemoryInput(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
 
+    @field_validator("content")
+    @classmethod
+    def content_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Memory content must not be blank.")
+        return value
+
 
 def require_client_token(authorization: str | None = Header(default=None)) -> None:
     expected = os.getenv("JARVIS_CLIENT_TOKEN", "").strip()
@@ -98,6 +106,8 @@ async def chat_completions(request: Request) -> Response:
         payload: dict[str, Any] = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="Request body must be valid JSON.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Request body must be a JSON object.")
     messages = payload.get("messages")
     if not isinstance(messages, list) or not messages or len(messages) > 60:
         raise HTTPException(status_code=422, detail="Provide between 1 and 60 messages.")
