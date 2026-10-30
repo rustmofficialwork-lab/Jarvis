@@ -94,6 +94,33 @@ def save_chat_history(history: list[dict], path: Path = HISTORY_FILE) -> None:
     temporary.replace(path)
 
 
+def adjust_windows_brightness(direction: str, brightness_module=None, platform_name=None) -> int:
+    """Adjust the primary display brightness in fixed 10-point steps."""
+    import os as _os
+
+    if (platform_name or _os.name) != "nt":
+        raise RuntimeError("Display brightness controls are available only on Windows.")
+    if direction not in {"up", "down"}:
+        raise ValueError("Brightness direction must be 'up' or 'down'.")
+    if brightness_module is None:
+        try:
+            import screen_brightness_control as brightness_module
+        except ImportError as exc:
+            raise RuntimeError("Install the screen-brightness-control package to adjust display brightness.") from exc
+    current = brightness_module.get_brightness(display=0)
+    if isinstance(current, list):
+        if not current:
+            raise RuntimeError("Windows did not report a brightness level for the primary display.")
+        current = current[0]
+    try:
+        current = int(current)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Windows returned an invalid display brightness level.") from exc
+    target = max(0, min(100, current + (10 if direction == "up" else -10)))
+    brightness_module.set_brightness(target, display=0)
+    return target
+
+
 def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     """Run only fixed, explicitly allowlisted desktop actions; never invoke a shell."""
     import subprocess
@@ -115,6 +142,15 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         "open google": ("url", "https://www.google.com", "Opening Google."),
         "open youtube": ("url", "https://www.youtube.com", "Opening YouTube."),
     }
+    brightness_actions = {
+        "brightness up": "up",
+        "increase brightness": "up",
+        "brightness down": "down",
+        "decrease brightness": "down",
+    }
+    if normalized in brightness_actions:
+        level = adjust_windows_brightness(brightness_actions[normalized])
+        return f"Display brightness set to {level}%."
     media_actions = {
         "volume up": ("volume_up", "Volume increased."),
         "increase volume": ("volume_up", "Volume increased."),
