@@ -72,7 +72,8 @@ def load_chat_history(path: Path = HISTORY_FILE) -> list[dict]:
         return []
     clean = []
     for item in data[-100:]:
-        if (isinstance(item, dict) and item.get("role") in {"user", "assistant"}
+        if (isinstance(item, dict) and isinstance(item.get("role"), str)
+                and item.get("role") in {"user", "assistant"}
                 and isinstance(item.get("content"), str)):
             content = item["content"].strip()
             if content:
@@ -86,7 +87,8 @@ def save_chat_history(history: list[dict], path: Path = HISTORY_FILE) -> None:
     clean = [
         {"role": item["role"], "content": str(item["content"])[:12000]}
         for item in history[-100:]
-        if isinstance(item, dict) and item.get("role") in {"user", "assistant"}
+        if isinstance(item, dict) and isinstance(item.get("role"), str)
+        and item.get("role") in {"user", "assistant"}
         and isinstance(item.get("content"), str)
     ]
     temporary = path.with_suffix(path.suffix + ".tmp")
