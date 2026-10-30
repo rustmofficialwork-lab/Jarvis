@@ -135,6 +135,25 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     return response
 
 
+def schedule_windows_power_action(action: str, popen=None, platform_name=None) -> bool:
+    """Schedule a fixed Windows power action with a 60-second cancellation window."""
+    import os as _os
+    import subprocess
+
+    if (platform_name or _os.name) != "nt":
+        return False
+    commands = {
+        "shutdown": ["shutdown.exe", "/s", "/t", "60"],
+        "restart": ["shutdown.exe", "/r", "/t", "60"],
+        "cancel": ["shutdown.exe", "/a"],
+    }
+    command = commands.get(action)
+    if command is None:
+        return False
+    (popen or subprocess.Popen)(command, shell=False)
+    return True
+
+
 def press_windows_media_key(key_name: str, keybd_event=None, platform_name=None) -> bool:
     """Send one fixed Windows multimedia key; never accepts arbitrary key codes."""
     import ctypes
@@ -275,6 +294,7 @@ class JarvisDesktop:
                                         command=self.toggle_listening)
         self.chat_button = ttk.Button(self.root, text="CHAT LOG", style="HUD.TButton", command=self.open_chat)
         self.settings_button = ttk.Button(self.root, text="SETTINGS ⚙", style="HUD.TButton", command=self.open_settings)
+        self.power_button = ttk.Button(self.root, text="POWER", style="HUD.TButton", command=self.open_power_controls)
         self.prompt_entry.bind("<Return>", lambda _event: self.send_text())
         self._draw_orb()
         self.root.after(50, self._animate_orb)
@@ -330,6 +350,7 @@ class JarvisDesktop:
                       fill="#328aa8", anchor="w", font=("Consolas", 9))
         c.create_window(w-365, 35, window=self.chat_button, width=105, height=30)
         c.create_window(w-250, 35, window=self.settings_button, width=115, height=30)
+        c.create_window(w-125, 35, window=self.power_button, width=90, height=30)
         c.create_oval(w-190, 25, w-178, 37, fill="#00f0a0", outline="")
         c.create_text(w-165, 31, text="SYSTEM ONLINE", fill=bright, anchor="w",
                       font=("Consolas", 10, "bold"))
@@ -749,6 +770,51 @@ class JarvisDesktop:
             self.events.put(("error", str(exc)))
         finally:
             self.request_lock.release()
+
+    def open_power_controls(self):
+        """Show explicit confirmation before scheduling a Windows power action."""
+        window = tk.Toplevel(self.root)
+        window.title("JARVIS | Power controls")
+        window.configure(bg="#07111b")
+        window.resizable(False, False)
+        tk.Label(window, text="SYSTEM POWER CONTROLS", bg="#07111b", fg="#8af4ff",
+                 font=("Consolas", 13, "bold")).pack(padx=20, pady=(18, 8))
+        tk.Label(window, text="Shutdown and restart start a 60-second timer.\nYou can cancel it using the button below.",
+                 bg="#07111b", fg="#d7f4ff", justify="center").pack(padx=20, pady=8)
+
+        def request(action, title):
+            if not messagebox.askyesno(
+                title, f"Are you sure you want to {action} this PC?\n\n"
+                       "The action will be scheduled for 60 seconds from now.",
+                parent=window,
+            ):
+                return
+            try:
+                if not schedule_windows_power_action(action):
+                    raise RuntimeError("Power controls are available only on Windows.")
+                self._set_status(f"{title} scheduled. You have 60 seconds to cancel.")
+                messagebox.showinfo("JARVIS", f"{title} scheduled. Use Cancel pending action within 60 seconds.",
+                                    parent=window)
+            except Exception as exc:
+                messagebox.showerror("Power action failed", str(exc), parent=window)
+
+        ttk.Button(window, text="Shut down (60 sec)", style="HUD.TButton",
+                   command=lambda: request("shut down", "Shutdown")).pack(fill="x", padx=24, pady=5)
+        ttk.Button(window, text="Restart (60 sec)", style="HUD.TButton",
+                   command=lambda: request("restart", "Restart")).pack(fill="x", padx=24, pady=5)
+        ttk.Button(window, text="Cancel pending shutdown/restart", style="HUD.TButton",
+                   command=lambda: self._cancel_power_action(window)).pack(fill="x", padx=24, pady=5)
+        ttk.Button(window, text="Close", style="HUD.TButton",
+                   command=window.destroy).pack(padx=24, pady=(8, 18))
+
+    def _cancel_power_action(self, parent):
+        try:
+            if not schedule_windows_power_action("cancel"):
+                raise RuntimeError("Power controls are available only on Windows.")
+            self._set_status("Pending shutdown/restart cancellation requested.")
+            messagebox.showinfo("JARVIS", "Cancellation command sent.", parent=parent)
+        except Exception as exc:
+            messagebox.showerror("Could not cancel", str(exc), parent=parent)
 
     def open_settings(self):
         window = tk.Toplevel(self.root)
