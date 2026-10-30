@@ -219,16 +219,9 @@ class JarvisDesktop:
         c.create_text(144, 184, text=now.strftime("%A  •  %d %B %Y").upper(),
                       fill="#56cce9", font=("Consolas", 10))
         panel(left, 294, 260, 488, "SYSTEM RESOURCES")
-        stats = []
-        try:
-            import psutil
-            stats = [("CPU LOAD", f"{psutil.cpu_percent():.0f}%"),
-                     ("MEMORY", f"{psutil.virtual_memory().percent:.0f}%"),
-                     ("BATTERY", f"{psutil.sensors_battery().percent:.0f}%" if psutil.sensors_battery() else "AC POWER")]
-        except Exception:
-            stats = [("CPU LOAD", "N/A"), ("MEMORY", "N/A"), ("BATTERY", "N/A")]
-        for i, (label, value) in enumerate(stats):
-            yy = 340 + i*45
+        stats = self._get_system_metrics()
+        for i, (label, value) in enumerate(stats[:4]):
+            yy = 338 + i*35
             c.create_text(48, yy, text=label, fill="#55aeca", anchor="w", font=("Consolas", 9))
             c.create_text(238, yy, text=value, fill=bright, anchor="e", font=("Consolas", 12, "bold"))
             c.create_rectangle(48, yy+12, 238, yy+18, outline="#075477")
@@ -251,9 +244,11 @@ class JarvisDesktop:
         # Right-side system status and JARVIS info
         rx = w-270
         panel(rx, 88, w-28, 278, "ENVIRONMENT")
+        metrics = dict(stats)
         c.create_text(rx+24, 145, text="CPU TEMPERATURE", fill="#55aeca", anchor="w", font=("Consolas", 9))
-        c.create_text(w-92, 180, text="--°C", fill=bright, font=("Consolas", 27, "bold"))
-        c.create_text(rx+24, 220, text="NETWORK  •  CONNECTED", fill="#62e8ff", anchor="w", font=("Consolas", 9))
+        c.create_text(w-92, 180, text=metrics.get("CPU TEMP", "N/A"), fill=bright, font=("Consolas", 27, "bold"))
+        network_label = "NETWORK  •  ONLINE" if metrics.get("NETWORK") == "ONLINE" else "NETWORK  •  OFFLINE"
+        c.create_text(rx+24, 220, text=network_label, fill="#62e8ff" if metrics.get("NETWORK") == "ONLINE" else "#ff8877", anchor="w", font=("Consolas", 9))
         panel(rx, 294, w-28, h-110, "J.A.R.V.I.S.  /  ASSISTANT")
         c.create_text(rx+24, 348, text="Always here for you.", fill=bright, anchor="w",
                       font=("Segoe UI", 14, "bold"))
@@ -323,6 +318,40 @@ class JarvisDesktop:
                       font=("Consolas", 9, "bold"))
         c.create_text(w-35, h-35, text="ESC  /  EXIT", fill="#328aa8", anchor="e",
                       font=("Consolas", 8))
+
+    def _get_system_metrics(self):
+        """Read actual Windows resource metrics, caching them between animation frames."""
+        import time
+        now = time.monotonic()
+        cached = getattr(self, "_metrics_cache", None)
+        if cached and now - cached[0] < 1.0:
+            return cached[1]
+        try:
+            import psutil
+            battery = psutil.sensors_battery()
+            drive = os.environ.get("SystemDrive", "C:") + chr(92)
+            disk = psutil.disk_usage(drive)
+            try:
+                temperatures = psutil.sensors_temperatures(fahrenheit=False)
+                cpu_temp = next((entry.current for entries in temperatures.values()
+                                 for entry in entries if entry.current is not None), None)
+            except (AttributeError, NotImplementedError, OSError):
+                cpu_temp = None
+            network = any(info.isup for name, info in psutil.net_if_stats().items()
+                          if name.lower() not in {"lo", "loopback"})
+            values = [
+                ("CPU LOAD", f"{psutil.cpu_percent(interval=None):.0f}%"),
+                ("MEMORY", f"{psutil.virtual_memory().percent:.0f}%"),
+                ("DISK USED", f"{disk.percent:.0f}%"),
+                ("BATTERY", f"{battery.percent:.0f}%" if battery else "AC POWER"),
+                ("CPU TEMP", f"{cpu_temp:.0f}°C" if cpu_temp is not None else "N/A"),
+                ("NETWORK", "ONLINE" if network else "OFFLINE"),
+            ]
+        except Exception:
+            values = [("CPU LOAD", "N/A"), ("MEMORY", "N/A"), ("DISK USED", "N/A"),
+                      ("BATTERY", "N/A"), ("CPU TEMP", "N/A"), ("NETWORK", "OFFLINE")]
+        self._metrics_cache = (now, values)
+        return values
 
     def open_quick_access(self, name: str):
         """Open a real Windows known folder from the HUD shortcut."""
