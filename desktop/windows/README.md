@@ -51,3 +51,8 @@ The executable is written to `dist\JARVIS.exe`. Keep the original `requirements.
 - It shares the configurable OpenAI-compatible endpoint/model approach, but Android-only controls (accessibility, notifications, phone settings, etc.) are not available on Windows.
 - Speech-to-text is online and currently defaults to English (India). AI replies can be in Hindi, English, or Hinglish based on the prompt.
 - Test the microphone and wake word on the actual Windows laptop before relying on continuous listening.
+
+
+## Automated installer artifact
+
+The Windows CI builds both a portable `JARVIS.exe` and an Inno Setup installer named `JARVIS-Setup-x64.exe`. After a successful `Windows Desktop Checks` workflow, download the `JARVIS-Windows-Installer-x64` artifact from the run's Artifacts section. The installer creates a Start Menu shortcut and offers an optional Desktop shortcut. It installs per-user without administrator privileges; it does not enable automatic startup.
