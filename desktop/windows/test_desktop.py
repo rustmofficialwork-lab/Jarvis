@@ -8,6 +8,60 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class InterruptibleSpeechTests(unittest.TestCase):
+    def test_speech_finishes_when_engine_becomes_idle(self):
+        class FakeEngine:
+            def __init__(self):
+                self.busy_checks = 0
+                self.ended = False
+            def say(self, text):
+                self.text = text
+            def startLoop(self, use_driver_loop):
+                self.started = use_driver_loop
+            def isBusy(self):
+                self.busy_checks += 1
+                return self.busy_checks == 1
+            def iterate(self):
+                pass
+            def endLoop(self):
+                self.ended = True
+            def stop(self):
+                pass
+        engine = FakeEngine()
+        import threading
+        self.assertTrue(jarvis_desktop.speak_text_interruptibly(
+            "Hello", threading.Event(), engine_factory=lambda: engine,
+        ))
+        self.assertTrue(engine.ended)
+        self.assertEqual(engine.text, "Hello")
+
+    def test_stop_request_interrupts_speech(self):
+        class FakeEngine:
+            def __init__(self):
+                self.stop_event = None
+                self.stopped = False
+            def say(self, text):
+                pass
+            def startLoop(self, use_driver_loop):
+                pass
+            def isBusy(self):
+                return True
+            def iterate(self):
+                self.stop_event.set()
+            def endLoop(self):
+                pass
+            def stop(self):
+                self.stopped = True
+        import threading
+        event = threading.Event()
+        engine = FakeEngine()
+        engine.stop_event = event
+        self.assertFalse(jarvis_desktop.speak_text_interruptibly(
+            "Long response", event, engine_factory=lambda: engine,
+        ))
+        self.assertTrue(engine.stopped)
+
+
 class ChatCompletionValidationTests(unittest.TestCase):
     def test_rejects_non_https_endpoint(self):
         with self.assertRaisesRegex(ValueError, "HTTPS"):
