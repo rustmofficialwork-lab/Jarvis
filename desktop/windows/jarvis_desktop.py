@@ -866,7 +866,6 @@ class JarvisDesktop:
                 self.events.put(("status", f"Reply ready; chat history could not be saved: {exc}"))
             self.events.put(("answer", answer))
             try:
-                self.speech_stop_event.clear()
                 speak_text_interruptibly(answer, self.speech_stop_event)
             except Exception as exc:
                 self.events.put(("status", f"Reply shown; speech output unavailable: {exc}"))
