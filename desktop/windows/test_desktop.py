@@ -898,15 +898,15 @@ class OfflineModelAutoSetupTests(unittest.TestCase):
         self.assertTrue(any("Offline voice is ready" in message for kind, message in messages))
 
     def test_existing_selected_model_is_not_downloaded_again(self):
-        from pathlib import Path
-        from unittest.mock import patch
+        from unittest.mock import Mock, patch
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.settings = {"language": "en-IN"}
         app.offline_model_setup_running = False
-        with patch.object(jarvis_desktop, "model_path_for_language", return_value=Path("installed-model")) as model_path, \
+        installed_model = Mock()
+        installed_model.is_dir.return_value = True
+        with patch.object(jarvis_desktop, "model_path_for_language", return_value=installed_model), \
              patch.object(jarvis_desktop, "install_offline_model") as install:
-            model_path.return_value.is_dir = lambda: True
             self.assertFalse(app._ensure_offline_model())
         install.assert_not_called()
 
