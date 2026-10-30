@@ -298,6 +298,21 @@ def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool
             pass
 
 
+def listen_for_voice_command(recognizer, source, stop_event, language: str,
+                             wait_timeout_error) -> str | None:
+    """Wait for a command in short, cancellable intervals without reopening the microphone."""
+    while not stop_event.is_set():
+        try:
+            audio = recognizer.listen(source, timeout=1, phrase_time_limit=12)
+        except wait_timeout_error:
+            continue
+        # Do not start an online recognition request after the user has stopped listening.
+        if stop_event.is_set():
+            return None
+        return recognizer.recognize_google(audio, language=language)
+    return None
+
+
 def validate_chat_configuration(endpoint: str, model: str) -> tuple[str, str]:
     """Validate and normalize non-secret chat settings before saving or sending."""
     from urllib.parse import urlparse
@@ -888,12 +903,19 @@ class JarvisDesktop:
                     try:
                         with sr.Microphone() as source:
                             recognizer.adjust_for_ambient_noise(source, duration=0.35)
-                            audio = recognizer.listen(source, timeout=5, phrase_time_limit=12)
-                        command = recognizer.recognize_google(audio, language=self.settings.get("language", "en-IN"))
+                            command = listen_for_voice_command(
+                                recognizer, source, self.stop_event,
+                                self.settings.get("language", "en-IN"), sr.WaitTimeoutError,
+                            )
+                        if self.stop_event.is_set():
+                            break
+                        if command is None:
+                            continue
                         self.events.put(("status", f"Heard: {command}"))
                         self._answer_voice(command)
                     except sr.WaitTimeoutError:
-                        self.events.put(("status", "No command heard. Listening again."))
+                        # Keep polling in short intervals so Stop/Exit is responsive.
+                        continue
                     except sr.UnknownValueError:
                         self.events.put(("status", "Sorry, I couldn't understand that. Listening again."))
                     except sr.RequestError as exc:
