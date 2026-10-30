@@ -78,6 +78,25 @@ class ChatHistoryTests(unittest.TestCase):
         self.assertEqual(loaded[0]["content"], "5")
 
 
+class LocalCommandHistoryTests(unittest.TestCase):
+    def test_failed_local_action_is_visible_and_persisted(self):
+        from unittest.mock import patch
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.history = []
+        app.transcript = []
+        app.chat = None
+        app._set_status = lambda _text: None
+        with patch.object(jarvis_desktop, "run_local_command",
+                          side_effect=RuntimeError("test failure")), \
+             patch.object(jarvis_desktop, "save_chat_history") as save:
+            self.assertTrue(app._try_local_command("open notepad"))
+        self.assertEqual([item["role"] for item in app.history], ["user", "assistant"])
+        self.assertEqual(app.history[0]["content"], "open notepad")
+        self.assertIn("test failure", app.history[1]["content"])
+        self.assertEqual([item[0] for item in app.transcript], ["YOU", "JARVIS ERROR"])
+        save.assert_called_once_with(app.history)
+
+
 class LocalCommandTests(unittest.TestCase):
     def test_allowlisted_app_uses_shell_false(self):
         calls = []
