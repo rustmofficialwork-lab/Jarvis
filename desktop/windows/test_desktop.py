@@ -333,6 +333,24 @@ class LocalCommandTests(unittest.TestCase):
         self.assertEqual(result, "Opening Notepad.")
         self.assertEqual(calls, [(["notepad.exe"], {"shell": False})])
 
+    def test_hindi_full_stop_is_ignored_for_local_commands(self):
+        calls = []
+        result = jarvis_desktop.run_local_command(
+            "नोटपैड खोलो।",
+            popen=lambda args, **kwargs: calls.append((args, kwargs)),
+        )
+        self.assertEqual(result, "Opening Notepad.")
+        self.assertEqual(calls, [(["notepad.exe"], {"shell": False})])
+
+    def test_hindi_double_danda_is_ignored_for_local_commands(self):
+        calls = []
+        result = jarvis_desktop.run_local_command(
+            "आवाज़ बढ़ाओ॥",
+            popen=lambda args, **kwargs: calls.append((args, kwargs)),
+        )
+        self.assertEqual(result, "Volume increased.")
+        self.assertEqual(calls, [])
+
     def test_hindi_and_hinglish_app_aliases_use_the_same_safe_allowlist(self):
         calls = []
         for phrase in ("notepad kholo", "नोटपैड खोलो", "कैलकुलेटर खोलो"):
