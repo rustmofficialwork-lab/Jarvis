@@ -535,7 +535,7 @@ class JarvisDesktop:
             ("AI CHAT", ai_ready, "CONFIGURED" if ai_ready else "ADD API TOKEN"),
             ("VOICE ENGINE", voice_key_ready and voice_packages,
              "CONFIGURED" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
-            ("MEMORY", True, "LOCAL HISTORY"),
+            ("MEMORY", True, f"{len(self.memory_store.list())} SAVED LOCALLY"),
             ("SYSTEM CONTROL", os.name == "nt",
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
         ]
@@ -799,7 +799,156 @@ class JarvisDesktop:
         ttk.Button(bottom, text="Close", style="HUD.TButton",
                    command=win.withdraw).pack(side="right")
 
-    def _load_secrets(self):
+
+    def _handle_memory_command(self, prompt: str) -> bool:
+        """Handle explicit remember/recall/forget requests without sending them online."""
+        import re
+        text = prompt.strip()
+        match = re.match(r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\\s*[:,-]?\\s*(.+)$", text, re.IGNORECASE)
+        if match:
+            content = match.group(1).strip().rstrip(".!?।")
+            try:
+                self.memory_store.add(content, "general")
+                reply = "Yaad rakh liya. Ye memory sirf is PC par save hui hai."
+            except ValueError as exc:
+                reply = str(exc)
+            self._append("YOU", prompt)
+            self._append("JARVIS", reply)
+            self.history.extend([{"role": "user", "content": prompt},
+                                 {"role": "assistant", "content": reply}])
+            try:
+                save_chat_history(self.history)
+            except OSError:
+                pass
+            self._set_status("Local memory updated.")
+            return True
+
+        normalized = " ".join(text.casefold().split())
+        recall_phrases = {
+            "what do you remember", "what do you remember about me",
+            "tumhe kya yaad hai", "mujhe kya yaad hai", "meri memories dikhao",
+            "show my memories", "show memories",
+        }
+        if normalized in recall_phrases:
+            items = self.memory_store.list()
+            reply = ("Abhi koi saved memory nahi hai." if not items else
+                     "Mujhe ye baatein yaad hain:\\n" + "\\n".join(
+                         f"• {item['content']}" for item in items[:20]
+                     ))
+            self._append("YOU", prompt)
+            self._append("JARVIS", reply)
+            self.history.extend([{"role": "user", "content": prompt},
+                                 {"role": "assistant", "content": reply}])
+            try:
+                save_chat_history(self.history)
+            except OSError:
+                pass
+            self._set_status(f"{len(items)} local memories.")
+            return True
+
+        if normalized in {"forget all memories", "sab memories bhool jao", "saari yaadein delete karo"}:
+            if messagebox.askyesno("Delete all memories", "Permanently delete every locally saved JARVIS memory?", parent=self.root):
+                removed = self.memory_store.clear()
+                reply = f"{removed} memories deleted from this PC."
+            else:
+                reply = "The saved memories were kept."
+            self._append("JARVIS", reply)
+            self._set_status("Local memory updated.")
+            return True
+        return False
+
+    def open_memory_manager(self):
+        """Show, add, edit, and delete memories stored only on this PC."""
+        window = tk.Toplevel(self.root)
+        window.title("JARVIS | Local Memory")
+        window.geometry("650x520")
+        window.configure(bg="#07111b")
+        window.minsize(520, 400)
+        tk.Label(
+            window, text="LOCAL MEMORY  /  STORED ON THIS PC",
+            bg="#07111b", fg="#8af4ff", font=("Consolas", 12, "bold"),
+        ).pack(anchor="w", padx=16, pady=(14, 4))
+        tk.Label(
+            window,
+            text="Only save useful preferences and facts. Passwords, API keys, tokens and OTPs are blocked.",
+            bg="#07111b", fg="#8aaabd", font=("Segoe UI", 9), wraplength=600,
+        ).pack(anchor="w", padx=16, pady=(0, 10))
+        listing = tk.Listbox(
+            window, bg="#041522", fg="#d9faff", selectbackground="#075477",
+            relief="flat", font=("Segoe UI", 10), height=12,
+        )
+        listing.pack(fill="both", expand=True, padx=16, pady=6)
+        entry = ttk.Entry(window, style="HUD.TEntry")
+        entry.pack(fill="x", padx=16, pady=8)
+        ids = []
+
+        def refresh(select_id=None):
+            listing.delete(0, "end")
+            ids.clear()
+            for item in self.memory_store.list():
+                ids.append(item["id"])
+                listing.insert("end", f"[{item['category']}] {item['content']}")
+            if select_id in ids:
+                index = ids.index(select_id)
+                listing.selection_set(index)
+                listing.see(index)
+
+        def selected_id():
+            selected = listing.curselection()
+            return ids[selected[0]] if selected and selected[0] < len(ids) else None
+
+        def load_selected(_event=None):
+            memory_id = selected_id()
+            if memory_id is None:
+                return
+            item = next((row for row in self.memory_store.list() if row["id"] == memory_id), None)
+            if item:
+                entry.delete(0, "end")
+                entry.insert(0, item["content"])
+
+        def add_memory():
+            try:
+                item = self.memory_store.add(entry.get(), "general")
+            except (ValueError, OSError) as exc:
+                messagebox.showerror("Memory not saved", str(exc), parent=window)
+                return
+            entry.delete(0, "end")
+            refresh(item["id"])
+            self._set_status("Memory saved locally.")
+
+        def edit_memory():
+            memory_id = selected_id()
+            if memory_id is None:
+                messagebox.showinfo("Select a memory", "Choose a memory to edit first.", parent=window)
+                return
+            try:
+                self.memory_store.update(memory_id, entry.get(), "general")
+            except (ValueError, KeyError, OSError) as exc:
+                messagebox.showerror("Memory not updated", str(exc), parent=window)
+                return
+            refresh(memory_id)
+            self._set_status("Memory updated locally.")
+
+        def delete_memory():
+            memory_id = selected_id()
+            if memory_id is None:
+                messagebox.showinfo("Select a memory", "Choose a memory to delete first.", parent=window)
+                return
+            if messagebox.askyesno("Delete memory", "Delete the selected saved memory?", parent=window):
+                self.memory_store.delete(memory_id)
+                entry.delete(0, "end")
+                refresh()
+                self._set_status("Memory deleted locally.")
+
+        listing.bind("<<ListboxSelect>>", load_selected)
+        controls = tk.Frame(window, bg="#07111b")
+        controls.pack(fill="x", padx=16, pady=(2, 14))
+        ttk.Button(controls, text="Add", style="HUD.TButton", command=add_memory).pack(side="left")
+        ttk.Button(controls, text="Update selected", style="HUD.TButton", command=edit_memory).pack(side="left", padx=6)
+        ttk.Button(controls, text="Delete selected", style="HUD.TButton", command=delete_memory).pack(side="left")
+        ttk.Button(controls, text="Close", style="HUD.TButton", command=window.destroy).pack(side="right")
+        refresh()
+\n    def _load_secrets(self):
         if self.keyring:
             try:
                 self.api_key_var = tk.StringVar(value=self.keyring.get_password(KEYRING_SERVICE, "ai_api_key") or "")
