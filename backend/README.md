@@ -1,6 +1,6 @@
 # JARVIS Backend
 
-This service provides the shared OpenRouter gateway and SQLite-backed memory API used by the Android and Windows clients when configured with the default endpoint.
+This service provides the shared OpenRouter gateway and SQLite-backed memory API used by the Windows laptop client when configured with the default endpoint.
 
 ## Features
 
