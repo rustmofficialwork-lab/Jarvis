@@ -410,6 +410,26 @@ class LocalCommandTests(unittest.TestCase):
         self.assertEqual(calls, [])
 
 
+class MemoryPrivacyTests(unittest.TestCase):
+    def test_explicit_memory_commands_are_not_forwarded_in_chat_history(self):
+        history = [
+            {"role": "user", "content": "remember that I prefer Hinglish"},
+            {"role": "assistant", "content": "Yaad rakh liya."},
+            {"role": "user", "content": "What is the weather like?"},
+            {"role": "assistant", "content": "I need your city."},
+            {"role": "user", "content": "what do you remember"},
+            {"role": "assistant", "content": "You prefer Hinglish."},
+        ]
+        filtered = jarvis_desktop.filter_memory_history(history)
+        self.assertEqual(
+            filtered,
+            [
+                {"role": "user", "content": "What is the weather like?"},
+                {"role": "assistant", "content": "I need your city."},
+            ],
+        )
+
+
 class ServiceStatusTests(unittest.TestCase):
     def test_service_status_does_not_claim_unconfigured_ai_or_voice_ready(self):
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
