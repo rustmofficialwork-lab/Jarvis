@@ -29,20 +29,9 @@ class BackendApiTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "ok")
         self.assertNotIn("OPENROUTER_API_KEY", response.text)
 
-    def test_memory_requires_authentication(self) -> None:
-        response = self.client.get("/v1/memory")
-        self.assertEqual(response.status_code, 401)
-
-    def test_memory_can_be_created_listed_and_deleted(self) -> None:
-        created = self.client.post(
-            "/v1/memory", headers=self.headers, json={"content": "User prefers Hindi replies"}
-        )
-        self.assertEqual(created.status_code, 201)
-        memory_id = created.json()["id"]
-        listed = self.client.get("/v1/memory", headers=self.headers)
-        self.assertTrue(any(item["id"] == memory_id for item in listed.json()["memories"]))
-        deleted = self.client.delete(f"/v1/memory/{memory_id}", headers=self.headers)
-        self.assertEqual(deleted.status_code, 204)
+    def test_shared_memory_api_is_not_exposed(self) -> None:
+        response = self.client.get("/v1/memory", headers=self.headers)
+        self.assertEqual(response.status_code, 404)
 
     def test_invalid_chat_payload_is_rejected_before_upstream_call(self) -> None:
         response = self.client.post(
