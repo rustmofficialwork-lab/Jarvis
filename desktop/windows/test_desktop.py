@@ -333,6 +333,24 @@ class LocalCommandTests(unittest.TestCase):
         self.assertEqual(result, "Opening Notepad.")
         self.assertEqual(calls, [(["notepad.exe"], {"shell": False})])
 
+    def test_hindi_and_hinglish_app_aliases_use_the_same_safe_allowlist(self):
+        calls = []
+        for phrase in ("notepad kholo", "नोटपैड खोलो", "कैलकुलेटर खोलो"):
+            jarvis_desktop.run_local_command(
+                phrase, popen=lambda args, **kwargs: calls.append((args, kwargs)),
+            )
+        self.assertEqual([call[0] for call in calls], [
+            ["notepad.exe"], ["notepad.exe"], ["calc.exe"],
+        ])
+        self.assertTrue(all(call[1] == {"shell": False} for call in calls))
+
+    def test_hindi_and_hinglish_media_aliases_map_to_fixed_media_keys(self):
+        from unittest.mock import patch
+        with patch.object(jarvis_desktop, "press_windows_media_key", return_value=True) as press:
+            self.assertEqual(jarvis_desktop.run_local_command("आवाज़ बढ़ाओ"), "Volume increased.")
+            self.assertEqual(jarvis_desktop.run_local_command("volume kam karo"), "Volume decreased.")
+        self.assertEqual([call.args[0] for call in press.call_args_list], ["volume_up", "volume_down"])
+
     def test_downloads_command_opens_fixed_user_folder_without_shell(self):
         calls = []
         result = jarvis_desktop.run_local_command(
