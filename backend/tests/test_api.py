@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -51,17 +52,21 @@ class BackendApiTests(unittest.TestCase):
 
     def test_non_object_chat_json_is_rejected_without_server_error(self) -> None:
         for payload in ([], ["messages"], "hello", 42, None):
-            response = self.client.post(
-                "/v1/chat/completions", headers=self.headers, json=payload
-            )
-            self.assertEqual(response.status_code, 422)
+            with self.subTest(payload=payload):
+                response = self.client.post(
+                    "/v1/chat/completions",
+                    headers={**self.headers, "Content-Type": "application/json"},
+                    content=json.dumps(payload),
+                )
+                self.assertEqual(response.status_code, 422, response.text)
 
     def test_blank_memory_is_rejected_after_trimming(self) -> None:
-        for content in ("", "   ", "\\n\\t"):
-            response = self.client.post(
-                "/v1/memory", headers=self.headers, json={"content": content}
-            )
-            self.assertEqual(response.status_code, 422)
+        for content in ("", "   ", "\n\t"):
+            with self.subTest(content=repr(content)):
+                response = self.client.post(
+                    "/v1/memory", headers=self.headers, json={"content": content}
+                )
+                self.assertEqual(response.status_code, 422, response.text)
 
 
 if __name__ == "__main__":
