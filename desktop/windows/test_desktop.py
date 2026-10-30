@@ -158,5 +158,30 @@ class WindowsMediaKeyTests(unittest.TestCase):
         self.assertEqual([call.args[0] for call in press.call_args_list], ["volume_up", "next_track"])
 
 
+class WindowsPowerActionTests(unittest.TestCase):
+    def test_shutdown_restart_and_cancel_use_fixed_safe_commands(self):
+        calls = []
+        for action, expected in [
+            ("shutdown", ["shutdown.exe", "/s", "/t", "60"]),
+            ("restart", ["shutdown.exe", "/r", "/t", "60"]),
+            ("cancel", ["shutdown.exe", "/a"]),
+        ]:
+            self.assertTrue(jarvis_desktop.schedule_windows_power_action(
+                action, popen=lambda command, **kwargs: calls.append((command, kwargs)),
+                platform_name="nt",
+            ))
+            self.assertEqual(calls[-1], (expected, {"shell": False}))
+
+    def test_unknown_or_non_windows_power_actions_are_rejected(self):
+        calls = []
+        self.assertFalse(jarvis_desktop.schedule_windows_power_action(
+            "format_disk", popen=lambda *args, **kwargs: calls.append(args), platform_name="nt",
+        ))
+        self.assertFalse(jarvis_desktop.schedule_windows_power_action(
+            "shutdown", popen=lambda *args, **kwargs: calls.append(args), platform_name="posix",
+        ))
+        self.assertEqual(calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()
