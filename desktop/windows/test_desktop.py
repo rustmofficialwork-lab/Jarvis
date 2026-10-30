@@ -285,6 +285,57 @@ class ServiceStatusTests(unittest.TestCase):
         self.assertEqual(details["VOICE ENGINE"], "CONFIGURED")
 
 
+class WindowsBrightnessTests(unittest.TestCase):
+    def test_brightness_increases_and_clamps_to_hundred(self):
+        class FakeBrightness:
+            def __init__(self):
+                self.level = 95
+                self.updated = None
+            def get_brightness(self, display):
+                self.asserted_display = display
+                return [self.level]
+            def set_brightness(self, level, display):
+                self.updated = (level, display)
+        fake = FakeBrightness()
+        result = jarvis_desktop.adjust_windows_brightness(
+            "up", brightness_module=fake, platform_name="nt",
+        )
+        self.assertEqual(result, 100)
+        self.assertEqual(fake.updated, (100, 0))
+
+    def test_brightness_decreases_and_clamps_to_zero(self):
+        class FakeBrightness:
+            def get_brightness(self, display):
+                return [5]
+            def set_brightness(self, level, display):
+                self.updated = (level, display)
+        fake = FakeBrightness()
+        result = jarvis_desktop.adjust_windows_brightness(
+            "down", brightness_module=fake, platform_name="nt",
+        )
+        self.assertEqual(result, 0)
+        self.assertEqual(fake.updated, (0, 0))
+
+    def test_brightness_rejects_unknown_direction_and_non_windows(self):
+        with self.assertRaises(ValueError):
+            jarvis_desktop.adjust_windows_brightness("sideways", platform_name="nt")
+        with self.assertRaisesRegex(RuntimeError, "only on Windows"):
+            jarvis_desktop.adjust_windows_brightness("up", platform_name="posix")
+
+    def test_voice_brightness_commands_use_fixed_steps(self):
+        from unittest.mock import patch
+        with patch.object(jarvis_desktop, "adjust_windows_brightness", return_value=70) as adjust:
+            self.assertEqual(
+                jarvis_desktop.run_local_command("brightness up"),
+                "Display brightness set to 70%.",
+            )
+            self.assertEqual(
+                jarvis_desktop.run_local_command("decrease brightness"),
+                "Display brightness set to 70%.",
+            )
+        self.assertEqual([call.args[0] for call in adjust.call_args_list], ["up", "down"])
+
+
 class WindowsMediaKeyTests(unittest.TestCase):
     def test_volume_and_media_actions_emit_fixed_key_down_and_up(self):
         calls = []
