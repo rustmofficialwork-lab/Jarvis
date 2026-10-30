@@ -62,6 +62,25 @@ class InterruptibleSpeechTests(unittest.TestCase):
         self.assertTrue(engine.stopped)
 
 
+    def test_voice_reply_uses_interruptible_speech(self):
+        from unittest.mock import patch
+        import queue
+        import threading
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        app.settings = {"endpoint": "https://example.com/chat", "model": "test-model"}
+        app.ai_api_key = "test-key"
+        app.history = []
+        app.request_lock = threading.Lock()
+        app.speech_stop_event = threading.Event()
+        with patch.object(jarvis_desktop, "chat_completion", return_value="Namaste"), \\
+             patch.object(jarvis_desktop, "save_chat_history"), \\
+             patch.object(jarvis_desktop, "speak_text_interruptibly", return_value=True) as speak:
+            app._answer_voice("hello JARVIS")
+        speak.assert_called_once_with("Namaste", app.speech_stop_event)
+        self.assertEqual([item["role"] for item in app.history], ["user", "assistant"])
+
+
 class ChatCompletionValidationTests(unittest.TestCase):
     def test_rejects_non_https_endpoint(self):
         with self.assertRaisesRegex(ValueError, "HTTPS"):
