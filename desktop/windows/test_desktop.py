@@ -580,5 +580,37 @@ class WindowsPowerActionTests(unittest.TestCase):
         self.assertEqual(calls, [])
 
 
+class ApplicationShutdownTests(unittest.TestCase):
+    def test_exit_stops_listener_speech_and_tray_before_destroying_window(self):
+        import threading
+
+        class FakeRoot:
+            def __init__(self):
+                self.destroyed = False
+            def destroy(self):
+                self.destroyed = True
+
+        class FakeTray:
+            def __init__(self):
+                self.stopped = False
+            def stop(self):
+                self.stopped = True
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.stop_event = threading.Event()
+        app.speech_stop_event = threading.Event()
+        app.root = FakeRoot()
+        app.tray_icon = FakeTray()
+        tray = app.tray_icon
+
+        app.exit_app()
+
+        self.assertTrue(app.stop_event.is_set())
+        self.assertTrue(app.speech_stop_event.is_set())
+        self.assertTrue(tray.stopped)
+        self.assertIsNone(app.tray_icon)
+        self.assertTrue(app.root.destroyed)
+
+
 if __name__ == "__main__":
     unittest.main()
