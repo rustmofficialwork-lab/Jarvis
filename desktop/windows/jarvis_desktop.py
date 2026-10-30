@@ -39,7 +39,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         settings = {
             "endpoint": data.get("endpoint") if isinstance(data.get("endpoint"), str) else DEFAULT_ENDPOINT,
             "model": data.get("model") if isinstance(data.get("model"), str) else DEFAULT_MODEL,
-            "language": data.get("language") if data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
+            "language": data.get("language") if isinstance(data.get("language"), str) and data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
             "start_with_windows": data.get("start_with_windows") is True,
         }
         # Older installs used OpenRouter directly. Migrate them to the secured JARVIS gateway.
