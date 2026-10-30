@@ -635,6 +635,44 @@ class WindowsStartupTests(unittest.TestCase):
                 True, winreg_module=object(), platform_name="posix",
             )
 
+    def test_startup_registry_key_is_closed_when_write_fails(self):
+        class FailingRegistry:
+            HKEY_CURRENT_USER = object()
+            REG_SZ = 1
+            closed = False
+            def CreateKey(self, root, path):
+                return "fake-key"
+            def SetValueEx(self, *args):
+                raise OSError("registry is unavailable")
+            def CloseKey(self, key):
+                self.closed = True
+
+        registry = FailingRegistry()
+        with self.assertRaisesRegex(OSError, "registry is unavailable"):
+            jarvis_desktop.set_windows_startup(
+                True, winreg_module=registry,
+                executable=r"C:\\JARVIS\\JARVIS.exe", frozen=True,
+                platform_name="nt",
+            )
+        self.assertTrue(registry.closed)
+
+    def test_disabling_missing_startup_entry_is_safe_and_closes_key(self):
+        class EmptyRegistry:
+            HKEY_CURRENT_USER = object()
+            closed = False
+            def CreateKey(self, root, path):
+                return "fake-key"
+            def DeleteValue(self, key, name):
+                raise FileNotFoundError()
+            def CloseKey(self, key):
+                self.closed = True
+
+        registry = EmptyRegistry()
+        self.assertTrue(jarvis_desktop.set_windows_startup(
+            False, winreg_module=registry, platform_name="nt",
+        ))
+        self.assertTrue(registry.closed)
+
 
 class WindowsPowerActionTests(unittest.TestCase):
     def test_shutdown_restart_and_cancel_use_fixed_safe_commands(self):
