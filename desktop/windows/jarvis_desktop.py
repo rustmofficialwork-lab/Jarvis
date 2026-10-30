@@ -1190,7 +1190,9 @@ class JarvisDesktop:
             self.exit_app()
 
     def exit_app(self):
+        """Stop background listening and interrupt speech before destroying the UI."""
         self.stop_event.set()
+        self.speech_stop_event.set()
         if self.tray_icon is not None:
             try:
                 self.tray_icon.stop()
