@@ -39,6 +39,14 @@ class ChatCompletionValidationTests(unittest.TestCase):
                 [],
             )
 
+class TranscriptTests(unittest.TestCase):
+    def test_append_keeps_transcript_when_chat_window_is_closed(self):
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.transcript = []
+        app.chat = None
+        app._append("YOU", "hello")
+        self.assertEqual(app.transcript, [("YOU", "hello", None)])
+
 
 if __name__ == "__main__":
     unittest.main()
