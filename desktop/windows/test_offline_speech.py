@@ -39,7 +39,7 @@ class OfflineSpeechTests(unittest.TestCase):
             def FinalResult(self):
                 return json.dumps({"text": "notepad kholo"})
         fake_vosk = Mock()
-        fake_vosk.KaldiRecognizer = FakeRecognizer
+        fake_vosk.KaldiRecognizer.side_effect = FakeRecognizer
         fake_vosk.Model.return_value = "loaded-model"
         audio = Mock()
         audio.get_raw_data.return_value = b"pcm"
