@@ -254,6 +254,14 @@ class WindowsMediaKeyTests(unittest.TestCase):
             self.assertIsNone(jarvis_desktop.run_local_command("run powershell"))
         self.assertEqual([call.args[0] for call in press.call_args_list], ["volume_up", "next_track"])
 
+    def test_explicit_unmute_and_pause_resume_are_not_misreported_as_toggles(self):
+        from unittest.mock import patch
+        with patch.object(jarvis_desktop, "press_windows_media_key") as press:
+            self.assertIsNone(jarvis_desktop.run_local_command("unmute"))
+            self.assertIsNone(jarvis_desktop.run_local_command("pause music"))
+            self.assertIsNone(jarvis_desktop.run_local_command("resume music"))
+        press.assert_not_called()
+
 
 class WindowsStartupTests(unittest.TestCase):
     def test_startup_command_uses_frozen_executable(self):
