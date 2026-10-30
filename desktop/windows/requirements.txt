@@ -9,3 +9,4 @@ pyinstaller>=6,<7
 psutil>=5.9,<8
 pystray>=0.19.5,<1
 Pillow>=10,<13
+screen-brightness-control>=0.24,<1
