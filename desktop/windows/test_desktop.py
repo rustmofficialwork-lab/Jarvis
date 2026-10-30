@@ -180,9 +180,9 @@ class WindowsMediaKeyTests(unittest.TestCase):
 class WindowsStartupTests(unittest.TestCase):
     def test_startup_command_uses_frozen_executable(self):
         command = jarvis_desktop.build_startup_command(
-            executable=r"C:\\Program Files\\JARVIS\\JARVIS.exe", frozen=True,
+            executable=r"C:\Program Files\JARVIS\JARVIS.exe", frozen=True,
         )
-        self.assertEqual(command, '"C:\\Program Files\\JARVIS\\JARVIS.exe"')
+        self.assertEqual(command, '"C:\Program Files\JARVIS\JARVIS.exe"')
 
     def test_startup_registry_value_can_be_added_and_removed(self):
         class FakeRegistry:
@@ -206,10 +206,11 @@ class WindowsStartupTests(unittest.TestCase):
         registry = FakeRegistry()
         self.assertTrue(jarvis_desktop.set_windows_startup(
             True, winreg_module=registry,
-            executable=r"C:\\JARVIS\\JARVIS.exe", frozen=True, platform_name="nt",
+            executable=r"C:\JARVIS\JARVIS.exe", frozen=True, platform_name="nt",
         ))
-        self.assertEqual(registry.values["JARVIS"][1], '"C:\\JARVIS\\JARVIS.exe"')
+        self.assertEqual(registry.values["JARVIS"][1], '"C:\JARVIS\JARVIS.exe"')
         self.assertTrue(registry.closed)
+        self.assertEqual(registry.asserted_path, jarvis_desktop.STARTUP_RUN_KEY)
         self.assertTrue(jarvis_desktop.set_windows_startup(
             False, winreg_module=registry, platform_name="nt",
         ))
