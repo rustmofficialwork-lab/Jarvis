@@ -810,7 +810,7 @@ class JarvisDesktop:
                         self.events.put(("status", f"Microphone unavailable ({exc}). Retrying in 2 seconds…"))
                         self.stop_event.wait(2)
                 finally:
-                    if recorder.is_recording:
+                    if recorder is not None and recorder.is_recording:
                         recorder.stop()
         except Exception as exc:
             self.events.put(("error", f"Wake listener could not start: {exc}"))
