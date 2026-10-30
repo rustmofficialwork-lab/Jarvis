@@ -7,11 +7,11 @@ This repository currently contains the native Windows laptop edition of JARVIS. 
 - Windows 10/11, 64-bit
 - Python 3.11 (recommended)
 - Microphone and speakers/headphones
-- Internet for Google speech-to-text and online AI responses
+- Internet for online AI responses and the one-time download of offline speech models
 - A Picovoice AccessKey for the Porcupine wake-word engine
 - An OpenAI-compatible chat-completions endpoint and API key for AI replies
 
-Wake-word inference runs locally after Porcupine initializes, but Picovoice may need internet to validate the AccessKey. Speech transcription currently uses Google's online recognizer; it is not offline speech-to-text. Online recognition requests have an eight-second network timeout so a stalled connection cannot block the voice worker indefinitely. The desktop app does not hide or bypass Windows microphone privacy indicators.
+Wake-word inference runs locally after Porcupine initializes, but Picovoice may need internet to validate the AccessKey. Speech transcription tries Google's online recognizer first and automatically falls back to a local Vosk model when the network request fails. Download the selected language model once from SETTINGS → Download offline voice model; after that, speech transcription and allowlisted Windows commands can work without internet. Online recognition requests have an eight-second network timeout. Offline models are stored under `%LOCALAPPDATA%\\JARVISDesktop\\models` and are not bundled into the installer. The desktop app does not hide or bypass Windows microphone privacy indicators.
 
 ## Run from source
 
@@ -48,7 +48,7 @@ The executable is written to `dist\JARVIS.exe`. Keep the original `requirements.
 ## Current scope and limitations
 
 - This Windows edition has its own UI, settings, voice loop, and local chat history. It does not sync its history or settings with the separate Android edition.
-- Speech-to-text is online and the Settings language selector supports English (India) (also suitable for many Hinglish phrases), Hindi (India), and English (US). AI replies can be in Hindi, English, or Hinglish based on the prompt. Use STOP SPEECH on the dashboard or Stop speaking in the tray menu to interrupt spoken replies.
+- Speech recognition supports online Google transcription with local Vosk fallback. Download the selected small model once from SETTINGS while online; Hindi (India), English (India), and English (US) have separate offline models. Hindi/Hinglish recognition quality depends on the selected model and accent; mixed-language accuracy is not guaranteed. AI replies and web/AI features still require internet. Use STOP SPEECH on the dashboard or Stop speaking in the tray menu to interrupt spoken replies.
 - Test the microphone and wake word on the actual Windows laptop before relying on continuous listening.
 
 
