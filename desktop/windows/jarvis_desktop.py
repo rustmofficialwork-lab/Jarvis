@@ -111,8 +111,8 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         "increase volume": ("volume_up", "Volume increased."),
         "volume down": ("volume_down", "Volume decreased."),
         "decrease volume": ("volume_down", "Volume decreased."),
-        "mute": ("volume_mute", "Volume mute toggled."),
-        "unmute": ("volume_mute", "Volume mute toggled."),
+        "mute": ("volume_mute", "Volume mute state toggled."),
+        "unmute": ("volume_mute", "Volume mute state toggled."),
         "play pause": ("play_pause", "Media playback toggled."),
         "pause music": ("play_pause", "Media playback toggled."),
         "resume music": ("play_pause", "Media playback toggled."),
@@ -397,9 +397,9 @@ class JarvisDesktop:
             for module in ("pvporcupine", "pvrecorder", "speech_recognition", "pyttsx3")
         )
         return [
-            ("AI CHAT", ai_ready, "READY" if ai_ready else "ADD API TOKEN"),
+            ("AI CHAT", ai_ready, "CONFIGURED" if ai_ready else "ADD API TOKEN"),
             ("VOICE ENGINE", voice_key_ready and voice_packages,
-             "READY" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
+             "CONFIGURED" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
             ("MEMORY", True, "LOCAL HISTORY"),
             ("SYSTEM CONTROL", os.name == "nt",
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
@@ -803,7 +803,7 @@ class JarvisDesktop:
                     except sr.UnknownValueError:
                         self.events.put(("status", "Sorry, I couldn't understand that. Listening again."))
                     except sr.RequestError as exc:
-                        self.events.put(("error", f"Speech recognition needs internet: {exc}"))
+                        self.events.put(("status", f"Speech recognition needs internet; wake-word listening will continue: {exc}"))
                 finally:
                     if recorder.is_recording:
                         recorder.stop()
