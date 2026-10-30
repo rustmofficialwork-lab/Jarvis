@@ -10,3 +10,4 @@ psutil>=5.9,<8
 pystray>=0.19.5,<1
 Pillow>=10,<13
 screen-brightness-control>=0.24,<1
+vosk>=0.3.45,<1
