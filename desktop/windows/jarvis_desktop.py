@@ -158,8 +158,8 @@ class JarvisDesktop:
         self.hud.bind("<Configure>", lambda _event: self._draw_orb())
         self.orb_phase = 0.0
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
-        # Retain the transcript model/widget for chat history and error reporting; the dashboard stays uncluttered.
-        self.chat = tk.Text(self.root, state="disabled", width=1, height=1)
+        self.chat = None
+        self.transcript = []
         self.prompt_var = tk.StringVar()
         self.prompt_entry = ttk.Entry(self.root, textvariable=self.prompt_var, style="HUD.TEntry")
         self.send_button = ttk.Button(self.root, text="TRANSMIT  ➤", style="HUD.TButton", command=self.send_text)
@@ -359,10 +359,16 @@ class JarvisDesktop:
         tk.Label(win, text="J.A.R.V.I.S.  /  LIVE CONVERSATION",
                  bg="#03101b", fg="#8af4ff", font=("Consolas", 13, "bold")).pack(
                      anchor="w", padx=16, pady=(14, 8))
-        self.chat.configure(state="disabled", bg="#041522", fg="#d9faff",
+        self.chat = tk.Text(win, state="disabled", bg="#041522", fg="#d9faff",
                             insertbackground="#ffffff", relief="flat",
-                            font=("Segoe UI", 11), padx=12, pady=12)
+                            font=("Segoe UI", 11), padx=12, pady=12, wrap="word")
         self.chat.pack(fill="both", expand=True, padx=14, pady=8)
+        for who, content, tag in self.transcript:
+            self.chat.configure(state="normal")
+            self.chat.insert("end", who + "\\n", "speaker")
+            self.chat.insert("end", content + "\\n\\n", tag or "")
+            self.chat.configure(state="disabled")
+        self.chat.see("end")
         bottom = tk.Frame(win, bg="#03101b")
         bottom.pack(fill="x", padx=14, pady=(4, 14))
         ttk.Button(bottom, text="Clear conversation", style="HUD.TButton",
@@ -594,10 +600,12 @@ class JarvisDesktop:
             row=6, column=1, sticky="e", padx=14, pady=(4, 16))
 
     def clear_chat(self):
-        self.chat.configure(state="normal")
-        self.chat.delete("1.0", "end")
-        self.chat.configure(state="disabled")
         self.history.clear()
+        self.transcript.clear()
+        if self.chat is not None and self.chat.winfo_exists():
+            self.chat.configure(state="normal")
+            self.chat.delete("1.0", "end")
+            self.chat.configure(state="disabled")
         self._append("JARVIS", "Conversation cleared.")
 
     def _poll_events(self):
