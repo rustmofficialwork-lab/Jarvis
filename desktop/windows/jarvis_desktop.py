@@ -927,27 +927,32 @@ class JarvisDesktop:
 
     def _answer_voice(self, prompt: str):
         self.events.put(("voice_command", prompt))
-        try:
-            local_response = run_local_command(prompt)
-        except Exception as exc:
-            self.events.put(("error", f"Could not run that approved action: {exc}"))
-            return
-        if local_response is not None:
-            self.history.extend([{"role": "user", "content": prompt},
-                                 {"role": "assistant", "content": local_response}])
-            try:
-                save_chat_history(self.history)
-            except OSError as exc:
-                self.events.put(("status", f"Action completed; history could not be saved: {exc}"))
-            self.events.put(("answer", local_response))
-            self.events.put(("status", "Local action completed."))
-            return
         if not self.request_lock.acquire(blocking=False):
             self.events.put(("status", "JARVIS is already answering; the voice request was skipped."))
             return
-        # A stop request made during thinking must remain set when speech begins.
+        # Clear a previous stop request only after this voice request owns the worker.
         self.speech_stop_event.clear()
         try:
+            try:
+                local_response = run_local_command(prompt)
+            except Exception as exc:
+                self.events.put(("error", f"Could not run that approved action: {exc}"))
+                return
+            if local_response is not None:
+                self.history.extend([{"role": "user", "content": prompt},
+                                     {"role": "assistant", "content": local_response}])
+                try:
+                    save_chat_history(self.history)
+                except OSError as exc:
+                    self.events.put(("status", f"Action completed; history could not be saved: {exc}"))
+                self.events.put(("answer", local_response))
+                self.events.put(("status", "Local action completed."))
+                try:
+                    speak_text_interruptibly(local_response, self.speech_stop_event)
+                except Exception as exc:
+                    self.events.put(("status", f"Action completed; speech output unavailable: {exc}"))
+                return
+
             answer = chat_completion(
                 self.settings.get("endpoint", DEFAULT_ENDPOINT),
                 self.settings.get("model", DEFAULT_MODEL),
