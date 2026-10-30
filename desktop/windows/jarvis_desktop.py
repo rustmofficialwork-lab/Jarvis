@@ -138,6 +138,8 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         "open explorer": ("app", ["explorer.exe"], "Opening File Explorer."),
         "open task manager": ("app", ["taskmgr.exe"], "Opening Task Manager."),
         "open taskmanager": ("app", ["taskmgr.exe"], "Opening Task Manager."),
+        "open downloads": ("app", ["explorer.exe", str(Path.home() / "Downloads")], "Opening Downloads."),
+        "open downloads folder": ("app", ["explorer.exe", str(Path.home() / "Downloads")], "Opening Downloads."),
         "open browser": ("url", "https://www.google.com", "Opening your default browser."),
         "open google": ("url", "https://www.google.com", "Opening Google."),
         "open youtube": ("url", "https://www.youtube.com", "Opening YouTube."),
