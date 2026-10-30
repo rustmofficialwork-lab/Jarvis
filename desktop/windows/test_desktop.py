@@ -866,6 +866,51 @@ class CancellableVoiceCaptureTests(unittest.TestCase):
         self.assertIsNone(command)
 
 
+class OfflineModelAutoSetupTests(unittest.TestCase):
+    def test_missing_selected_model_is_downloaded_in_background(self):
+        import queue
+        from unittest.mock import patch
+        from pathlib import Path
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {"language": "hi-IN"}
+        app.events = queue.Queue()
+        app.offline_model_setup_running = False
+        installed = Path("fake-model")
+
+        class ImmediateThread:
+            def __init__(self, target, daemon):
+                self.target = target
+                self.daemon = daemon
+            def start(self):
+                self.target()
+
+        with patch.object(jarvis_desktop, "model_path_for_language", return_value=Path("missing-model")), \
+             patch.object(jarvis_desktop, "install_offline_model", return_value=installed) as install, \
+             patch.object(jarvis_desktop.threading, "Thread", ImmediateThread):
+            self.assertTrue(app._ensure_offline_model())
+
+        install.assert_called_once_with("hi-IN")
+        self.assertFalse(app.offline_model_setup_running)
+        messages = []
+        while not app.events.empty():
+            messages.append(app.events.get_nowait())
+        self.assertTrue(any("Offline voice is ready" in message for kind, message in messages))
+
+    def test_existing_selected_model_is_not_downloaded_again(self):
+        from pathlib import Path
+        from unittest.mock import patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {"language": "en-IN"}
+        app.offline_model_setup_running = False
+        with patch.object(jarvis_desktop, "model_path_for_language", return_value=Path("installed-model")) as model_path, \
+             patch.object(jarvis_desktop, "install_offline_model") as install:
+            model_path.return_value.is_dir = lambda: True
+            self.assertFalse(app._ensure_offline_model())
+        install.assert_not_called()
+
+
 class OfflineVoiceFallbackTests(unittest.TestCase):
     def test_network_failure_uses_local_vosk_transcription(self):
         from unittest.mock import patch
@@ -899,9 +944,9 @@ class OfflineVoiceFallbackTests(unittest.TestCase):
                 raise RequestError("network unavailable")
         with patch.object(
             jarvis_desktop, "transcribe_offline_vosk",
-            side_effect=jarvis_desktop.OfflineModelUnavailable("Install model from Settings."),
+            side_effect=jarvis_desktop.OfflineModelUnavailable("JARVIS will download it automatically when online."),
         ):
-            with self.assertRaisesRegex(RequestError, "Install model from Settings"):
+            with self.assertRaisesRegex(RequestError, "download it automatically"):
                 jarvis_desktop.listen_for_voice_command(
                     Recognizer(), object(), threading.Event(), "en-IN",
                     TimeoutError, RequestError,
