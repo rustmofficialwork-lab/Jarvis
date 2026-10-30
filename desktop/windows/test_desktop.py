@@ -262,7 +262,7 @@ class WindowsStartupTests(unittest.TestCase):
             True, winreg_module=registry,
             executable=r"C:\JARVIS\JARVIS.exe", frozen=True, platform_name="nt",
         ))
-        self.assertEqual(registry.values["JARVIS"][1], '"C:\JARVIS\JARVIS.exe"')
+        self.assertEqual(registry.values["JARVIS"][1], r"C:\JARVIS\JARVIS.exe")
         self.assertTrue(registry.closed)
         self.assertEqual(registry.asserted_path, jarvis_desktop.STARTUP_RUN_KEY)
         self.assertTrue(jarvis_desktop.set_windows_startup(
