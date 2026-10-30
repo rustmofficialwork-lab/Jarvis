@@ -78,5 +78,33 @@ class ChatHistoryTests(unittest.TestCase):
         self.assertEqual(loaded[0]["content"], "5")
 
 
+class LocalCommandTests(unittest.TestCase):
+    def test_allowlisted_app_uses_shell_false(self):
+        calls = []
+        result = jarvis_desktop.run_local_command(
+            "  OPEN   NOTEPAD! ",
+            popen=lambda args, **kwargs: calls.append((args, kwargs)),
+        )
+        self.assertEqual(result, "Opening Notepad.")
+        self.assertEqual(calls, [(["notepad.exe"], {"shell": False})])
+
+    def test_allowlisted_website_uses_fixed_url(self):
+        opened = []
+        result = jarvis_desktop.run_local_command(
+            "open youtube", open_url=lambda url: opened.append(url) or True,
+        )
+        self.assertEqual(result, "Opening YouTube.")
+        self.assertEqual(opened, ["https://www.youtube.com"])
+
+    def test_unknown_or_injected_commands_are_not_executed(self):
+        calls = []
+        result = jarvis_desktop.run_local_command(
+            "open notepad & del important.txt",
+            popen=lambda *args, **kwargs: calls.append((args, kwargs)),
+        )
+        self.assertIsNone(result)
+        self.assertEqual(calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()
