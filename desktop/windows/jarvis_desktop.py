@@ -595,20 +595,20 @@ class JarvisDesktop:
         c.create_text(w-35, h-35, text="ESC  /  EXIT", fill="#328aa8", anchor="e",
                       font=("Consolas", 8))
 
-def format_battery_status(battery) -> str:
-    """Format battery percentage and charging state without assuming a laptop battery."""
-    if battery is None:
-        return "AC POWER"
-    try:
-        percent = max(0, min(100, float(battery.percent)))
-    except (AttributeError, TypeError, ValueError):
-        return "N/A"
-    charging = getattr(battery, "power_plugged", None)
-    suffix = " • CHARGING" if charging is True and percent < 100 else (
-        " • ON BATTERY" if charging is False else ""
-    )
-    return f"{percent:.0f}%{suffix}"
-
+    @staticmethod
+    def _format_battery_status(battery) -> str:
+        """Format battery percentage and charging state without assuming a laptop battery."""
+        if battery is None:
+            return "AC POWER"
+        try:
+            percent = max(0, min(100, float(battery.percent)))
+        except (AttributeError, TypeError, ValueError):
+            return "N/A"
+        charging = getattr(battery, "power_plugged", None)
+        suffix = " • CHARGING" if charging is True and percent < 100 else (
+            " • ON BATTERY" if charging is False else ""
+        )
+        return f"{percent:.0f}%{suffix}"
 
     def _get_system_metrics(self):
         """Read each system metric independently so one unsupported sensor cannot blank the HUD."""
@@ -627,7 +627,6 @@ def format_battery_status(battery) -> str:
                 return fallback
 
         drive = os.environ.get("SystemDrive", "C:") + chr(92)
-        battery = read(psutil.sensors_battery)
         disk = read(lambda: psutil.disk_usage(drive), formatter=lambda value: f"{value.percent:.0f}%")
         cpu_temp = read(
             lambda: next(
@@ -649,7 +648,7 @@ def format_battery_status(battery) -> str:
             ("CPU LOAD", read(lambda: psutil.cpu_percent(interval=None), formatter=lambda v: f"{v:.0f}%")),
             ("MEMORY", read(lambda: psutil.virtual_memory().percent, formatter=lambda v: f"{v:.0f}%")),
             ("DISK USED", disk),
-            ("BATTERY", read(psutil.sensors_battery, formatter=format_battery_status)),
+            ("BATTERY", read(psutil.sensors_battery, formatter=self._format_battery_status)),
             ("CPU TEMP", cpu_temp),
             ("NETWORK", network),
         ]
