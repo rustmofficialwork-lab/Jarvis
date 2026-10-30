@@ -84,6 +84,39 @@ def save_chat_history(history: list[dict], path: Path = HISTORY_FILE) -> None:
     temporary.replace(path)
 
 
+def run_local_command(command: str, popen=None, open_url=None) -> str | None:
+    """Run only fixed, explicitly allowlisted desktop actions; never invoke a shell."""
+    import subprocess
+    import webbrowser
+
+    launch = popen or subprocess.Popen
+    browse = open_url or webbrowser.open
+    normalized = " ".join(command.casefold().strip().rstrip(" .!?").split())
+    actions = {
+        "open notepad": ("app", ["notepad.exe"], "Opening Notepad."),
+        "start notepad": ("app", ["notepad.exe"], "Opening Notepad."),
+        "open calculator": ("app", ["calc.exe"], "Opening Calculator."),
+        "open calc": ("app", ["calc.exe"], "Opening Calculator."),
+        "open file explorer": ("app", ["explorer.exe"], "Opening File Explorer."),
+        "open explorer": ("app", ["explorer.exe"], "Opening File Explorer."),
+        "open task manager": ("app", ["taskmgr.exe"], "Opening Task Manager."),
+        "open taskmanager": ("app", ["taskmgr.exe"], "Opening Task Manager."),
+        "open browser": ("url", "https://www.google.com", "Opening your default browser."),
+        "open google": ("url", "https://www.google.com", "Opening Google."),
+        "open youtube": ("url", "https://www.youtube.com", "Opening YouTube."),
+    }
+    action = actions.get(normalized)
+    if action is None:
+        return None
+    kind, target, response = action
+    if kind == "app":
+        launch(target, shell=False)
+    else:
+        if browse(target) is False:
+            raise RuntimeError("Windows could not open the requested website.")
+    return response
+
+
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     history: list[dict]) -> str:
     from urllib.parse import urlparse
@@ -462,15 +495,36 @@ class JarvisDesktop:
     def _set_status(self, text: str):
         self.status_var.set(text)
 
+    def _try_local_command(self, prompt: str) -> bool:
+        try:
+            response = run_local_command(prompt)
+        except Exception as exc:
+            self._append("JARVIS ERROR", f"Could not run that approved action: {exc}", "error")
+            self._set_status("Local action failed.")
+            return True
+        if response is None:
+            return False
+        self.history.extend([{"role": "user", "content": prompt},
+                             {"role": "assistant", "content": response}])
+        try:
+            save_chat_history(self.history)
+        except OSError as exc:
+            self._set_status(f"Action completed; chat history could not be saved: {exc}")
+        self._append("JARVIS", response)
+        self._set_status("Local action completed.")
+        return True
+
     def send_text(self):
         prompt = self.prompt_var.get().strip()
         if not prompt or self.busy:
             return
+        self.prompt_var.set("")
+        self._append("YOU", prompt)
+        if self._try_local_command(prompt):
+            return
         if not self.request_lock.acquire(blocking=False):
             self._set_status("JARVIS is already answering; please wait.")
             return
-        self.prompt_var.set("")
-        self._append("YOU", prompt)
         self.busy = True
         self._set_status("Thinking…")
         try:
@@ -557,7 +611,6 @@ class JarvisDesktop:
                             recognizer.adjust_for_ambient_noise(source, duration=0.35)
                             audio = recognizer.listen(source, timeout=5, phrase_time_limit=12)
                         command = recognizer.recognize_google(audio, language=self.settings.get("language", "en-IN"))
-                        self.events.put(("voice_command", command))
                         self.events.put(("status", f"Heard: {command}"))
                         self._answer_voice(command)
                     except sr.WaitTimeoutError:
@@ -585,6 +638,22 @@ class JarvisDesktop:
             self.events.put(("listener_stopped", None))
 
     def _answer_voice(self, prompt: str):
+        self.events.put(("voice_command", prompt))
+        try:
+            local_response = run_local_command(prompt)
+        except Exception as exc:
+            self.events.put(("error", f"Could not run that approved action: {exc}"))
+            return
+        if local_response is not None:
+            self.history.extend([{"role": "user", "content": prompt},
+                                 {"role": "assistant", "content": local_response}])
+            try:
+                save_chat_history(self.history)
+            except OSError as exc:
+                self.events.put(("status", f"Action completed; history could not be saved: {exc}"))
+            self.events.put(("answer", local_response))
+            self.events.put(("status", "Local action completed."))
+            return
         if not self.request_lock.acquire(blocking=False):
             self.events.put(("status", "JARVIS is already answering; the voice request was skipped."))
             return
