@@ -49,6 +49,20 @@ class BackendApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
 
+    def test_non_object_chat_json_is_rejected_without_server_error(self) -> None:
+        for payload in ([], ["messages"], "hello", 42, None):
+            response = self.client.post(
+                "/v1/chat/completions", headers=self.headers, json=payload
+            )
+            self.assertEqual(response.status_code, 422)
+
+    def test_blank_memory_is_rejected_after_trimming(self) -> None:
+        for content in ("", "   ", "\\n\\t"):
+            response = self.client.post(
+                "/v1/memory", headers=self.headers, json={"content": content}
+            )
+            self.assertEqual(response.status_code, 422)
+
 
 if __name__ == "__main__":
     unittest.main()
