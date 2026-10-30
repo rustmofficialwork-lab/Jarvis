@@ -158,6 +158,8 @@ class JarvisDesktop:
         self.hud.bind("<Configure>", lambda _event: self._draw_orb())
         self.orb_phase = 0.0
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
+        # Retain the transcript model/widget for chat history and error reporting; the dashboard stays uncluttered.
+        self.chat = tk.Text(self.root, state="disabled", width=1, height=1)
         self.prompt_var = tk.StringVar()
         self.prompt_entry = ttk.Entry(self.root, textvariable=self.prompt_var, style="HUD.TEntry")
         self.send_button = ttk.Button(self.root, text="TRANSMIT  ➤", style="HUD.TButton", command=self.send_text)
