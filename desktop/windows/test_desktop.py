@@ -110,6 +110,31 @@ class InterruptibleSpeechTests(unittest.TestCase):
         self.assertEqual(observed, [True])
 
 
+class ChatConfigurationTests(unittest.TestCase):
+    def test_valid_configuration_is_trimmed(self):
+        self.assertEqual(
+            jarvis_desktop.validate_chat_configuration("  https://example.com/chat  ", " model-x "),
+            ("https://example.com/chat", "model-x"),
+        )
+
+    def test_rejects_http_missing_host_credentials_and_invalid_port(self):
+        for endpoint in (
+            "http://example.com/chat",
+            "https:///chat",
+            "https://user:pass@example.com/chat",
+            "https://example.com:99999/chat",
+        ):
+            with self.subTest(endpoint=endpoint):
+                with self.assertRaisesRegex(ValueError, "valid HTTPS"):
+                    jarvis_desktop.validate_chat_configuration(endpoint, "model")
+
+    def test_rejects_blank_or_oversized_model(self):
+        for model in (" ", "m" * 201):
+            with self.subTest(model_length=len(model)):
+                with self.assertRaisesRegex(ValueError, "model name"):
+                    jarvis_desktop.validate_chat_configuration("https://example.com/chat", model)
+
+
 class ChatCompletionValidationTests(unittest.TestCase):
     def test_rejects_non_https_endpoint(self):
         with self.assertRaisesRegex(ValueError, "HTTPS"):
