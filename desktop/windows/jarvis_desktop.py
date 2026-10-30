@@ -298,6 +298,14 @@ def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool
             pass
 
 
+def configure_voice_recognizer(recognizer, request_timeout: float = 8.0):
+    """Bound online speech-recognition requests so network stalls cannot hang the worker."""
+    if request_timeout <= 0:
+        raise ValueError("Speech recognition timeout must be positive.")
+    recognizer.operation_timeout = request_timeout
+    return recognizer
+
+
 def listen_for_voice_command(recognizer, source, stop_event, language: str,
                              wait_timeout_error) -> str | None:
     """Wait for a command in short, cancellable intervals without reopening the microphone."""
@@ -899,7 +907,7 @@ class JarvisDesktop:
                     recorder.delete()
                     recorder = None
                     self.events.put(("status", "Wake word detected — speak your command now."))
-                    recognizer = sr.Recognizer()
+                    recognizer = configure_voice_recognizer(sr.Recognizer())
                     try:
                         with sr.Microphone() as source:
                             recognizer.adjust_for_ambient_noise(source, duration=0.35)
