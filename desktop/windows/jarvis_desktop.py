@@ -244,6 +244,25 @@ class JarvisDesktop:
         self._draw_orb()
         self.root.after(55, self._animate_orb)
 
+    def _get_service_statuses(self):
+        """Report readiness from actual configuration and installed capabilities."""
+        import importlib.util
+
+        ai_ready = bool(getattr(self, "ai_api_key", "").strip())
+        voice_key_ready = bool(getattr(self, "picovoice_access_key", "").strip())
+        voice_packages = all(
+            importlib.util.find_spec(module) is not None
+            for module in ("pvporcupine", "pvrecorder", "speech_recognition", "pyttsx3")
+        )
+        return [
+            ("AI CHAT", ai_ready, "READY" if ai_ready else "ADD API TOKEN"),
+            ("VOICE ENGINE", voice_key_ready and voice_packages,
+             "READY" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
+            ("MEMORY", True, "LOCAL HISTORY"),
+            ("SYSTEM CONTROL", os.name == "nt",
+             "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
+        ]
+
     def _draw_orb(self):
         if not hasattr(self, "hud"):
             return
@@ -322,10 +341,14 @@ class JarvisDesktop:
         c.create_text(rx+24, 422, text="Say  “Hey JARVIS”  to begin", fill="#b7eaff", anchor="w",
                       font=("Segoe UI", 10))
         c.create_text(rx+24, 478, text="CORE SERVICES", fill="#55aeca", anchor="w", font=("Consolas", 9))
-        for i, label in enumerate(("AI CHAT", "VOICE ENGINE", "MEMORY", "SYSTEM CONTROL")):
+        for i, (label, ready, detail) in enumerate(self._get_service_statuses()):
             yy = 512+i*35
-            c.create_oval(rx+25, yy-5, rx+35, yy+5, fill="#00e5a0", outline="")
-            c.create_text(rx+48, yy, text=label, fill="#a8eaff", anchor="w", font=("Consolas", 9))
+            c.create_oval(rx+25, yy-5, rx+35, yy+5,
+                          fill="#00e5a0" if ready else "#ffb454", outline="")
+            c.create_text(rx+48, yy, text=label, fill="#a8eaff", anchor="w",
+                          font=("Consolas", 9))
+            c.create_text(w-45, yy, text=detail, fill="#65d9ef" if ready else "#ffb454",
+                          anchor="e", font=("Consolas", 7))
         # Central reactor: concentric animated rings and radial energy arcs
         cx, cy = w/2, h*0.43
         radius = min(w*0.19, h*0.29, 245)
