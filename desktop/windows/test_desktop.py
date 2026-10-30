@@ -180,6 +180,37 @@ class ChatHistoryTests(unittest.TestCase):
         self.assertEqual(loaded[0]["content"], "5")
 
 
+class SettingsPersistenceTests(unittest.TestCase):
+    def test_settings_are_saved_atomically_and_reloaded(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "settings.json"
+        settings = {
+            "endpoint": "https://example.com/chat",
+            "model": "test-model",
+            "language": "hi-IN",
+            "start_with_windows": True,
+        }
+        jarvis_desktop.save_settings(settings, path)
+        self.assertEqual(jarvis_desktop.load_settings(path), settings)
+        self.assertFalse(path.with_suffix(".json.tmp").exists())
+
+    def test_malformed_setting_types_fall_back_to_safe_defaults(self):
+        import json
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "settings.json"
+        path.write_text(json.dumps({
+            "endpoint": ["not", "a", "string"],
+            "model": None,
+            "language": "unsupported",
+            "start_with_windows": "yes",
+        }), encoding="utf-8")
+        loaded = jarvis_desktop.load_settings(path)
+        self.assertEqual(loaded["endpoint"], jarvis_desktop.DEFAULT_ENDPOINT)
+        self.assertEqual(loaded["model"], jarvis_desktop.DEFAULT_MODEL)
+        self.assertEqual(loaded["language"], "en-IN")
+        self.assertFalse(loaded["start_with_windows"])
+
+
 class LocalCommandHistoryTests(unittest.TestCase):
     def test_failed_local_action_is_visible_and_persisted(self):
         from unittest.mock import patch
