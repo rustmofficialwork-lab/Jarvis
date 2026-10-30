@@ -48,5 +48,35 @@ class TranscriptTests(unittest.TestCase):
         self.assertEqual(app.transcript, [("YOU", "hello", None)])
 
 
+class ChatHistoryTests(unittest.TestCase):
+    def test_history_round_trip_and_bounds(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "nested" / "history.json"
+        source = [
+            {"role": "user", "content": "नमस्ते"},
+            {"role": "assistant", "content": "Hello"},
+            {"role": "system", "content": "must not persist"},
+        ]
+        jarvis_desktop.save_chat_history(source, path)
+        self.assertEqual(jarvis_desktop.load_chat_history(path), source[:2])
+
+    def test_invalid_history_is_ignored(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "history.json"
+        path.write_text("{broken", encoding="utf-8")
+        self.assertEqual(jarvis_desktop.load_chat_history(path), [])
+
+    def test_history_rejects_invalid_roles_and_limits_entries(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "history.json"
+        path.write_text(__import__("json").dumps(
+            [{"role": "system", "content": "no"}] +
+            [{"role": "user", "content": str(i)} for i in range(105)]
+        ), encoding="utf-8")
+        loaded = jarvis_desktop.load_chat_history(path)
+        self.assertEqual(len(loaded), 100)
+        self.assertEqual(loaded[0]["content"], "5")
+
+
 if __name__ == "__main__":
     unittest.main()
