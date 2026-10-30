@@ -18,6 +18,7 @@ APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
+HISTORY_FILE = SETTINGS_DIR / "chat_history.json"
 DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
 DEFAULT_MODEL = "openrouter/free"
 SYSTEM_PROMPT = (
@@ -49,6 +50,38 @@ def load_settings() -> dict:
 def save_settings(data: dict) -> None:
     SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
     SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def load_chat_history(path: Path = HISTORY_FILE) -> list[dict]:
+    """Load a bounded, validated chat history; corrupt files are ignored safely."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    clean = []
+    for item in data[-100:]:
+        if (isinstance(item, dict) and item.get("role") in {"user", "assistant"}
+                and isinstance(item.get("content"), str)):
+            content = item["content"].strip()
+            if content:
+                clean.append({"role": item["role"], "content": content[:12000]})
+    return clean
+
+
+def save_chat_history(history: list[dict], path: Path = HISTORY_FILE) -> None:
+    """Atomically persist only chat roles and text, never credentials or settings."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    clean = [
+        {"role": item["role"], "content": str(item["content"])[:12000]}
+        for item in history[-100:]
+        if isinstance(item, dict) and item.get("role") in {"user", "assistant"}
+        and isinstance(item.get("content"), str)
+    ]
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)
 
 
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
@@ -116,7 +149,7 @@ class JarvisDesktop:
         self.root.configure(bg="#07111b")
         self.settings = load_settings()
         self.events: queue.Queue = queue.Queue()
-        self.history: list[dict] = []
+        self.history: list[dict] = load_chat_history()
         self.stop_event = threading.Event()
         self.wake_thread: threading.Thread | None = None
         self.busy = False
@@ -159,7 +192,7 @@ class JarvisDesktop:
         self.orb_phase = 0.0
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.chat = None
-        self.transcript = []
+        self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
         self.prompt_var = tk.StringVar()
         self.prompt_entry = ttk.Entry(self.root, textvariable=self.prompt_var, style="HUD.TEntry")
         self.send_button = ttk.Button(self.root, text="TRANSMIT  ➤", style="HUD.TButton", command=self.send_text)
@@ -458,6 +491,10 @@ class JarvisDesktop:
             )
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
+            try:
+                save_chat_history(self.history)
+            except OSError as exc:
+                self.events.put(("status", f"Reply ready; chat history could not be saved: {exc}"))
             self.events.put(("answer", answer))
             try:
                 import pyttsx3
@@ -634,6 +671,10 @@ class JarvisDesktop:
     def clear_chat(self):
         self.history.clear()
         self.transcript.clear()
+        try:
+            save_chat_history(self.history)
+        except OSError as exc:
+            self._set_status(f"Chat cleared in memory; could not update history file: {exc}")
         if self.chat is not None and self.chat.winfo_exists():
             self.chat.configure(state="normal")
             self.chat.delete("1.0", "end")
