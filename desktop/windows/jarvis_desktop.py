@@ -1213,7 +1213,7 @@ class JarvisDesktop:
         """Handle spoken remember/recall requests without touching Tk from a worker."""
         import re
         match = re.match(
-            r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\\s*[:,-]?\\s*(.+)$",
+            r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\s*[:,-]?\s*(.+)$",
             prompt.strip(),
             re.IGNORECASE,
         )
