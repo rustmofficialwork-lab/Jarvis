@@ -49,7 +49,7 @@ The executable is written to `dist\JARVIS.exe`. Keep the original `requirements.
 
 - This desktop companion has its own UI and voice loop; it does not yet sync conversation history or settings automatically with Android.
 - It shares the configurable OpenAI-compatible endpoint/model approach, but Android-only controls (accessibility, notifications, phone settings, etc.) are not available on Windows.
-- Speech-to-text is online and currently defaults to English (India). AI replies can be in Hindi, English, or Hinglish based on the prompt.
+- Speech-to-text is online and the Settings language selector supports English (India) (also suitable for many Hinglish phrases), Hindi (India), and English (US). AI replies can be in Hindi, English, or Hinglish based on the prompt. Use STOP SPEECH on the dashboard or Stop speaking in the tray menu to interrupt spoken replies.
 - Test the microphone and wake word on the actual Windows laptop before relying on continuous listening.
 
 
