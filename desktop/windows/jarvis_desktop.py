@@ -134,10 +134,16 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     actions = {
         "open notepad": ("app", ["notepad.exe"], "Opening Notepad."),
         "start notepad": ("app", ["notepad.exe"], "Opening Notepad."),
+        "notepad kholo": ("app", ["notepad.exe"], "Opening Notepad."),
+        "नोटपैड खोलो": ("app", ["notepad.exe"], "Opening Notepad."),
         "open calculator": ("app", ["calc.exe"], "Opening Calculator."),
         "open calc": ("app", ["calc.exe"], "Opening Calculator."),
+        "calculator kholo": ("app", ["calc.exe"], "Opening Calculator."),
+        "कैलकुलेटर खोलो": ("app", ["calc.exe"], "Opening Calculator."),
         "open file explorer": ("app", ["explorer.exe"], "Opening File Explorer."),
         "open explorer": ("app", ["explorer.exe"], "Opening File Explorer."),
+        "file explorer kholo": ("app", ["explorer.exe"], "Opening File Explorer."),
+        "फाइल एक्सप्लोरर खोलो": ("app", ["explorer.exe"], "Opening File Explorer."),
         "open task manager": ("app", ["taskmgr.exe"], "Opening Task Manager."),
         "open taskmanager": ("app", ["taskmgr.exe"], "Opening Task Manager."),
         "open downloads": ("app", ["explorer.exe", str(Path.home() / "Downloads")], "Opening Downloads."),
@@ -149,8 +155,12 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     brightness_actions = {
         "brightness up": "up",
         "increase brightness": "up",
+        "brightness badhao": "up",
+        "ब्राइटनेस बढ़ाओ": "up",
         "brightness down": "down",
         "decrease brightness": "down",
+        "brightness kam karo": "down",
+        "ब्राइटनेस कम करो": "down",
     }
     if normalized in brightness_actions:
         level = adjust_windows_brightness(brightness_actions[normalized])
@@ -158,8 +168,12 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     media_actions = {
         "volume up": ("volume_up", "Volume increased."),
         "increase volume": ("volume_up", "Volume increased."),
+        "volume badhao": ("volume_up", "Volume increased."),
+        "आवाज़ बढ़ाओ": ("volume_up", "Volume increased."),
         "volume down": ("volume_down", "Volume decreased."),
         "decrease volume": ("volume_down", "Volume decreased."),
+        "volume kam karo": ("volume_down", "Volume decreased."),
+        "आवाज़ कम करो": ("volume_down", "Volume decreased."),
         # These hardware keys are toggles, not explicit mute/pause state setters.
         "mute": ("volume_mute", "Volume mute state toggled."),
         "play pause": ("play_pause", "Media playback toggled."),
