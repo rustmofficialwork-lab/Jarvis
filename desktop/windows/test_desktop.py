@@ -343,13 +343,11 @@ class LocalCommandTests(unittest.TestCase):
         self.assertEqual(calls, [(["notepad.exe"], {"shell": False})])
 
     def test_hindi_double_danda_is_ignored_for_local_commands(self):
-        calls = []
-        result = jarvis_desktop.run_local_command(
-            "आवाज़ बढ़ाओ॥",
-            popen=lambda args, **kwargs: calls.append((args, kwargs)),
-        )
+        from unittest.mock import patch
+        with patch.object(jarvis_desktop, "press_windows_media_key", return_value=True) as press:
+            result = jarvis_desktop.run_local_command("आवाज़ बढ़ाओ॥")
         self.assertEqual(result, "Volume increased.")
-        self.assertEqual(calls, [])
+        press.assert_called_once_with("volume_up")
 
     def test_hindi_and_hinglish_app_aliases_use_the_same_safe_allowlist(self):
         calls = []
