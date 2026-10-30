@@ -1209,6 +1209,46 @@ class JarvisDesktop:
                     pass
             self.events.put(("listener_stopped", None))
 
+    def _handle_voice_memory_command(self, prompt: str) -> bool:
+        """Handle spoken remember/recall requests without touching Tk from a worker."""
+        import re
+        match = re.match(
+            r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\\s*[:,-]?\\s*(.+)$",
+            prompt.strip(),
+            re.IGNORECASE,
+        )
+        if match:
+            try:
+                self.memory_store.add(match.group(1).strip().rstrip(".!?।"), "general")
+                reply = "Yaad rakh liya. Ye memory sirf is PC par save hui hai."
+            except ValueError as exc:
+                reply = str(exc)
+        elif " ".join(prompt.casefold().split()) in {
+            "what do you remember", "what do you remember about me",
+            "tumhe kya yaad hai", "mujhe kya yaad hai",
+            "meri memories dikhao", "show my memories", "show memories",
+        }:
+            items = self.memory_store.list()
+            reply = ("Abhi koi saved memory nahi hai." if not items else
+                     "Mujhe ye baatein yaad hain: " + "; ".join(
+                         item["content"] for item in items[:12]
+                     ))
+        else:
+            return False
+
+        self.history.extend([{"role": "user", "content": prompt},
+                             {"role": "assistant", "content": reply}])
+        try:
+            save_chat_history(self.history)
+        except OSError as exc:
+            self.events.put(("status", f"Memory action completed; history could not be saved: {exc}"))
+        self.events.put(("answer", reply))
+        try:
+            speak_text_interruptibly(reply, self.speech_stop_event)
+        except Exception as exc:
+            self.events.put(("status", f"Memory action completed; speech output unavailable: {exc}"))
+        return True
+
     def _answer_voice(self, prompt: str):
         self.events.put(("voice_command", prompt))
         if not self.request_lock.acquire(blocking=False):
@@ -1217,6 +1257,8 @@ class JarvisDesktop:
         # Clear a previous stop request only after this voice request owns the worker.
         self.speech_stop_event.clear()
         try:
+            if self._handle_voice_memory_command(prompt):
+                return
             try:
                 local_response = run_local_command(prompt)
             except Exception as exc:
@@ -1243,6 +1285,7 @@ class JarvisDesktop:
                 self.ai_api_key,
                 prompt,
                 self.history,
+                self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
             )
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
