@@ -945,11 +945,12 @@ class JarvisDesktop:
                         self.events.put(("status", "Sorry, I couldn't understand that. Listening again."))
                     except sr.RequestError as exc:
                         self.events.put(("status", f"Speech recognition needs internet; wake-word listening will continue: {exc}"))
-                    except OSError as exc:
+                    except (OSError, RuntimeError) as exc:
                         self.events.put(("status", f"Microphone unavailable ({exc}). Retrying in 2 seconds…"))
                         self.stop_event.wait(2)
-                except OSError as exc:
-                    # A USB/headset microphone can disappear while listening. Discard
+                except (OSError, RuntimeError) as exc:
+                    # Audio backends may report disconnected or unavailable devices
+                    # as either OSError or RuntimeError. Discard the stale handle.
                     # the stale recorder handle and reopen the default input device.
                     self.events.put(("status", f"Wake microphone disconnected ({exc}). Reconnecting in 2 seconds…"))
                     release_wake_recorder(recorder)
