@@ -226,6 +226,33 @@ def set_windows_startup(enabled: bool, winreg_module=None, executable=None,
     return True
 
 
+def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool:
+    """Speak on the calling worker thread while allowing the UI to interrupt playback."""
+    import time
+    if engine_factory is None:
+        import pyttsx3
+        engine_factory = pyttsx3.init
+    engine = engine_factory()
+    try:
+        engine.say(text)
+        engine.startLoop(False)
+        try:
+            while engine.isBusy() and not stop_event.is_set():
+                engine.iterate()
+                time.sleep(0.01)
+            if stop_event.is_set():
+                engine.stop()
+                return False
+            return True
+        finally:
+            engine.endLoop()
+    finally:
+        try:
+            engine.stop()
+        except Exception:
+            pass
+
+
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     history: list[dict]) -> str:
     from urllib.parse import urlparse
@@ -297,6 +324,7 @@ class JarvisDesktop:
         self.busy = False
         self.tray_icon = None
         self.tray_thread = None
+        self.speech_stop_event = threading.Event()
         # Serialize typed and voice requests so history and TTS cannot race.
         self.request_lock = threading.Lock()
 
@@ -340,6 +368,8 @@ class JarvisDesktop:
         self.prompt_var = tk.StringVar()
         self.prompt_entry = ttk.Entry(self.root, textvariable=self.prompt_var, style="HUD.TEntry")
         self.send_button = ttk.Button(self.root, text="TRANSMIT  ➤", style="HUD.TButton", command=self.send_text)
+        self.stop_speaking_button = ttk.Button(self.root, text="STOP SPEECH", style="HUD.TButton",
+                                               command=self.stop_speaking)
         self.listen_button = ttk.Button(self.root, text="◉  ACTIVATE VOICE", style="HUD.TButton",
                                         command=self.toggle_listening)
         self.chat_button = ttk.Button(self.root, text="CHAT LOG", style="HUD.TButton", command=self.open_chat)
@@ -515,6 +545,7 @@ class JarvisDesktop:
                       fill="#58cbe8", anchor="w", font=("Consolas", 9))
         c.create_window(360, h-35, window=self.prompt_entry, width=max(350, w-780), height=34)
         c.create_window(w-190, h-35, window=self.send_button, width=120, height=34)
+        c.create_window(w-330, h-35, window=self.stop_speaking_button, width=110, height=34)
         c.create_window(130, h-35, window=self.listen_button, width=190, height=34)
         c.create_text(w/2, h-91, text=self.status_var.get().upper(), fill=bright,
                       font=("Consolas", 9, "bold"))
@@ -697,11 +728,8 @@ class JarvisDesktop:
                 self.events.put(("status", f"Reply ready; chat history could not be saved: {exc}"))
             self.events.put(("answer", answer))
             try:
-                import pyttsx3
-                engine = pyttsx3.init()
-                engine.say(answer)
-                engine.runAndWait()
-                engine.stop()
+                self.speech_stop_event.clear()
+                speak_text_interruptibly(answer, self.speech_stop_event)
             except Exception as exc:
                 self.events.put(("status", f"Reply shown; speech output unavailable: {exc}"))
         except Exception as exc:
@@ -714,6 +742,11 @@ class JarvisDesktop:
             self.events.put(("error", str(exc)))
         finally:
             self.request_lock.release()
+
+    def stop_speaking(self):
+        """Request speech cancellation; the TTS worker performs the engine stop safely."""
+        self.speech_stop_event.set()
+        self._set_status("Stopping spoken response…")
 
     def toggle_listening(self):
         if self.wake_thread and self.wake_thread.is_alive():
@@ -1011,6 +1044,7 @@ class JarvisDesktop:
             menu = pystray.Menu(
                 pystray.MenuItem("Open JARVIS", lambda _icon, _item: self._show_window(), default=True),
                 pystray.MenuItem("Activate / stop voice", lambda _icon, _item: self.root.after(0, self.toggle_listening)),
+                pystray.MenuItem("Stop speaking", lambda _icon, _item: self.root.after(0, self.stop_speaking)),
                 pystray.MenuItem("Exit JARVIS", lambda _icon, _item: self.root.after(0, self.exit_app)),
             )
             self.tray_icon = pystray.Icon(APP_NAME, image, "JARVIS Desktop", menu)
