@@ -964,7 +964,8 @@ class JarvisDesktop:
         ttk.Button(controls, text="Delete selected", style="HUD.TButton", command=delete_memory).pack(side="left")
         ttk.Button(controls, text="Close", style="HUD.TButton", command=window.destroy).pack(side="right")
         refresh()
-\n    def _load_secrets(self):
+
+    def _load_secrets(self):
         if self.keyring:
             try:
                 self.api_key_var = tk.StringVar(value=self.keyring.get_password(KEYRING_SERVICE, "ai_api_key") or "")
