@@ -14,7 +14,8 @@ import urllib.request
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
-from offline_speech import OfflineModelUnavailable, install_offline_model, transcribe_offline_vosk
+from offline_speech import (OfflineModelUnavailable, install_offline_model,
+                            model_path_for_language, transcribe_offline_vosk)
 
 APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
@@ -459,6 +460,7 @@ class JarvisDesktop:
         self.speech_stop_event = threading.Event()
         # Serialize typed and voice requests so history and TTS cannot race.
         self.request_lock = threading.Lock()
+        self.offline_model_setup_running = False
 
         try:
             import keyring
@@ -472,6 +474,7 @@ class JarvisDesktop:
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
         self.root.after(120, self._poll_events)
+        self.root.after(700, self._ensure_offline_model)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
@@ -917,6 +920,7 @@ class JarvisDesktop:
             self.open_settings()
             self._set_status("Add a Picovoice AccessKey in Settings to enable wake listening.")
             return
+        self._ensure_offline_model(self.settings.get("language", "en-IN"))
         self.stop_event.clear()
         self.listen_button.configure(text="Stop wake listening")
         self._set_status("Starting local JARVIS wake-word detector…")
@@ -1101,16 +1105,32 @@ class JarvisDesktop:
         except Exception as exc:
             messagebox.showerror("Could not cancel", str(exc), parent=parent)
 
-    def _start_offline_model_download(self, language: str):
-        """Install the selected small speech model in the background."""
+    def _ensure_offline_model(self, language: str | None = None):
+        """Automatically install the selected offline model without requiring a Settings visit."""
+        language = language or self.settings.get("language", "en-IN")
+        try:
+            if model_path_for_language(language).is_dir():
+                return False
+        except ValueError as exc:
+            self.events.put(("status", f"Offline voice setup skipped: {exc}"))
+            return False
+        if self.offline_model_setup_running:
+            return False
+
+        self.offline_model_setup_running = True
+
         def worker():
-            self.events.put(("status", f"Downloading the {language} offline voice model… Internet is needed only for this setup."))
+            self.events.put(("status", f"Preparing offline voice for {language}. Downloading the model in the background; internet is needed only for this one-time setup."))
             try:
                 path = install_offline_model(language)
-                self.events.put(("status", f"Offline voice model installed: {path.name}. Voice commands can now fall back locally when internet is unavailable."))
+                self.events.put(("status", f"Offline voice is ready ({language}). The model is saved on this PC for future offline use."))
             except Exception as exc:
-                self.events.put(("status", f"Offline voice model setup failed: {exc}"))
+                self.events.put(("status", f"Offline voice model could not download yet: {exc}. JARVIS will retry when voice listening is activated."))
+            finally:
+                self.offline_model_setup_running = False
+
         threading.Thread(target=worker, daemon=True).start()
+        return True
 
     def open_settings(self):
         window = tk.Toplevel(self.root)
@@ -1136,9 +1156,10 @@ class JarvisDesktop:
         language = ttk.Combobox(window, values=["en-IN", "hi-IN", "en-US"], state="readonly", width=12)
         language.set(self.settings.get("language", "en-IN"))
         language.grid(row=4, column=1, sticky="w", padx=14, pady=8)
-        ttk.Button(
-            window, text="Download offline voice model for selected language",
-            command=lambda: self._start_offline_model_download(language.get()),
+        tk.Label(
+            window,
+            text="Offline voice model downloads automatically in the background for the selected language.",
+            bg="#07111b", fg="#78c8df", font=("Segoe UI", 9),
         ).grid(row=5, column=1, sticky="w", padx=14, pady=8)
         startup_var = tk.BooleanVar(value=bool(self.settings.get("start_with_windows", False)))
         ttk.Checkbutton(window, text="Start JARVIS when I sign in to Windows",
@@ -1187,6 +1208,7 @@ class JarvisDesktop:
                 messagebox.showerror("Could not save", str(exc), parent=window)
                 return
             self._set_status("Settings saved.")
+            self._ensure_offline_model(self.settings["language"])
             window.destroy()
 
         ttk.Button(window, text="Save settings", command=save).grid(
