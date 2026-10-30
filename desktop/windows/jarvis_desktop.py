@@ -595,37 +595,64 @@ class JarvisDesktop:
         c.create_text(w-35, h-35, text="ESC  /  EXIT", fill="#328aa8", anchor="e",
                       font=("Consolas", 8))
 
+def format_battery_status(battery) -> str:
+    """Format battery percentage and charging state without assuming a laptop battery."""
+    if battery is None:
+        return "AC POWER"
+    try:
+        percent = max(0, min(100, float(battery.percent)))
+    except (AttributeError, TypeError, ValueError):
+        return "N/A"
+    charging = getattr(battery, "power_plugged", None)
+    suffix = " • CHARGING" if charging is True and percent < 100 else (
+        " • ON BATTERY" if charging is False else ""
+    )
+    return f"{percent:.0f}%{suffix}"
+
+
     def _get_system_metrics(self):
-        """Read actual Windows resource metrics, caching them between animation frames."""
+        """Read each system metric independently so one unsupported sensor cannot blank the HUD."""
         import time
+        import psutil
+
         now = time.monotonic()
         cached = getattr(self, "_metrics_cache", None)
         if cached and now - cached[0] < 1.0:
             return cached[1]
-        try:
-            import psutil
-            battery = psutil.sensors_battery()
-            drive = os.environ.get("SystemDrive", "C:") + chr(92)
-            disk = psutil.disk_usage(drive)
+
+        def read(read_fn, fallback="N/A", formatter=str):
             try:
-                temperatures = psutil.sensors_temperatures(fahrenheit=False)
-                cpu_temp = next((entry.current for entries in temperatures.values()
-                                 for entry in entries if entry.current is not None), None)
-            except (AttributeError, NotImplementedError, OSError):
-                cpu_temp = None
-            network = any(info.isup for name, info in psutil.net_if_stats().items()
-                          if name.lower() not in {"lo", "loopback"})
-            values = [
-                ("CPU LOAD", f"{psutil.cpu_percent(interval=None):.0f}%"),
-                ("MEMORY", f"{psutil.virtual_memory().percent:.0f}%"),
-                ("DISK USED", f"{disk.percent:.0f}%"),
-                ("BATTERY", f"{battery.percent:.0f}%" if battery else "AC POWER"),
-                ("CPU TEMP", f"{cpu_temp:.0f}°C" if cpu_temp is not None else "N/A"),
-                ("NETWORK", "ONLINE" if network else "OFFLINE"),
-            ]
-        except Exception:
-            values = [("CPU LOAD", "N/A"), ("MEMORY", "N/A"), ("DISK USED", "N/A"),
-                      ("BATTERY", "N/A"), ("CPU TEMP", "N/A"), ("NETWORK", "OFFLINE")]
+                return formatter(read_fn())
+            except Exception:
+                return fallback
+
+        drive = os.environ.get("SystemDrive", "C:") + chr(92)
+        battery = read(psutil.sensors_battery)
+        disk = read(lambda: psutil.disk_usage(drive), formatter=lambda value: f"{value.percent:.0f}%")
+        cpu_temp = read(
+            lambda: next(
+                (entry.current for entries in psutil.sensors_temperatures(fahrenheit=False).values()
+                 for entry in entries if entry.current is not None),
+                None,
+            ),
+            formatter=lambda value: f"{value:.0f}°C" if value is not None else "N/A",
+        )
+        network = read(
+            lambda: any(
+                info.isup for name, info in psutil.net_if_stats().items()
+                if name.lower() not in {"lo", "loopback"}
+            ),
+            fallback="OFFLINE",
+            formatter=lambda online: "ONLINE" if online else "OFFLINE",
+        )
+        values = [
+            ("CPU LOAD", read(lambda: psutil.cpu_percent(interval=None), formatter=lambda v: f"{v:.0f}%")),
+            ("MEMORY", read(lambda: psutil.virtual_memory().percent, formatter=lambda v: f"{v:.0f}%")),
+            ("DISK USED", disk),
+            ("BATTERY", read(psutil.sensors_battery, formatter=format_battery_status)),
+            ("CPU TEMP", cpu_temp),
+            ("NETWORK", network),
+        ]
         self._metrics_cache = (now, values)
         return values
 
