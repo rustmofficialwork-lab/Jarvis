@@ -177,6 +177,51 @@ class WindowsMediaKeyTests(unittest.TestCase):
         self.assertEqual([call.args[0] for call in press.call_args_list], ["volume_up", "next_track"])
 
 
+class WindowsStartupTests(unittest.TestCase):
+    def test_startup_command_uses_frozen_executable(self):
+        command = jarvis_desktop.build_startup_command(
+            executable=r"C:\\Program Files\\JARVIS\\JARVIS.exe", frozen=True,
+        )
+        self.assertEqual(command, '"C:\\Program Files\\JARVIS\\JARVIS.exe"')
+
+    def test_startup_registry_value_can_be_added_and_removed(self):
+        class FakeRegistry:
+            HKEY_CURRENT_USER = object()
+            REG_SZ = 1
+            def __init__(self):
+                self.values = {}
+                self.closed = False
+            def CreateKey(self, root, path):
+                self.asserted_path = path
+                return "fake-key"
+            def SetValueEx(self, key, name, reserved, kind, value):
+                self.values[name] = (kind, value)
+            def DeleteValue(self, key, name):
+                if name not in self.values:
+                    raise FileNotFoundError()
+                del self.values[name]
+            def CloseKey(self, key):
+                self.closed = True
+
+        registry = FakeRegistry()
+        self.assertTrue(jarvis_desktop.set_windows_startup(
+            True, winreg_module=registry,
+            executable=r"C:\\JARVIS\\JARVIS.exe", frozen=True, platform_name="nt",
+        ))
+        self.assertEqual(registry.values["JARVIS"][1], '"C:\\JARVIS\\JARVIS.exe"')
+        self.assertTrue(registry.closed)
+        self.assertTrue(jarvis_desktop.set_windows_startup(
+            False, winreg_module=registry, platform_name="nt",
+        ))
+        self.assertNotIn("JARVIS", registry.values)
+
+    def test_startup_registry_rejects_non_windows(self):
+        with self.assertRaisesRegex(RuntimeError, "Windows"):
+            jarvis_desktop.set_windows_startup(
+                True, winreg_module=object(), platform_name="posix",
+            )
+
+
 class WindowsPowerActionTests(unittest.TestCase):
     def test_shutdown_restart_and_cancel_use_fixed_safe_commands(self):
         calls = []
