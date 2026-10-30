@@ -699,6 +699,8 @@ class JarvisDesktop:
             self.prompt_var.set(prompt)
             self._set_status("JARVIS is already answering; your message is ready to retry.")
             return
+        # Reset cancellation only when a new request is accepted, not just before TTS.
+        self.speech_stop_event.clear()
         self._append("YOU", prompt)
         self.busy = True
         self._set_status("Thinking…")
@@ -726,7 +728,6 @@ class JarvisDesktop:
                 self.events.put(("status", f"Reply ready; chat history could not be saved: {exc}"))
             self.events.put(("answer", answer))
             try:
-                self.speech_stop_event.clear()
                 speak_text_interruptibly(answer, self.speech_stop_event)
             except Exception as exc:
                 self.events.put(("status", f"Reply shown; speech output unavailable: {exc}"))
@@ -847,6 +848,8 @@ class JarvisDesktop:
         if not self.request_lock.acquire(blocking=False):
             self.events.put(("status", "JARVIS is already answering; the voice request was skipped."))
             return
+        # A stop request made during thinking must remain set when speech begins.
+        self.speech_stop_event.clear()
         try:
             answer = chat_completion(
                 self.settings.get("endpoint", DEFAULT_ENDPOINT),
