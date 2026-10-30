@@ -365,8 +365,8 @@ class JarvisDesktop:
         self.chat.pack(fill="both", expand=True, padx=14, pady=8)
         for who, content, tag in self.transcript:
             self.chat.configure(state="normal")
-            self.chat.insert("end", who + "\\n", "speaker")
-            self.chat.insert("end", content + "\\n\\n", tag or "")
+            self.chat.insert("end", who + "\n", "speaker")
+            self.chat.insert("end", content + "\n\n", tag or "")
             self.chat.configure(state="disabled")
         self.chat.see("end")
         bottom = tk.Frame(win, bg="#03101b")
@@ -388,6 +388,9 @@ class JarvisDesktop:
         self.picovoice_var = tk.StringVar(value=os.getenv("PICOVOICE_ACCESS_KEY", ""))
 
     def _append(self, who: str, text: str, tag: str | None = None):
+        self.transcript.append((who, text, tag))
+        if self.chat is None or not self.chat.winfo_exists():
+            return
         self.chat.configure(state="normal")
         self.chat.insert("end", f"{who}\n", "speaker")
         self.chat.insert("end", f"{text}\n\n", tag or "")
