@@ -179,7 +179,7 @@ def press_windows_media_key(key_name: str, keybd_event=None, platform_name=None)
     return True
 
 
-STARTUP_RUN_KEY = r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+STARTUP_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 
 def build_startup_command(executable=None, script_path=None, frozen=None) -> str:
