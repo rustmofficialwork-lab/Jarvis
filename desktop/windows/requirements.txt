@@ -6,3 +6,4 @@ PyAudio>=0.2.14
 pyttsx3>=2.90,<3
 keyring>=25,<26
 pyinstaller>=6,<7
+psutil>=5.9,<8
