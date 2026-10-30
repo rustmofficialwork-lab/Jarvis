@@ -612,5 +612,58 @@ class ApplicationShutdownTests(unittest.TestCase):
         self.assertTrue(app.root.destroyed)
 
 
+class CancellableVoiceCaptureTests(unittest.TestCase):
+    def test_short_timeout_retries_until_a_command_is_received(self):
+        import threading
+
+        class WaitTimeoutError(Exception):
+            pass
+
+        class FakeRecognizer:
+            def __init__(self):
+                self.calls = 0
+                self.recognized_language = None
+            def listen(self, source, timeout, phrase_time_limit):
+                self.calls += 1
+                self.asserted_timeout = timeout
+                self.asserted_phrase_limit = phrase_time_limit
+                if self.calls == 1:
+                    raise WaitTimeoutError()
+                return "audio"
+            def recognize_google(self, audio, language):
+                self.recognized_language = language
+                return "open downloads"
+
+        recognizer = FakeRecognizer()
+        command = jarvis_desktop.listen_for_voice_command(
+            recognizer, object(), threading.Event(), "hi-IN", WaitTimeoutError,
+        )
+        self.assertEqual(command, "open downloads")
+        self.assertEqual(recognizer.calls, 2)
+        self.assertEqual(recognizer.asserted_timeout, 1)
+        self.assertEqual(recognizer.asserted_phrase_limit, 12)
+        self.assertEqual(recognizer.recognized_language, "hi-IN")
+
+    def test_stop_during_idle_wait_does_not_start_cloud_recognition(self):
+        import threading
+
+        class WaitTimeoutError(Exception):
+            pass
+
+        stop_event = threading.Event()
+
+        class FakeRecognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                stop_event.set()
+                raise WaitTimeoutError()
+            def recognize_google(self, audio, language):
+                raise AssertionError("Recognition must not run after stop is requested.")
+
+        command = jarvis_desktop.listen_for_voice_command(
+            FakeRecognizer(), object(), stop_event, "en-IN", WaitTimeoutError,
+        )
+        self.assertIsNone(command)
+
+
 if __name__ == "__main__":
     unittest.main()
