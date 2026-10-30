@@ -165,6 +165,9 @@ class JarvisDesktop:
         self.send_button = ttk.Button(self.root, text="TRANSMIT  ➤", style="HUD.TButton", command=self.send_text)
         self.listen_button = ttk.Button(self.root, text="◉  ACTIVATE VOICE", style="HUD.TButton",
                                         command=self.toggle_listening)
+        self.chat_button = ttk.Button(self.root, text="CHAT LOG", style="HUD.TButton", command=self.open_chat)
+        self.settings_button = ttk.Button(self.root, text="SETTINGS ⚙", style="HUD.TButton", command=self.open_settings)
+        self.prompt_entry.bind("<Return>", lambda _event: self.send_text())
         self._draw_orb()
         self.root.after(50, self._animate_orb)
 
@@ -198,6 +201,8 @@ class JarvisDesktop:
                       font=("Segoe UI Semibold", 21))
         c.create_text(250, 36, text="PERSONAL COMMAND INTERFACE  /  V 1.0",
                       fill="#328aa8", anchor="w", font=("Consolas", 9))
+        c.create_window(w-365, 35, window=self.chat_button, width=105, height=30)
+        c.create_window(w-250, 35, window=self.settings_button, width=115, height=30)
         c.create_oval(w-190, 25, w-178, 37, fill="#00f0a0", outline="")
         c.create_text(w-165, 31, text="SYSTEM ONLINE", fill=bright, anchor="w",
                       font=("Consolas", 10, "bold"))
@@ -314,6 +319,32 @@ class JarvisDesktop:
                       font=("Consolas", 9, "bold"))
         c.create_text(w-35, h-35, text="ESC  /  EXIT", fill="#328aa8", anchor="e",
                       font=("Consolas", 8))
+
+    def open_chat(self):
+        """Open a visible, scrollable conversation window."""
+        if getattr(self, "chat_window", None) is not None and self.chat_window.winfo_exists():
+            self.chat_window.deiconify()
+            self.chat_window.lift()
+            return
+        win = tk.Toplevel(self.root)
+        self.chat_window = win
+        win.title("JARVIS | Conversation")
+        win.geometry("680x620")
+        win.configure(bg="#03101b")
+        win.minsize(480, 380)
+        tk.Label(win, text="J.A.R.V.I.S.  /  LIVE CONVERSATION",
+                 bg="#03101b", fg="#8af4ff", font=("Consolas", 13, "bold")).pack(
+                     anchor="w", padx=16, pady=(14, 8))
+        self.chat.configure(state="disabled", bg="#041522", fg="#d9faff",
+                            insertbackground="#ffffff", relief="flat",
+                            font=("Segoe UI", 11), padx=12, pady=12)
+        self.chat.pack(fill="both", expand=True, padx=14, pady=8)
+        bottom = tk.Frame(win, bg="#03101b")
+        bottom.pack(fill="x", padx=14, pady=(4, 14))
+        ttk.Button(bottom, text="Clear conversation", style="HUD.TButton",
+                   command=self.clear_chat).pack(side="left")
+        ttk.Button(bottom, text="Close", style="HUD.TButton",
+                   command=win.withdraw).pack(side="right")
 
     def _load_secrets(self):
         if self.keyring:
