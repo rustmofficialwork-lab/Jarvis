@@ -1128,6 +1128,9 @@ class JarvisDesktop:
                 self.events.put(("status", f"Offline voice model could not download yet: {exc}. JARVIS will retry when voice listening is activated."))
             finally:
                 self.offline_model_setup_running = False
+                selected_language = self.settings.get("language", "en-IN")
+                if selected_language != language:
+                    self._ensure_offline_model(selected_language)
 
         threading.Thread(target=worker, daemon=True).start()
         return True
