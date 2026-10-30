@@ -866,5 +866,47 @@ class CancellableVoiceCaptureTests(unittest.TestCase):
         self.assertIsNone(command)
 
 
+class OfflineVoiceFallbackTests(unittest.TestCase):
+    def test_network_failure_uses_local_vosk_transcription(self):
+        from unittest.mock import patch
+        import threading
+
+        class RequestError(Exception):
+            pass
+        class Recognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                return "captured-audio"
+            def recognize_google(self, audio, language):
+                raise RequestError("offline")
+        with patch.object(jarvis_desktop, "transcribe_offline_vosk", return_value="notepad kholo") as offline:
+            result = jarvis_desktop.listen_for_voice_command(
+                Recognizer(), object(), threading.Event(), "hi-IN",
+                TimeoutError, RequestError,
+            )
+        self.assertEqual(result, "notepad kholo")
+        offline.assert_called_once_with("captured-audio", "hi-IN")
+
+    def test_missing_offline_model_reports_setup_instructions(self):
+        from unittest.mock import patch
+        import threading
+
+        class RequestError(Exception):
+            pass
+        class Recognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                return "captured-audio"
+            def recognize_google(self, audio, language):
+                raise RequestError("network unavailable")
+        with patch.object(
+            jarvis_desktop, "transcribe_offline_vosk",
+            side_effect=jarvis_desktop.OfflineModelUnavailable("Install model from Settings."),
+        ):
+            with self.assertRaisesRegex(RequestError, "Install model from Settings"):
+                jarvis_desktop.listen_for_voice_command(
+                    Recognizer(), object(), threading.Event(), "en-IN",
+                    TimeoutError, RequestError,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
