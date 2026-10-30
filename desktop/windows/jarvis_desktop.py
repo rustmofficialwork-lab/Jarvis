@@ -298,6 +298,23 @@ def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool
             pass
 
 
+def release_wake_recorder(recorder) -> None:
+    """Best-effort stop and release a wake-word microphone handle."""
+    if recorder is None:
+        return
+    try:
+        if recorder.is_recording:
+            recorder.stop()
+    except Exception:
+        # A disconnected device may already have invalidated the recording handle.
+        pass
+    try:
+        recorder.delete()
+    except Exception:
+        # Cleanup must not hide the original microphone or shutdown error.
+        pass
+
+
 def configure_voice_recognizer(recognizer, request_timeout: float = 8.0):
     """Bound online speech-recognition requests so network stalls cannot hang the worker."""
     if request_timeout <= 0:
@@ -904,7 +921,7 @@ class JarvisDesktop:
                             recorder.stop()
                     if not detected or self.stop_event.is_set():
                         break
-                    recorder.delete()
+                    release_wake_recorder(recorder)
                     recorder = None
                     self.events.put(("status", "Wake word detected — speak your command now."))
                     recognizer = configure_voice_recognizer(sr.Recognizer())
@@ -935,21 +952,13 @@ class JarvisDesktop:
                     # A USB/headset microphone can disappear while listening. Discard
                     # the stale recorder handle and reopen the default input device.
                     self.events.put(("status", f"Wake microphone disconnected ({exc}). Reconnecting in 2 seconds…"))
-                    if recorder is not None:
-                        try:
-                            recorder.delete()
-                        except Exception:
-                            pass
-                        recorder = None
+                    release_wake_recorder(recorder)
+                    recorder = None
                     self.stop_event.wait(2)
         except Exception as exc:
             self.events.put(("error", f"Wake listener could not start: {exc}"))
         finally:
-            if recorder is not None:
-                try:
-                    recorder.delete()
-                except Exception:
-                    pass
+            release_wake_recorder(recorder)
             if porcupine is not None:
                 try:
                     porcupine.delete()
