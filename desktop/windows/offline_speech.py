@@ -44,7 +44,7 @@ def transcribe_offline_vosk(audio, language: str, model_dir: Path = DEFAULT_MODE
     model_path = model_path_for_language(language, model_dir)
     if not model_path.is_dir():
         raise OfflineModelUnavailable(
-            f"Offline {language} model is missing. Install it from JARVIS Settings while online."
+            f"Offline {language} model is missing. JARVIS will download it automatically when an internet connection is available."
         )
     if vosk_module is None:
         try:
