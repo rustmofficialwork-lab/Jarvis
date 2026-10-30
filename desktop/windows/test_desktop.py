@@ -62,6 +62,43 @@ class InterruptibleSpeechTests(unittest.TestCase):
         self.assertTrue(engine.stopped)
 
 
+    def test_voice_local_command_speaks_confirmation_and_persists_history(self):
+        from unittest.mock import patch
+        import queue
+        import threading
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        app.history = []
+        app.request_lock = threading.Lock()
+        app.speech_stop_event = threading.Event()
+        app.speech_stop_event.set()
+        with (
+            patch.object(jarvis_desktop, "run_local_command", return_value="Opening Notepad."),
+            patch.object(jarvis_desktop, "save_chat_history") as save,
+            patch.object(jarvis_desktop, "speak_text_interruptibly") as speak,
+        ):
+            app._answer_voice("open notepad")
+        self.assertFalse(app.speech_stop_event.is_set())
+        speak.assert_called_once_with("Opening Notepad.", app.speech_stop_event)
+        save.assert_called_once_with(app.history)
+        self.assertEqual([item["role"] for item in app.history], ["user", "assistant"])
+        self.assertFalse(app.request_lock.locked())
+
+    def test_voice_request_does_not_run_local_action_while_another_request_owns_lock(self):
+        from unittest.mock import patch
+        import queue
+        import threading
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        app.history = []
+        app.request_lock = threading.Lock()
+        app.request_lock.acquire()
+        app.speech_stop_event = threading.Event()
+        with patch.object(jarvis_desktop, "run_local_command") as local:
+            app._answer_voice("open notepad")
+        local.assert_not_called()
+        app.request_lock.release()
+
     def test_voice_reply_uses_interruptible_speech(self):
         from unittest.mock import patch
         import queue
