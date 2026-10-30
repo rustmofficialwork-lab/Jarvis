@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -178,6 +179,53 @@ def press_windows_media_key(key_name: str, keybd_event=None, platform_name=None)
     return True
 
 
+STARTUP_RUN_KEY = r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+
+
+def build_startup_command(executable=None, script_path=None, frozen=None) -> str:
+    """Build a safely quoted per-user startup command for frozen or Python runs."""
+    import subprocess
+
+    is_frozen = getattr(sys, "frozen", False) if frozen is None else frozen
+    app_executable = executable or sys.executable
+    if is_frozen:
+        parts = [app_executable]
+    else:
+        executable_path = Path(app_executable)
+        pythonw = executable_path.with_name("pythonw.exe")
+        runner = str(pythonw if pythonw.exists() else executable_path)
+        parts = [runner, str(script_path or Path(__file__).resolve())]
+    return subprocess.list2cmdline(parts)
+
+
+def set_windows_startup(enabled: bool, winreg_module=None, executable=None,
+                        script_path=None, frozen=None, platform_name=None) -> bool:
+    """Enable or disable JARVIS for the current Windows user (no elevation)."""
+    import os as _os
+
+    if (platform_name or _os.name) != "nt":
+        raise RuntimeError("Windows startup settings are available only on Windows.")
+    if winreg_module is None:
+        import winreg as winreg_module
+    key = winreg_module.CreateKey(
+        winreg_module.HKEY_CURRENT_USER, STARTUP_RUN_KEY
+    )
+    try:
+        if enabled:
+            command = build_startup_command(executable, script_path, frozen)
+            winreg_module.SetValueEx(
+                key, APP_NAME, 0, winreg_module.REG_SZ, command
+            )
+        else:
+            try:
+                winreg_module.DeleteValue(key, APP_NAME)
+            except FileNotFoundError:
+                pass
+    finally:
+        winreg_module.CloseKey(key)
+    return True
+
+
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     history: list[dict]) -> str:
     from urllib.parse import urlparse
@@ -247,6 +295,8 @@ class JarvisDesktop:
         self.stop_event = threading.Event()
         self.wake_thread: threading.Thread | None = None
         self.busy = False
+        self.tray_icon = None
+        self.tray_thread = None
         # Serialize typed and voice requests so history and TTS cannot race.
         self.request_lock = threading.Lock()
 
@@ -262,7 +312,7 @@ class JarvisDesktop:
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
         self.root.after(120, self._poll_events)
-        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
         """Build the blue holographic laptop dashboard while keeping the assistant controls live."""
@@ -861,14 +911,27 @@ class JarvisDesktop:
         language = ttk.Combobox(window, values=["en-IN", "hi-IN", "en-US"], state="readonly", width=12)
         language.set(self.settings.get("language", "en-IN"))
         language.grid(row=4, column=1, sticky="w", padx=14, pady=8)
+        startup_var = tk.BooleanVar(value=bool(self.settings.get("start_with_windows", False)))
+        ttk.Checkbutton(window, text="Start JARVIS when I sign in to Windows",
+                        variable=startup_var).grid(row=5, column=1, sticky="w", padx=14, pady=8)
+        tk.Label(window, text="Closing the window keeps JARVIS in the system tray. Use Exit from its tray menu.",
+                 bg="#07111b", fg="#7897aa", font=("Segoe UI", 9)).grid(
+                     row=6, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 4))
         tk.Label(window, text="Secrets are stored in Windows Credential Manager when available.",
                  bg="#07111b", fg="#7897aa", font=("Segoe UI", 9)).grid(
-                     row=5, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 12))
+                     row=7, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 12))
 
         def save():
             self.settings["endpoint"] = entries["endpoint"].get().strip()
             self.settings["model"] = entries["model"].get().strip()
             self.settings["language"] = language.get().strip() or "en-IN"
+            startup_enabled = startup_var.get()
+            try:
+                set_windows_startup(startup_enabled)
+            except Exception as exc:
+                messagebox.showerror("Startup setting failed", str(exc), parent=window)
+                return
+            self.settings["start_with_windows"] = startup_enabled
             self.api_key_var.set(entries["ai_key"].get().strip())
             self.picovoice_var.set(entries["picovoice_key"].get().strip())
             self.ai_api_key = self.api_key_var.get()
@@ -891,7 +954,7 @@ class JarvisDesktop:
             window.destroy()
 
         ttk.Button(window, text="Save settings", command=save).grid(
-            row=6, column=1, sticky="e", padx=14, pady=(4, 16))
+            row=8, column=1, sticky="e", padx=14, pady=(4, 16))
 
     def clear_chat(self):
         self.history.clear()
@@ -929,9 +992,60 @@ class JarvisDesktop:
             pass
         self.root.after(120, self._poll_events)
 
-    def close(self):
+    def _show_window(self):
+        self.root.after(0, self.root.deiconify)
+        self.root.after(0, self.root.lift)
+
+    def _start_tray(self):
+        if self.tray_icon is not None:
+            return
+        try:
+            import pystray
+            from PIL import Image, ImageDraw
+
+            image = Image.new("RGBA", (64, 64), (2, 7, 13, 255))
+            draw = ImageDraw.Draw(image)
+            draw.ellipse((5, 5, 59, 59), outline=(0, 191, 255, 255), width=3)
+            draw.ellipse((15, 15, 49, 49), outline=(138, 244, 255, 255), width=2)
+            draw.ellipse((27, 27, 37, 37), fill=(0, 191, 255, 255))
+            menu = pystray.Menu(
+                pystray.MenuItem("Open JARVIS", lambda _icon, _item: self._show_window(), default=True),
+                pystray.MenuItem("Activate / stop voice", lambda _icon, _item: self.root.after(0, self.toggle_listening)),
+                pystray.MenuItem("Exit JARVIS", lambda _icon, _item: self.root.after(0, self.exit_app)),
+            )
+            self.tray_icon = pystray.Icon(APP_NAME, image, "JARVIS Desktop", menu)
+            self.tray_icon.run_detached()
+            return True
+        except Exception as exc:
+            self.tray_icon = None
+            self._set_status(f"System tray unavailable: {exc}")
+            return False
+
+    def hide_to_tray(self):
+        if self._start_tray():
+            self.root.withdraw()
+            self._set_status("JARVIS is running in the system tray.")
+            return
+        if messagebox.askyesno(
+            "JARVIS system tray unavailable",
+            "The tray component could not start. Exit JARVIS instead?",
+            parent=self.root,
+        ):
+            self.exit_app()
+
+    def exit_app(self):
         self.stop_event.set()
+        if self.tray_icon is not None:
+            try:
+                self.tray_icon.stop()
+            except Exception:
+                pass
+            self.tray_icon = None
         self.root.destroy()
+
+    def close(self):
+        """Backward-compatible explicit exit hook."""
+        self.exit_app()
 
 
 def main():
