@@ -351,8 +351,8 @@ class JarvisDesktop:
         c.create_window(w-365, 35, window=self.chat_button, width=105, height=30)
         c.create_window(w-250, 35, window=self.settings_button, width=115, height=30)
         c.create_window(w-125, 35, window=self.power_button, width=90, height=30)
-        c.create_oval(w-190, 25, w-178, 37, fill="#00f0a0", outline="")
-        c.create_text(w-165, 31, text="SYSTEM ONLINE", fill=bright, anchor="w",
+        c.create_oval(w-480, 25, w-468, 37, fill="#00f0a0", outline="")
+        c.create_text(w-455, 31, text="SYSTEM ONLINE", fill=bright, anchor="w",
                       font=("Consolas", 10, "bold"))
         # Panel helper
         def panel(x1, y1, x2, y2, title):
