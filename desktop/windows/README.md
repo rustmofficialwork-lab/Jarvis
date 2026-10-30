@@ -11,7 +11,7 @@ This repository currently contains the native Windows laptop edition of JARVIS. 
 - A Picovoice AccessKey for the Porcupine wake-word engine
 - An OpenAI-compatible chat-completions endpoint and API key for AI replies
 
-Wake-word inference runs locally after Porcupine initializes, but Picovoice may need internet to validate the AccessKey. Speech transcription currently uses Google's online recognizer; it is not offline speech-to-text. The desktop app does not hide or bypass Windows microphone privacy indicators.
+Wake-word inference runs locally after Porcupine initializes, but Picovoice may need internet to validate the AccessKey. Speech transcription currently uses Google's online recognizer; it is not offline speech-to-text. Online recognition requests have an eight-second network timeout so a stalled connection cannot block the voice worker indefinitely. The desktop app does not hide or bypass Windows microphone privacy indicators.
 
 ## Run from source
 
