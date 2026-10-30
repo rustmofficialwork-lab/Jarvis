@@ -285,6 +285,47 @@ class ServiceStatusTests(unittest.TestCase):
         self.assertEqual(details["VOICE ENGINE"], "CONFIGURED")
 
 
+class SystemMetricsTests(unittest.TestCase):
+    def test_battery_status_includes_charging_and_on_battery_state(self):
+        from types import SimpleNamespace
+        formatter = jarvis_desktop.JarvisDesktop._format_battery_status
+        self.assertEqual(formatter(SimpleNamespace(percent=62, power_plugged=True)), "62% • CHARGING")
+        self.assertEqual(formatter(SimpleNamespace(percent=62, power_plugged=False)), "62% • ON BATTERY")
+        self.assertEqual(formatter(SimpleNamespace(percent=100, power_plugged=True)), "100%")
+        self.assertEqual(formatter(None), "AC POWER")
+
+    def test_invalid_battery_reading_is_reported_as_unavailable(self):
+        from types import SimpleNamespace
+        self.assertEqual(
+            jarvis_desktop.JarvisDesktop._format_battery_status(
+                SimpleNamespace(percent="unknown", power_plugged=False)
+            ),
+            "N/A",
+        )
+
+    def test_temperature_sensor_failure_does_not_hide_other_metrics(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        fake_psutil = SimpleNamespace(
+            sensors_battery=lambda: SimpleNamespace(percent=80, power_plugged=True),
+            disk_usage=lambda _drive: SimpleNamespace(percent=40),
+            sensors_temperatures=lambda **_kwargs: (_ for _ in ()).throw(NotImplementedError()),
+            net_if_stats=lambda: {"Ethernet": SimpleNamespace(isup=True)},
+            cpu_percent=lambda interval=None: 12,
+            virtual_memory=lambda: SimpleNamespace(percent=55),
+        )
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        with patch.dict(sys.modules, {"psutil": fake_psutil}):
+            metrics = dict(app._get_system_metrics())
+        self.assertEqual(metrics["CPU LOAD"], "12%")
+        self.assertEqual(metrics["MEMORY"], "55%")
+        self.assertEqual(metrics["DISK USED"], "40%")
+        self.assertEqual(metrics["BATTERY"], "80% • CHARGING")
+        self.assertEqual(metrics["CPU TEMP"], "N/A")
+        self.assertEqual(metrics["NETWORK"], "ONLINE")
+
+
 class WindowsBrightnessTests(unittest.TestCase):
     def test_brightness_increases_and_clamps_to_hundred(self):
         class FakeBrightness:
