@@ -5,9 +5,9 @@ import json
 import os
 import secrets
 import sqlite3
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
@@ -20,13 +20,20 @@ MAX_REQUEST_BYTES = max(16_384, int(os.getenv("MAX_REQUEST_BYTES", "12582912")))
 UPSTREAM_TIMEOUT_SECONDS = max(5, min(90, int(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "45"))))
 
 
-def _database() -> sqlite3.Connection:
+@contextmanager
+def _database() -> Iterator[sqlite3.Connection]:
     path = Path(DATABASE_PATH)
     if str(path) != ":memory:":
         path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(path), timeout=10)
     connection.row_factory = sqlite3.Row
-    return connection
+    try:
+        # sqlite3's connection context manager commits/rolls back but does not
+        # close the connection, so close it explicitly after every operation.
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 def _initialize_database() -> None:
