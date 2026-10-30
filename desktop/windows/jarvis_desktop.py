@@ -111,11 +111,9 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         "increase volume": ("volume_up", "Volume increased."),
         "volume down": ("volume_down", "Volume decreased."),
         "decrease volume": ("volume_down", "Volume decreased."),
+        # These hardware keys are toggles, not explicit mute/pause state setters.
         "mute": ("volume_mute", "Volume mute state toggled."),
-        "unmute": ("volume_mute", "Volume mute state toggled."),
         "play pause": ("play_pause", "Media playback toggled."),
-        "pause music": ("play_pause", "Media playback toggled."),
-        "resume music": ("play_pause", "Media playback toggled."),
         "next track": ("next_track", "Skipping to the next track."),
         "previous track": ("previous_track", "Going to the previous track."),
     }
