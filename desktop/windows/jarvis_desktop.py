@@ -241,8 +241,12 @@ class JarvisDesktop:
         quick = [("▣", "Documents"), ("▧", "Pictures"), ("♫", "Music"), ("⌁", "Downloads"), ("◉", "This PC")]
         for i, (symbol, label) in enumerate(quick):
             yy = 550 + i*42
-            c.create_text(52, yy, text=symbol, fill=blue, font=("Segoe UI", 15))
-            c.create_text(78, yy, text=label, fill="#a8eaff", anchor="w", font=("Segoe UI", 10))
+            tag = "quick_" + label.lower().replace(" ", "_")
+            c.create_text(52, yy, text=symbol, fill=blue, font=("Segoe UI", 15), tags=(tag,))
+            c.create_text(78, yy, text=label, fill="#a8eaff", anchor="w", font=("Segoe UI", 10), tags=(tag,))
+            c.tag_bind(tag, "<Button-1>", lambda _event, name=label: self.open_quick_access(name))
+            c.tag_bind(tag, "<Enter>", lambda _event: c.configure(cursor="hand2"))
+            c.tag_bind(tag, "<Leave>", lambda _event: c.configure(cursor=""))
             c.create_line(46, yy+18, 240, yy+18, fill="#092b3b")
         # Right-side system status and JARVIS info
         rx = w-270
@@ -319,6 +323,26 @@ class JarvisDesktop:
                       font=("Consolas", 9, "bold"))
         c.create_text(w-35, h-35, text="ESC  /  EXIT", fill="#328aa8", anchor="e",
                       font=("Consolas", 8))
+
+    def open_quick_access(self, name: str):
+        """Open a real Windows known folder from the HUD shortcut."""
+        import subprocess
+        from pathlib import Path
+        folders = {
+            "Documents": Path.home() / "Documents",
+            "Pictures": Path.home() / "Pictures",
+            "Music": Path.home() / "Music",
+            "Downloads": Path.home() / "Downloads",
+            "This PC": Path(os.environ.get("SystemDrive", "C:") + "\\"),
+        }
+        target = folders[name]
+        if not target.exists():
+            messagebox.showwarning("Folder unavailable", f"{name} folder was not found.")
+            return
+        try:
+            os.startfile(str(target))
+        except OSError as exc:
+            messagebox.showerror("Could not open folder", str(exc))
 
     def open_chat(self):
         """Open a visible, scrollable conversation window."""
