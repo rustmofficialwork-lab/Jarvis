@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -42,10 +43,15 @@ class MemoryStore:
                 "ON memories(content COLLATE NOCASE)"
             )
 
+    @contextmanager
     def _connect(self):
         db = sqlite3.connect(str(self.path), timeout=10)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     @staticmethod
     def validate(content: str) -> str:
@@ -143,7 +149,7 @@ class MemoryStore:
         """Return a small, newest-first memory slice for the local chat request."""
         selected = []
         used = 0
-        for item in reversed(self.list(limit)):
+        for item in self.list(limit):
             content = item["content"]
             if used + len(content) > max_chars:
                 continue
