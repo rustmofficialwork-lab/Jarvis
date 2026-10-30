@@ -42,7 +42,7 @@ Send an OpenAI-compatible JSON body to `POST /v1/chat/completions`, including `m
 - `POST /v1/memory` with `{"content":"..."}` — save a note (maximum 4,000 characters).
 - `DELETE /v1/memory/{id}` — delete a note.
 
-Saved notes are private to this single-token deployment, not separated by user accounts. A token embedded in a mobile/desktop client can be extracted by a determined attacker; do not expose this instance to untrusted users. Public release should add per-user authentication and quotas.
+Saved notes are private to this single-token deployment, not separated by user accounts. A token embedded in a desktop client can be extracted by a determined attacker; do not expose this instance to untrusted users. Public release should add per-user authentication and quotas.
 
 ## Render deployment and persistence
 
@@ -57,4 +57,4 @@ pip install httpx pytest
 python -m unittest discover -s tests -v
 ```
 
-CI checks and unit tests validate code paths, but they do not prove that live provider credentials, upstream availability, mobile permissions, or physical-device audio work. Verify `GET /health`, authenticated chat, and memory create/list/delete against the deployed service before relying on those features.
+CI checks and unit tests validate code paths, but they do not prove that live provider credentials, upstream availability, or physical-device audio work. Verify `GET /health`, authenticated chat, and memory create/list/delete against the deployed service before relying on those features.
