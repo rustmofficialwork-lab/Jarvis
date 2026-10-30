@@ -612,6 +612,29 @@ class ApplicationShutdownTests(unittest.TestCase):
         self.assertTrue(app.root.destroyed)
 
 
+class VoiceRecognizerTimeoutTests(unittest.TestCase):
+    def test_online_recognition_timeout_is_bounded(self):
+        class FakeRecognizer:
+            operation_timeout = None
+
+        recognizer = jarvis_desktop.configure_voice_recognizer(FakeRecognizer())
+        self.assertEqual(recognizer.operation_timeout, 8.0)
+
+    def test_custom_positive_timeout_is_supported(self):
+        class FakeRecognizer:
+            operation_timeout = None
+
+        recognizer = jarvis_desktop.configure_voice_recognizer(FakeRecognizer(), 3.5)
+        self.assertEqual(recognizer.operation_timeout, 3.5)
+
+    def test_non_positive_timeout_is_rejected(self):
+        class FakeRecognizer:
+            operation_timeout = None
+
+        with self.assertRaises(ValueError):
+            jarvis_desktop.configure_voice_recognizer(FakeRecognizer(), 0)
+
+
 class CancellableVoiceCaptureTests(unittest.TestCase):
     def test_short_timeout_retries_until_a_command_is_received(self):
         import threading
