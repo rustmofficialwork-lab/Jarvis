@@ -193,11 +193,21 @@ class ChatCompletionValidationTests(unittest.TestCase):
                 [],
             )
 
-    def test_requires_model_and_key(self):
-        with self.assertRaisesRegex(ValueError, "model and API key"):
+    def test_requires_model_name(self):
+        with self.assertRaisesRegex(ValueError, "model name"):
             jarvis_desktop.chat_completion(
                 "https://example.com/v1/chat/completions",
                 "",
+                "test-key",
+                "hello",
+                [],
+            )
+
+    def test_requires_api_key(self):
+        with self.assertRaisesRegex(ValueError, "API key"):
+            jarvis_desktop.chat_completion(
+                "https://example.com/v1/chat/completions",
+                "test-model",
                 "",
                 "hello",
                 [],
