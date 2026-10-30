@@ -598,6 +598,10 @@ class JarvisDesktop:
             )
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
+            try:
+                save_chat_history(self.history)
+            except OSError as exc:
+                self.events.put(("status", f"Reply ready; chat history could not be saved: {exc}"))
             self.events.put(("answer", answer))
             try:
                 import pyttsx3
