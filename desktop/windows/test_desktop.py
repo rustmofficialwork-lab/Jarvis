@@ -430,6 +430,45 @@ class MemoryPrivacyTests(unittest.TestCase):
         )
 
 
+class VoiceMemoryCommandTests(unittest.TestCase):
+    def test_voice_can_save_and_recall_a_local_memory(self):
+        import queue
+        import tempfile
+        import threading
+        from unittest.mock import patch
+        from memory_store import MemoryStore
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.memory_store = MemoryStore(Path(tempfile.mkdtemp()) / "memory.sqlite3")
+        app.events = queue.Queue()
+        app.history = []
+        app.speech_stop_event = threading.Event()
+        with patch.object(jarvis_desktop, "save_chat_history"), \
+             patch.object(jarvis_desktop, "speak_text_interruptibly") as speak:
+            self.assertTrue(app._handle_voice_memory_command("yaad rakhna I prefer Hindi"))
+            self.assertTrue(app._handle_voice_memory_command("what do you remember"))
+        self.assertEqual(app.memory_store.list()[0]["content"], "I prefer Hindi")
+        self.assertEqual(len(app.history), 4)
+        self.assertEqual(speak.call_count, 2)
+
+    def test_voice_memory_command_rejects_secrets(self):
+        import queue
+        import tempfile
+        import threading
+        from unittest.mock import patch
+        from memory_store import MemoryStore
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.memory_store = MemoryStore(Path(tempfile.mkdtemp()) / "memory.sqlite3")
+        app.events = queue.Queue()
+        app.history = []
+        app.speech_stop_event = threading.Event()
+        with patch.object(jarvis_desktop, "save_chat_history"), \
+             patch.object(jarvis_desktop, "speak_text_interruptibly"):
+            self.assertTrue(app._handle_voice_memory_command("remember that my API key is secret"))
+        self.assertEqual(app.memory_store.list(), [])
+
+
 class ServiceStatusTests(unittest.TestCase):
     def test_service_status_does_not_claim_unconfigured_ai_or_voice_ready(self):
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
