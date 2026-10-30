@@ -296,14 +296,29 @@ def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool
             pass
 
 
-def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
-                    history: list[dict]) -> str:
+def validate_chat_configuration(endpoint: str, model: str) -> tuple[str, str]:
+    """Validate and normalize non-secret chat settings before saving or sending."""
     from urllib.parse import urlparse
 
-    parsed = urlparse(endpoint.strip())
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+    endpoint = endpoint.strip()
+    model = model.strip()
+    parsed = urlparse(endpoint)
+    try:
+        valid_port = parsed.port is None or 1 <= parsed.port <= 65535
+    except ValueError:
+        valid_port = False
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+            or not valid_port):
         raise ValueError("AI endpoint must be a valid HTTPS URL without embedded credentials.")
-    if not model.strip() or not api_key.strip():
+    if not model or len(model) > 200:
+        raise ValueError("Please enter a model name (maximum 200 characters).")
+    return endpoint, model
+
+
+def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
+                    history: list[dict]) -> str:
+    endpoint, model = validate_chat_configuration(endpoint, model)
+    if not api_key.strip():
         raise ValueError("Please set the AI model and API key in Settings.")
 
     language_hint = (
@@ -1041,8 +1056,15 @@ class JarvisDesktop:
                      row=7, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 12))
 
         def save():
-            self.settings["endpoint"] = entries["endpoint"].get().strip()
-            self.settings["model"] = entries["model"].get().strip()
+            try:
+                endpoint, model = validate_chat_configuration(
+                    entries["endpoint"].get(), entries["model"].get()
+                )
+            except ValueError as exc:
+                messagebox.showerror("Invalid AI settings", str(exc), parent=window)
+                return
+            self.settings["endpoint"] = endpoint
+            self.settings["model"] = model
             self.settings["language"] = language.get().strip() or "en-IN"
             startup_enabled = startup_var.get()
             try:
