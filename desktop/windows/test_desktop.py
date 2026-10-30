@@ -130,5 +130,33 @@ class ServiceStatusTests(unittest.TestCase):
         self.assertTrue(by_name["VOICE ENGINE"])
 
 
+class WindowsMediaKeyTests(unittest.TestCase):
+    def test_volume_and_media_actions_emit_fixed_key_down_and_up(self):
+        calls = []
+        sent = jarvis_desktop.press_windows_media_key(
+            "volume_up", keybd_event=lambda *args: calls.append(args), platform_name="nt",
+        )
+        self.assertTrue(sent)
+        self.assertEqual(calls, [(0xAF, 0, 0, 0), (0xAF, 0, 2, 0)])
+
+    def test_unknown_key_and_non_windows_are_rejected(self):
+        calls = []
+        self.assertFalse(jarvis_desktop.press_windows_media_key(
+            "arbitrary_key", keybd_event=lambda *args: calls.append(args), platform_name="nt",
+        ))
+        self.assertFalse(jarvis_desktop.press_windows_media_key(
+            "volume_up", keybd_event=lambda *args: calls.append(args), platform_name="posix",
+        ))
+        self.assertEqual(calls, [])
+
+    def test_voice_command_mapping_only_accepts_fixed_media_phrases(self):
+        from unittest.mock import patch
+        with patch.object(jarvis_desktop, "press_windows_media_key", return_value=True) as press:
+            self.assertEqual(jarvis_desktop.run_local_command("volume up"), "Volume increased.")
+            self.assertEqual(jarvis_desktop.run_local_command("next track"), "Skipping to the next track.")
+            self.assertIsNone(jarvis_desktop.run_local_command("run powershell"))
+        self.assertEqual([call.args[0] for call in press.call_args_list], ["volume_up", "next_track"])
+
+
 if __name__ == "__main__":
     unittest.main()
