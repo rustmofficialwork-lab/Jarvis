@@ -282,6 +282,14 @@ class SettingsPersistenceTests(unittest.TestCase):
         self.assertEqual(loaded["language"], "en-IN")
         self.assertFalse(loaded["start_with_windows"])
 
+    def test_non_string_language_does_not_crash_settings_loader(self):
+        import json
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "settings.json"
+        path.write_text(json.dumps({"language": ["hi-IN"]}), encoding="utf-8")
+        loaded = jarvis_desktop.load_settings(path)
+        self.assertEqual(loaded["language"], "en-IN")
+
 
 class LocalCommandHistoryTests(unittest.TestCase):
     def test_failed_local_action_is_visible_and_persisted(self):
