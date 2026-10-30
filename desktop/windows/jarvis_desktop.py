@@ -138,140 +138,180 @@ class JarvisDesktop:
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
     def _build_ui(self):
+        """Build the blue holographic laptop dashboard while keeping the assistant controls live."""
+        self.root.title("J.A.R.V.I.S. | Desktop Command Center")
+        self.root.geometry("1500x900")
+        self.root.minsize(1100, 700)
+        self.root.configure(bg="#02070d")
         style = ttk.Style()
         try:
             style.theme_use("clam")
         except tk.TclError:
             pass
-        style.configure("TButton", padding=8, font=("Segoe UI", 10))
-        style.configure("TLabel", background="#050505", foreground="#f2d1b2", font=("Segoe UI", 10))
-        style.configure("TEntry", padding=6)
-        style.configure("TCombobox", padding=5)
-
-        self.root.configure(bg="#050505")
-        header = tk.Frame(self.root, bg="#050505")
-        header.pack(fill="x", padx=24, pady=(12, 2))
-        tk.Label(header, text="J.A.R.V.I.S.", bg="#050505", fg="#ff8a18",
-                 font=("Segoe UI Semibold", 21)).pack(anchor="center")
-        tk.Label(header, text="PERSONAL AI • DESKTOP INTERFACE", bg="#050505", fg="#80502e",
-                 font=("Consolas", 9)).pack(anchor="center", pady=(1, 0))
-
-        # Large animated canvas: particle sphere and flowing energy ribbons, matching the chosen orange orb.
-        self.orb_canvas = tk.Canvas(self.root, bg="#000000", highlightthickness=0, height=290)
-        self.orb_canvas.pack(fill="both", expand=True, padx=18, pady=(4, 2))
+        style.configure("HUD.TButton", background="#061827", foreground="#8deeff",
+                        bordercolor="#087ca8", padding=(12, 8), font=("Segoe UI", 10))
+        style.map("HUD.TButton", background=[("active", "#0a2940")])
+        style.configure("HUD.TEntry", fieldbackground="#04111d", foreground="#d9faff",
+                        insertcolor="#ffffff", bordercolor="#087ca8", padding=9)
+        self.hud = tk.Canvas(self.root, bg="#02070d", highlightthickness=0)
+        self.hud.pack(fill="both", expand=True)
+        self.hud.bind("<Configure>", lambda _event: self._draw_orb())
         self.orb_phase = 0.0
-        self.orb_canvas.bind("<Configure>", lambda _event: self._draw_orb())
-
-        self.status_var = tk.StringVar(value="Ready — configure your AI endpoint and client token in Settings.")
-        tk.Label(self.root, textvariable=self.status_var, bg="#100a06", fg="#ffb36b",
-                 anchor="center", padx=12, pady=8).pack(fill="x", padx=24, pady=(4, 8))
-
-        self.chat = tk.Text(self.root, bg="#0b0908", fg="#f5e7db", insertbackground="#f5e7db",
-                            relief="flat", wrap="word", padx=12, pady=8,
-                            font=("Segoe UI", 10), height=5, state="disabled")
-        self.chat.pack(fill="both", expand=True, padx=24, pady=(0, 8))
-        self.chat.tag_configure("speaker", foreground="#ff9a3d", font=("Segoe UI Semibold", 10))
-        self.chat.tag_configure("error", foreground="#ff9d9d")
-
-        entry_row = tk.Frame(self.root, bg="#050505")
-        entry_row.pack(fill="x", padx=24, pady=(0, 8))
+        self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.prompt_var = tk.StringVar()
-        self.prompt_entry = ttk.Entry(entry_row, textvariable=self.prompt_var)
-        self.prompt_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.prompt_entry.bind("<Return>", lambda _event: self.send_text())
-        ttk.Button(entry_row, text="Send", command=self.send_text).pack(side="right")
-
-        controls = tk.Frame(self.root, bg="#050505")
-        controls.pack(fill="x", padx=24, pady=(0, 12))
-        self.listen_button = ttk.Button(controls, text="Start wake listening", command=self.toggle_listening)
-        self.listen_button.pack(side="left")
-        ttk.Button(controls, text="Settings", command=self.open_settings).pack(side="left", padx=8)
-        ttk.Button(controls, text="Clear chat", command=self.clear_chat).pack(side="right")
-        self._append("JARVIS", "Ready when you are. Type a message or configure wake-word listening in Settings.")
+        self.prompt_entry = ttk.Entry(self.root, textvariable=self.prompt_var, style="HUD.TEntry")
+        self.send_button = ttk.Button(self.root, text="TRANSMIT  ➤", style="HUD.TButton", command=self.send_text)
+        self.listen_button = ttk.Button(self.root, text="◉  ACTIVATE VOICE", style="HUD.TButton",
+                                        command=self.toggle_listening)
         self._draw_orb()
         self.root.after(50, self._animate_orb)
 
     def _animate_orb(self):
         if not self.root.winfo_exists():
             return
-        # Smooth, continuous motion without redrawing thousands of expensive objects.
-        self.orb_phase = (self.orb_phase + 1.6) % 360.0
+        self.orb_phase = (self.orb_phase + 1.2) % 360.0
         self._draw_orb()
-        self.root.after(40, self._animate_orb)
+        self.root.after(55, self._animate_orb)
 
     def _draw_orb(self):
-        if not hasattr(self, "orb_canvas"):
+        if not hasattr(self, "hud"):
             return
         import math
-        canvas = self.orb_canvas
-        width = max(canvas.winfo_width(), 300)
-        height = max(canvas.winfo_height(), 220)
-        canvas.delete("all")
-        cx, cy = width / 2.0, height / 2.0
+        from datetime import datetime
+        c = self.hud
+        w, h = max(c.winfo_width(), 1100), max(c.winfo_height(), 700)
+        c.delete("all")
+        c.configure(bg="#02070d")
+        blue, bright, dim = "#00bfff", "#8af4ff", "#075477"
         phase = math.radians(self.orb_phase)
-        pulse = 1.0 + 0.018 * math.sin(phase * 1.7)
-        radius = min(width * 0.245, height * 0.405, 225) * pulse
-
-        # Deep black background with a layered amber aura around the orb.
-        for ring in range(18, 0, -1):
-            r = radius * (0.58 + ring * 0.045)
-            shade = max(0, 30 - ring)
-            color = f"#{shade:02x}{max(0, shade//3):02x}00"
-            canvas.create_oval(cx-r, cy-r, cx+r, cy+r, fill=color, outline="")
-
-        # Sparse drifting embers around the sphere.
-        for i in range(86):
-            angle = i * 2.399963 + phase * (0.12 + (i % 5) * 0.025)
-            distance = radius * (1.08 + ((i * 43) % 100) / 100 * 0.58)
-            sx = cx + math.cos(angle) * distance
-            sy = cy + math.sin(angle) * distance * 0.88
-            twinkle = (i + int(self.orb_phase * 2)) % 7
-            if twinkle in (0, 1):
-                size = 1.2 if i % 3 else 2.0
-                canvas.create_oval(sx-size, sy-size, sx+size, sy+size,
-                                   fill="#ff6a08" if twinkle else "#ffb34d", outline="")
-
-        # Dense, rotating particle shell. Keep the centre dark like the selected reference.
-        colors = ["#ff3b00", "#ff5100", "#ff6a00", "#ff8b12", "#ffb33c", "#ffe0a0"]
-        for i in range(820):
-            angle = i * 2.3999632297 + phase * (0.20 + (i % 11) * 0.009)
-            spread = math.sqrt(((i * 97) % 823) / 823.0)
-            wobble = 0.94 + 0.045 * math.sin(angle * 3.0 + phase * 1.3)
-            px = cx + math.cos(angle) * radius * spread * wobble
-            py = cy + math.sin(angle) * radius * spread * wobble
-            core = ((px-cx)/(radius*0.67))**2 + ((py-cy)/(radius*0.67))**2
-            if core < 0.92 and i % 7 != 0:
-                continue
-            color = colors[(i * 13 + int(self.orb_phase * 0.6)) % len(colors)]
-            dot = 0.8 if i % 5 else 1.7
-            canvas.create_oval(px-dot, py-dot, px+dot, py+dot, fill=color, outline="")
-
-        # Multiple luminous curved energy ribbons rotate around the particle shell.
-        ribbons = [
-            (0.94, 0.60, 218 + self.orb_phase * 0.58, 232, "#ffb84f", 2),
-            (0.87, 0.47, 24 - self.orb_phase * 0.43, 248, "#ff6a0a", 2),
-            (0.68, 0.84, 122 + self.orb_phase * 0.31, 218, "#ff8a19", 1),
-            (0.98, 0.72, 305 - self.orb_phase * 0.24, 110, "#ff4a00", 1),
-        ]
-        for rx, ry, start, extent, color, line_width in ribbons:
-            xrad, yrad = radius * rx, radius * ry
-            canvas.create_arc(cx-xrad, cy-yrad, cx+xrad, cy+yrad,
-                              start=start, extent=extent, style="arc",
-                              outline=color, width=line_width)
-
-        # Fine bright rim and small moving highlights make the sphere feel energized.
-        canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
-                           outline="#ff8a20", width=1)
-        for j in range(7):
-            a = phase * 1.25 + j * (math.tau / 7)
-            hx = cx + math.cos(a) * radius * 0.985
-            hy = cy + math.sin(a) * radius * 0.985
-            canvas.create_oval(hx-2, hy-2, hx+2, hy+2,
-                               fill="#ffe2a0", outline="#ff6a00")
-        # A subtle warm core glint; most of the centre remains dark.
-        core_r = radius * (0.025 + 0.004 * math.sin(phase * 2))
-        canvas.create_oval(cx-core_r, cy-core_r, cx+core_r, cy+core_r,
-                           fill="#ff9a25", outline="#ffe1a0", width=1)
+        c.create_rectangle(0, 0, w, h, fill="#02070d", outline="")
+        # Fine HUD grid and edge frame
+        for x in range(0, w, 48):
+            c.create_line(x, 0, x, h, fill="#041522")
+        for y in range(0, h, 48):
+            c.create_line(0, y, w, y, fill="#041522")
+        c.create_rectangle(14, 14, w-14, h-14, outline="#075477", width=1)
+        c.create_line(24, 62, w-24, 62, fill=blue, width=2)
+        c.create_text(42, 35, text="◈  J A R V I S", fill=bright, anchor="w",
+                      font=("Segoe UI Semibold", 21))
+        c.create_text(250, 36, text="PERSONAL COMMAND INTERFACE  /  V 1.0",
+                      fill="#328aa8", anchor="w", font=("Consolas", 9))
+        c.create_oval(w-190, 25, w-178, 37, fill="#00f0a0", outline="")
+        c.create_text(w-165, 31, text="SYSTEM ONLINE", fill=bright, anchor="w",
+                      font=("Consolas", 10, "bold"))
+        # Panel helper
+        def panel(x1, y1, x2, y2, title):
+            c.create_rectangle(x1, y1, x2, y2, fill="#03101b", outline="#087ca8", width=1)
+            c.create_line(x1+12, y1, x1+145, y1, fill=bright, width=2)
+            c.create_text(x1+14, y1+13, text=title, fill=bright, anchor="w",
+                          font=("Consolas", 10, "bold"))
+        left, right = 28, 290
+        panel(left, 88, 260, 278, "DATE / TIME")
+        now = datetime.now()
+        c.create_text(144, 145, text=now.strftime("%H:%M"), fill=bright, font=("Consolas", 36, "bold"))
+        c.create_text(144, 184, text=now.strftime("%A  •  %d %B %Y").upper(),
+                      fill="#56cce9", font=("Consolas", 10))
+        panel(left, 294, 260, 488, "SYSTEM RESOURCES")
+        stats = []
+        try:
+            import psutil
+            stats = [("CPU LOAD", f"{psutil.cpu_percent():.0f}%"),
+                     ("MEMORY", f"{psutil.virtual_memory().percent:.0f}%"),
+                     ("BATTERY", f"{psutil.sensors_battery().percent:.0f}%" if psutil.sensors_battery() else "AC POWER")]
+        except Exception:
+            stats = [("CPU LOAD", "N/A"), ("MEMORY", "N/A"), ("BATTERY", "N/A")]
+        for i, (label, value) in enumerate(stats):
+            yy = 340 + i*45
+            c.create_text(48, yy, text=label, fill="#55aeca", anchor="w", font=("Consolas", 9))
+            c.create_text(238, yy, text=value, fill=bright, anchor="e", font=("Consolas", 12, "bold"))
+            c.create_rectangle(48, yy+12, 238, yy+18, outline="#075477")
+            try:
+                pct = float(value.rstrip("%"))
+                c.create_rectangle(48, yy+12, 48+190*pct/100, yy+18, fill=blue, outline="")
+            except Exception:
+                pass
+        panel(left, 504, 260, h-110, "QUICK ACCESS")
+        quick = [("▣", "Documents"), ("▧", "Pictures"), ("♫", "Music"), ("⌁", "Downloads"), ("◉", "This PC")]
+        for i, (symbol, label) in enumerate(quick):
+            yy = 550 + i*42
+            c.create_text(52, yy, text=symbol, fill=blue, font=("Segoe UI", 15))
+            c.create_text(78, yy, text=label, fill="#a8eaff", anchor="w", font=("Segoe UI", 10))
+            c.create_line(46, yy+18, 240, yy+18, fill="#092b3b")
+        # Right-side system status and JARVIS info
+        rx = w-270
+        panel(rx, 88, w-28, 278, "ENVIRONMENT")
+        c.create_text(rx+24, 145, text="CPU TEMPERATURE", fill="#55aeca", anchor="w", font=("Consolas", 9))
+        c.create_text(w-92, 180, text="--°C", fill=bright, font=("Consolas", 27, "bold"))
+        c.create_text(rx+24, 220, text="NETWORK  •  CONNECTED", fill="#62e8ff", anchor="w", font=("Consolas", 9))
+        panel(rx, 294, w-28, h-110, "J.A.R.V.I.S.  /  ASSISTANT")
+        c.create_text(rx+24, 348, text="Always here for you.", fill=bright, anchor="w",
+                      font=("Segoe UI", 14, "bold"))
+        c.create_text(rx+24, 386, text="VOICE INTERFACE", fill="#55aeca", anchor="w", font=("Consolas", 9))
+        c.create_text(rx+24, 422, text="Say  “Hey JARVIS”  to begin", fill="#b7eaff", anchor="w",
+                      font=("Segoe UI", 10))
+        c.create_text(rx+24, 478, text="CORE SERVICES", fill="#55aeca", anchor="w", font=("Consolas", 9))
+        for i, label in enumerate(("AI CHAT", "VOICE ENGINE", "MEMORY", "SYSTEM CONTROL")):
+            yy = 512+i*35
+            c.create_oval(rx+25, yy-5, rx+35, yy+5, fill="#00e5a0", outline="")
+            c.create_text(rx+48, yy, text=label, fill="#a8eaff", anchor="w", font=("Consolas", 9))
+        # Central reactor: concentric animated rings and radial energy arcs
+        cx, cy = w/2, h*0.43
+        radius = min(w*0.19, h*0.29, 245)
+        for i in range(9, 0, -1):
+            r = radius*(1+i*0.095)
+            c.create_oval(cx-r, cy-r, cx+r, cy+r, outline="#06334b", width=1)
+        for i in range(4):
+            r = radius*(1.0+i*0.18)
+            c.create_arc(cx-r, cy-r, cx+r, cy+r, start=self.orb_phase*(1 if i%2==0 else -1)+i*35,
+                         extent=235, style="arc", outline=blue if i%2==0 else "#087ca8", width=3)
+        for i in range(3):
+            r = radius*(0.78-i*0.17)
+            c.create_oval(cx-r, cy-r, cx+r, cy+r, outline="#087ca8", width=2)
+        c.create_oval(cx-radius*.62, cy-radius*.62, cx+radius*.62, cy+radius*.62,
+                      fill="#031b2c", outline=bright, width=3)
+        c.create_oval(cx-radius*.48, cy-radius*.48, cx+radius*.48, cy+radius*.48,
+                      outline=blue, width=2)
+        for i in range(48):
+            a = math.tau*i/48 + phase*.25
+            r1, r2 = radius*.68, radius*.79
+            c.create_line(cx+math.cos(a)*r1, cy+math.sin(a)*r1,
+                          cx+math.cos(a)*r2, cy+math.sin(a)*r2,
+                          fill=bright if i%4==0 else "#087ca8", width=2 if i%4==0 else 1)
+        for i in range(80):
+            a = i*2.399 + phase*(.2+(i%4)*.02)
+            r = radius*(.18+((i*37)%100)/100*.76)
+            x, y = cx+math.cos(a)*r, cy+math.sin(a)*r
+            c.create_oval(x-1.5, y-1.5, x+1.5, y+1.5, fill=bright if i%5==0 else blue, outline="")
+        c.create_oval(cx-radius*.18, cy-radius*.18, cx+radius*.18, cy+radius*.18,
+                      fill="#06466a", outline=bright, width=2)
+        c.create_oval(cx-radius*.09, cy-radius*.09, cx+radius*.09, cy+radius*.09,
+                      fill="#9afaff", outline="#ffffff", width=2)
+        c.create_text(cx, cy+radius+36, text="J A R V I S   /   REACTOR CORE",
+                      fill=bright, font=("Consolas", 12, "bold"))
+        # Labels and connector traces around reactor
+        for label, x, y, side in [("IMAGES",cx-radius-165,cy-radius*.72,"left"),
+                                  ("DOCUMENTS",cx-radius-165,cy-radius*.35,"left"),
+                                  ("DOWNLOADS",cx-radius-165,cy+radius*.05,"left"),
+                                  ("MUSIC",cx-radius-165,cy+radius*.45,"left"),
+                                  ("GMAIL",cx+radius+65,cy-radius*.55,"right"),
+                                  ("WHATSAPP",cx+radius+65,cy-radius*.18,"right"),
+                                  ("DISCORD",cx+radius+65,cy+radius*.18,"right"),
+                                  ("CHATGPT",cx+radius+65,cy+radius*.55,"right")]:
+            c.create_oval(x-9, y-9, x+9, y+9, outline=blue, width=2)
+            c.create_text(x+18, y, text=label, fill="#8deeff", anchor="w", font=("Consolas", 9))
+            c.create_line(x+8, y+13, x+45, y+13, fill="#075477")
+        # Bottom telemetry strip and live command bar
+        by = h-84
+        c.create_line(280, by-28, w-280, by-28, fill="#087ca8")
+        c.create_text(300, by-10, text="SYSTEM STATUS  •  SECURE CONNECTION  •  ALL SYSTEMS NOMINAL",
+                      fill="#58cbe8", anchor="w", font=("Consolas", 9))
+        c.create_window(360, h-35, window=self.prompt_entry, width=max(350, w-780), height=34)
+        c.create_window(w-190, h-35, window=self.send_button, width=120, height=34)
+        c.create_window(130, h-35, window=self.listen_button, width=190, height=34)
+        c.create_text(w/2, h-91, text=self.status_var.get().upper(), fill=bright,
+                      font=("Consolas", 9, "bold"))
+        c.create_text(w-35, h-35, text="ESC  /  EXIT", fill="#328aa8", anchor="e",
+                      font=("Consolas", 8))
 
     def _load_secrets(self):
         if self.keyring:
