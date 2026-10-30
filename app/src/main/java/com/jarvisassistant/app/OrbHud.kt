@@ -59,8 +59,8 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         Canvas(Modifier.fillMaxSize()) {
             val cx = size.width * 0.5f
-            val cy = size.height * 0.51f
-            val radius = size.minDimension * 0.205f
+            val cy = size.height * 0.526f
+            val radius = size.minDimension * 0.218f
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(Color(0x66FF6A00), Color(0x22FF6A00), Color.Transparent),
@@ -73,7 +73,7 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
             for (i in 1..5) {
                 drawCircle(
                     color = orange.copy(alpha = if (i % 2 == 0) 0.25f else 0.48f),
-                    radius = radius * (1.12f + i * 0.16f),
+                    radius = radius * (1.12f + (i - 1) * 0.17f),
                     center = androidx.compose.ui.geometry.Offset(cx, cy),
                     style = Stroke(width = if (i == 1) 2.2f else 1f)
                 )
@@ -99,7 +99,7 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
             // Molten orange shell with a dark, hollow-looking core.
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFE7A0), Color(0xFFFFA11A), Color(0xFFFF5A00), Color(0xFF541600)),
+                    colors = listOf(Color(0xFFFFB52C), Color(0xFFFF7A00), Color(0xFFFF5100), Color(0xFF9A3100)),
                     center = androidx.compose.ui.geometry.Offset(cx - radius * 0.16f, cy - radius * 0.2f),
                     radius = radius * 1.18f
                 ),
@@ -122,8 +122,8 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
             }
             // Dark core and sweeping curved energy ribbons, like the selected reference.
             drawCircle(
-                color = Color(0xFF170600).copy(alpha = 0.74f),
-                radius = radius * 0.67f,
+                color = Color(0xFF321405).copy(alpha = 0.96f),
+                radius = radius * 0.64f,
                 center = androidx.compose.ui.geometry.Offset(cx + radius * 0.05f, cy + radius * 0.08f)
             )
             drawArc(
@@ -146,7 +146,7 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
             )
             drawCircle(
                 color = Color(0xFFFFF4B0).copy(alpha = 0.9f),
-                radius = radius * 0.13f,
+                radius = radius * 0.125f,
                 center = androidx.compose.ui.geometry.Offset(cx, cy),
             )
             for (i in 0..19) {
@@ -158,17 +158,17 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
             }
         }
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 28.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 58.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(Modifier.fillMaxSize().weight(1f), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text("●  J A R V I S", color = orange, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-                    Text("Always here for you", color = orange.copy(alpha = 0.85f), fontSize = 11.sp)
+                    Text("●  J A R V I S", color = orange, fontSize = 18.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
+                    Text("Always here for you", color = Color(0xFFD17A28), fontSize = 12.sp)
                 }
-                Text("AI SYSTEM  •  ONLINE", color = Color.LightGray, fontSize = 9.sp)
+                Text("AI SYSTEM  •  ONLINE", color = Color(0xFFBDBDBD), fontSize = 9.sp)
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 when (state) {
                     JarvisState.LISTENING -> "“I'M LISTENING”"
@@ -176,32 +176,30 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
                     JarvisState.SPEAKING -> "RESPONDING"
                     else -> "“HEY JARVIS”"
                 },
-                color = orange, fontSize = 17.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Medium
+                color = Color(0xFFFF9A24), fontSize = 17.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Medium
             )
-            Spacer(Modifier.weight(1.05f))
-            Text("J A R V I S", color = Color.White, fontSize = 25.sp, letterSpacing = 5.sp, fontWeight = FontWeight.Light)
-            Text("Your AI Assistant", color = Color.LightGray, fontSize = 14.sp, letterSpacing = 1.sp)
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.weight(1.18f))
+            Text("J A R V I S", color = Color(0xFFF0F0F0), fontSize = 25.sp, letterSpacing = 6.sp, fontWeight = FontWeight.Light)
+            Text("Your AI Assistant", color = Color(0xFFBDBDBD), fontSize = 14.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.height(24.dp))
             Box(
-                modifier = Modifier.size(width = 112.dp, height = 66.dp)
-                    .clickable(onClick = onMicTap)
+                modifier = Modifier.size(width = 150.dp, height = 88.dp)
                     .clip(CircleShape)
-                    .background(Brush.verticalGradient(listOf(Color(0xFFFFB02E), Color(0xFF9B3C00))))
-                    .background(Color(0xFF120900)),
+                    .background(Color(0xFF100800))
+                    .clickable(onClick = onMicTap),
                 contentAlignment = Alignment.Center
             ) {
-                Text("🎙", modifier = Modifier.padding(10.dp), fontSize = 28.sp, textAlign = TextAlign.Center)
-
+                Text("🎙", modifier = Modifier.padding(10.dp), fontSize = 31.sp, textAlign = TextAlign.Center)
             }
             Text(
                 when (state) {
                     JarvisState.LISTENING -> "LISTENING NOW"
                     JarvisState.THINKING -> "THINKING..."
                     JarvisState.SPEAKING -> "SPEAKING..."
-                    else -> "TAP MIC TO TALK  •  SWIPE RIGHT FOR SETTINGS"
+                    else -> "TAP MIC TO TALK"
                 },
-                modifier = Modifier.padding(top = 12.dp),
-                color = Color(0xFFB5B5B5), fontSize = 9.sp, letterSpacing = 1.2.sp, textAlign = TextAlign.Center
+                modifier = Modifier.padding(top = 14.dp),
+                color = Color(0xFFB5B5B5), fontSize = 9.sp, letterSpacing = 1.5.sp, textAlign = TextAlign.Center
             )
         }
     }
