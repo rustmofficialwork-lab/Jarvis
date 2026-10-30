@@ -44,6 +44,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
             "model": data.get("model") if isinstance(data.get("model"), str) else DEFAULT_MODEL,
             "language": data.get("language") if isinstance(data.get("language"), str) and data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
             "start_with_windows": data.get("start_with_windows") is True,
+            "share_memory_with_ai": data.get("share_memory_with_ai") is True,
         }
         # Older installs used OpenRouter directly. Migrate them to the secured JARVIS gateway.
         if settings["endpoint"].strip() == "https://openrouter.ai/api/v1/chat/completions":
@@ -1048,7 +1049,7 @@ class JarvisDesktop:
                 self.ai_api_key,
                 prompt,
                 self.history,
-                self.memory_store.context(),
+                self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
             )
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
@@ -1331,15 +1332,18 @@ class JarvisDesktop:
             text="Offline voice model downloads automatically in the background for the selected language.",
             bg="#07111b", fg="#78c8df", font=("Segoe UI", 9),
         ).grid(row=5, column=1, sticky="w", padx=14, pady=8)
+        share_memory_var = tk.BooleanVar(value=bool(self.settings.get("share_memory_with_ai", False)))
+        ttk.Checkbutton(window, text="Allow saved memories in online AI chats (optional)",
+                        variable=share_memory_var).grid(row=6, column=1, sticky="w", padx=14, pady=8)
         startup_var = tk.BooleanVar(value=bool(self.settings.get("start_with_windows", False)))
         ttk.Checkbutton(window, text="Start JARVIS when I sign in to Windows",
-                        variable=startup_var).grid(row=6, column=1, sticky="w", padx=14, pady=8)
+                        variable=startup_var).grid(row=7, column=1, sticky="w", padx=14, pady=8)
         tk.Label(window, text="Closing the window keeps JARVIS in the system tray. Use Exit from its tray menu.",
                  bg="#07111b", fg="#7897aa", font=("Segoe UI", 9)).grid(
-                     row=7, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 4))
+                     row=8, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 4))
         tk.Label(window, text="Secrets are stored in Windows Credential Manager when available.",
                  bg="#07111b", fg="#7897aa", font=("Segoe UI", 9)).grid(
-                     row=8, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 12))
+                     row=9, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 12))
 
         def save():
             try:
@@ -1359,6 +1363,7 @@ class JarvisDesktop:
                 messagebox.showerror("Startup setting failed", str(exc), parent=window)
                 return
             self.settings["start_with_windows"] = startup_enabled
+            self.settings["share_memory_with_ai"] = share_memory_var.get()
             self.api_key_var.set(entries["ai_key"].get().strip())
             self.picovoice_var.set(entries["picovoice_key"].get().strip())
             self.ai_api_key = self.api_key_var.get()
@@ -1382,7 +1387,7 @@ class JarvisDesktop:
             window.destroy()
 
         ttk.Button(window, text="Save settings", command=save).grid(
-            row=9, column=1, sticky="e", padx=14, pady=(4, 16))
+            row=10, column=1, sticky="e", padx=14, pady=(4, 16))
 
     def clear_chat(self):
         # Do not clear shared history while a background AI request may append to it.
