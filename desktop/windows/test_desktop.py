@@ -93,13 +93,16 @@ class InterruptibleSpeechTests(unittest.TestCase):
         app.history = []
         app.request_lock = threading.Lock()
         app.speech_stop_event = threading.Event()
-        app.speech_stop_event.set()
         observed = []
+        def finish_generation_with_stop(*_args, **_kwargs):
+            # Simulate the user pressing STOP SPEECH while the AI is thinking.
+            app.speech_stop_event.set()
+            return "Namaste"
         def fake_speak(_text, stop_event):
             observed.append(stop_event.is_set())
             return False
         with (
-            patch.object(jarvis_desktop, "chat_completion", return_value="Namaste"),
+            patch.object(jarvis_desktop, "chat_completion", side_effect=finish_generation_with_stop),
             patch.object(jarvis_desktop, "save_chat_history"),
             patch.object(jarvis_desktop, "speak_text_interruptibly", side_effect=fake_speak),
         ):
