@@ -96,58 +96,56 @@ fun OrbHud(state: JarvisState, onMicTap: () -> Unit, modifier: Modifier = Modifi
                 size = androidx.compose.ui.geometry.Size(radius * 3.44f, radius * 3.44f),
                 style = Stroke(width = 2f)
             )
-            // Molten orange shell with a dark, hollow-looking core.
+            // Fiery plasma sphere: glowing orange perimeter, deep translucent interior,
+            // dense sparks, and layered sweeping energy ribbons (matching supplied reference).
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFB52C), Color(0xFFFF7A00), Color(0xFFFF5100), Color(0xFF9A3100)),
-                    center = androidx.compose.ui.geometry.Offset(cx - radius * 0.16f, cy - radius * 0.2f),
-                    radius = radius * 1.18f
+                    colors = listOf(
+                        Color(0xFF170400),
+                        Color(0xFF3A0900),
+                        Color(0xFF9B1D00),
+                        Color(0xFFFF4B00),
+                        Color(0xFFFFA020),
+                        Color(0xFFFF5A00)
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(cx - radius * 0.08f, cy - radius * 0.10f),
+                    radius = radius * 1.12f
                 ),
                 radius = radius * pulse,
                 center = androidx.compose.ui.geometry.Offset(cx, cy)
             )
-            // Hundreds of deterministic glowing specks create the particle-mesh look.
-            for (i in 0 until 560) {
-                val angle = i * 2.3999632 + orbit * 0.0045
-                val spread = kotlin.math.sqrt(((i * 97 % 563) / 563.0)).toFloat()
-                val px = cx + kotlin.math.cos(angle).toFloat() * radius * 0.97f * spread
-                val py = cy + kotlin.math.sin(angle).toFloat() * radius * 0.97f * spread
-                val shimmer = 0.28f + ((i * 13 % 67) / 100f)
+            // Fine plasma grain spread over the whole sphere.
+            for (i in 0 until 1900) {
+                val angle = i * 2.3999632 + orbit * 0.003f
+                val spread = kotlin.math.sqrt(((i * 97 % 1901) / 1901.0)).toFloat()
+                val px = cx + kotlin.math.cos(angle).toFloat() * radius * 0.985f * spread
+                val py = cy + kotlin.math.sin(angle).toFloat() * radius * 0.985f * spread
+                val shimmer = 0.16f + ((i * 17 % 79) / 100f)
                 drawCircle(
-                    color = if (i % 11 == 0) Color(0xFFFFE8A0).copy(alpha = shimmer)
-                    else Color(0xFFFF6A00).copy(alpha = shimmer),
-                    radius = if (i % 9 == 0) 1.8f else 0.75f + (i % 3) * 0.35f,
+                    color = if (i % 17 == 0) Color(0xFFFFE5A0).copy(alpha = shimmer)
+                    else Color(0xFFFF5A08).copy(alpha = shimmer * 0.82f),
+                    radius = if (i % 13 == 0) 1.6f else 0.45f + (i % 4) * 0.22f,
                     center = androidx.compose.ui.geometry.Offset(px, py)
                 )
             }
-            // Dark core and sweeping curved energy ribbons, like the selected reference.
+            // Interwoven luminous ribbons sweep around the orb at different inclinations.
+            for (i in 0..5) {
+                val rotation = orbit * (if (i % 2 == 0) 0.42f else -0.31f) + i * 31f
+                drawContext.transform.rotate(rotation, pivot = androidx.compose.ui.geometry.Offset(cx, cy))
+                drawOval(
+                    color = (if (i % 2 == 0) Color(0xFFFFA12A) else Color(0xFFFF4B08)).copy(alpha = 0.72f),
+                    topLeft = androidx.compose.ui.geometry.Offset(cx - radius * (0.98f - i * 0.025f), cy - radius * (0.42f + i * 0.035f)),
+                    size = androidx.compose.ui.geometry.Size(radius * 1.96f, radius * (0.84f + i * 0.07f)),
+                    style = Stroke(width = if (i % 2 == 0) 2.1f else 1.25f)
+                )
+                drawContext.transform.rotate(-rotation, pivot = androidx.compose.ui.geometry.Offset(cx, cy))
+            }
+            // Bright, thin outer plasma edge.
             drawCircle(
-                color = Color(0xFF321405).copy(alpha = 0.96f),
-                radius = radius * 0.64f,
-                center = androidx.compose.ui.geometry.Offset(cx + radius * 0.05f, cy + radius * 0.08f)
-            )
-            drawArc(
-                color = Color(0xFFFFB34D).copy(alpha = 0.82f),
-                startAngle = 202f + orbit * 0.45f,
-                sweepAngle = 215f,
-                useCenter = false,
-                topLeft = androidx.compose.ui.geometry.Offset(cx - radius * 0.96f, cy - radius * 0.78f),
-                size = androidx.compose.ui.geometry.Size(radius * 1.92f, radius * 1.56f),
-                style = Stroke(width = 2.4f)
-            )
-            drawArc(
-                color = Color(0xFFFF7A00).copy(alpha = 0.78f),
-                startAngle = 25f - orbit * 0.32f,
-                sweepAngle = 248f,
-                useCenter = false,
-                topLeft = androidx.compose.ui.geometry.Offset(cx - radius * 0.88f, cy - radius * 0.52f),
-                size = androidx.compose.ui.geometry.Size(radius * 1.76f, radius * 1.04f),
-                style = Stroke(width = 1.7f)
-            )
-            drawCircle(
-                color = Color(0xFFFFF4B0).copy(alpha = 0.9f),
-                radius = radius * 0.125f,
+                color = Color(0xFFFF8A18).copy(alpha = 0.9f),
+                radius = radius * 0.995f,
                 center = androidx.compose.ui.geometry.Offset(cx, cy),
+                style = Stroke(width = 2.2f)
             )
             for (i in 0..19) {
                 val a = Math.toRadians((i * 18.0 + orbit).toDouble())
