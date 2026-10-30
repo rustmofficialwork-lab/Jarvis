@@ -777,17 +777,20 @@ class JarvisDesktop:
             )
             self.events.put(("status", "Listening locally for “Jarvis”. Windows may show its microphone indicator."))
             while not self.stop_event.is_set():
-                # Release Porcupine's microphone handle before SpeechRecognition opens it.
-                if recorder is None:
-                    recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
-                recorder.start()
                 try:
-                    detected = False
-                    while not self.stop_event.is_set():
-                        if porcupine.process(recorder.read()) >= 0:
-                            detected = True
-                            break
-                    recorder.stop()
+                    # Release Porcupine's microphone handle before SpeechRecognition opens it.
+                    if recorder is None:
+                        recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
+                    recorder.start()
+                    try:
+                        detected = False
+                        while not self.stop_event.is_set():
+                            if porcupine.process(recorder.read()) >= 0:
+                                detected = True
+                                break
+                    finally:
+                        if recorder is not None and recorder.is_recording:
+                            recorder.stop()
                     if not detected or self.stop_event.is_set():
                         break
                     recorder.delete()
@@ -810,9 +813,17 @@ class JarvisDesktop:
                     except OSError as exc:
                         self.events.put(("status", f"Microphone unavailable ({exc}). Retrying in 2 seconds…"))
                         self.stop_event.wait(2)
-                finally:
-                    if recorder is not None and recorder.is_recording:
-                        recorder.stop()
+                except OSError as exc:
+                    # A USB/headset microphone can disappear while listening. Discard
+                    # the stale recorder handle and reopen the default input device.
+                    self.events.put(("status", f"Wake microphone disconnected ({exc}). Reconnecting in 2 seconds…"))
+                    if recorder is not None:
+                        try:
+                            recorder.delete()
+                        except Exception:
+                            pass
+                        recorder = None
+                    self.stop_event.wait(2)
         except Exception as exc:
             self.events.put(("error", f"Wake listener could not start: {exc}"))
         finally:
