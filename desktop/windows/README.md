@@ -1,6 +1,6 @@
 # JARVIS Desktop for Windows 11
 
-This is the first native Windows companion for the existing Android JARVIS project. It is a separate desktop app, not an Android APK conversion. It provides a JARVIS-themed chat window, text input, spoken replies, and optional always-listening wake-word detection through Picovoice Porcupine.
+This is the first native Windows companion for the existing Android JARVIS project. It is a separate desktop app, not an Android APK conversion. It provides a blue JARVIS-themed command dashboard, separate conversation window, text input, spoken replies, and optional always-listening wake-word detection through Picovoice Porcupine.
 
 ## Requirements
 
@@ -31,7 +31,7 @@ In the app, enter:
 - **Model** — default: `openrouter/free`
 - **AI API key** — paste your JARVIS backend client token here (not your OpenRouter secret key). The OpenRouter key stays on the backend.
 
-Press **Save settings**. To test without a Picovoice key, type a message and press **Send**; wake listening requires a separate Picovoice AccessKey. The main window shows the animated orange particle orb. Say “Jarvis”, wait for the listening status, then speak a command. You can also send a typed message without enabling the microphone.
+Press **Save settings**. To test without a Picovoice key, type a message and press **Send**; wake listening requires a separate Picovoice AccessKey. The main window shows the blue holographic command dashboard with an animated reactor, resource panel, quick-access folders, and voice/chat controls. Use CHAT LOG to open the conversation transcript and SETTINGS to configure the backend and wake-word key. Say “Jarvis”, wait for the listening status, then speak a command. You can also send a typed message without enabling the microphone.
 
 Keys are stored using the Windows Credential Manager through Python's `keyring` package. The endpoint and model are stored in the current user's AppData folder. Do not put keys in source files, screenshots, or Git commits.
 
