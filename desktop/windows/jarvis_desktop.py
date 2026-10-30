@@ -992,17 +992,24 @@ class JarvisDesktop:
             row=8, column=1, sticky="e", padx=14, pady=(4, 16))
 
     def clear_chat(self):
-        self.history.clear()
-        self.transcript.clear()
+        # Do not clear shared history while a background AI request may append to it.
+        if not self.request_lock.acquire(blocking=False):
+            self._set_status("Wait for the current reply to finish before clearing chat.")
+            return
         try:
-            save_chat_history(self.history)
-        except OSError as exc:
-            self._set_status(f"Chat cleared in memory; could not update history file: {exc}")
-        if self.chat is not None and self.chat.winfo_exists():
-            self.chat.configure(state="normal")
-            self.chat.delete("1.0", "end")
-            self.chat.configure(state="disabled")
-        self._append("JARVIS", "Conversation cleared.")
+            self.history.clear()
+            self.transcript.clear()
+            try:
+                save_chat_history(self.history)
+            except OSError as exc:
+                self._set_status(f"Chat cleared in memory; could not update history file: {exc}")
+            if self.chat is not None and self.chat.winfo_exists():
+                self.chat.configure(state="normal")
+                self.chat.delete("1.0", "end")
+                self.chat.configure(state="disabled")
+            self._append("JARVIS", "Conversation cleared.")
+        finally:
+            self.request_lock.release()
 
     def _poll_events(self):
         try:
