@@ -585,11 +585,20 @@ class JarvisDesktop:
         try:
             response = run_local_command(prompt)
         except Exception as exc:
-            self._append("JARVIS ERROR", f"Could not run that approved action: {exc}", "error")
+            error_text = f"Could not run that approved action: {exc}"
+            self._append("YOU", prompt)
+            self._append("JARVIS ERROR", error_text, "error")
+            self.history.extend([{"role": "user", "content": prompt},
+                                 {"role": "assistant", "content": error_text}])
+            try:
+                save_chat_history(self.history)
+            except OSError:
+                pass
             self._set_status("Local action failed.")
             return True
         if response is None:
             return False
+        self._append("YOU", prompt)
         self.history.extend([{"role": "user", "content": prompt},
                              {"role": "assistant", "content": response}])
         try:
@@ -605,12 +614,13 @@ class JarvisDesktop:
         if not prompt or self.busy:
             return
         self.prompt_var.set("")
-        self._append("YOU", prompt)
         if self._try_local_command(prompt):
             return
         if not self.request_lock.acquire(blocking=False):
-            self._set_status("JARVIS is already answering; please wait.")
+            self.prompt_var.set(prompt)
+            self._set_status("JARVIS is already answering; your message is ready to retry.")
             return
+        self._append("YOU", prompt)
         self.busy = True
         self._set_status("Thinking…")
         try:
@@ -645,6 +655,12 @@ class JarvisDesktop:
             except Exception as exc:
                 self.events.put(("status", f"Reply shown; speech output unavailable: {exc}"))
         except Exception as exc:
+            # Keep failed prompts in local history so the conversation survives a restart.
+            self.history.append({"role": "user", "content": prompt})
+            try:
+                save_chat_history(self.history)
+            except OSError:
+                pass
             self.events.put(("error", str(exc)))
         finally:
             self.request_lock.release()
@@ -767,6 +783,11 @@ class JarvisDesktop:
             except Exception as exc:
                 self.events.put(("status", f"Reply shown; speech output unavailable: {exc}"))
         except Exception as exc:
+            self.history.append({"role": "user", "content": prompt})
+            try:
+                save_chat_history(self.history)
+            except OSError:
+                pass
             self.events.put(("error", str(exc)))
         finally:
             self.request_lock.release()
