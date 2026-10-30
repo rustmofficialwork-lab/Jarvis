@@ -589,7 +589,7 @@ class WindowsStartupTests(unittest.TestCase):
             command = jarvis_desktop.build_startup_command(
                 executable=str(python), script_path="jarvis_desktop.py", frozen=False,
             )
-            self.assertEqual(command, f'"{python}" jarvis_desktop.py')
+            self.assertEqual(command, f'{python} jarvis_desktop.py')
 
     def test_startup_command_uses_frozen_executable(self):
         command = jarvis_desktop.build_startup_command(
