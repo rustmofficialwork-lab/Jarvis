@@ -1,6 +1,0 @@
-<resources>
-    <string name="app_name">JARVIS</string>
-    <string name="accessibility_service_label">JARVIS accessibility actions</string>
-    <string name="accessibility_service_description">Allows JARVIS to perform explicit user-requested navigation and gestures. JARVIS does not record or store screen content.</string>
-    <string name="device_admin_description">Optional permission that lets JARVIS lock the phone only when explicitly requested.</string>
-</resources>

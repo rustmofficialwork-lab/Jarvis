@@ -1,17 +1,3 @@
-# Android / Gradle
-.gradle/
-**/build/
-local.properties
-*.apk
-*.aab
-*.jks
-*.keystore
-keystore.properties
-
-# Android Studio / IntelliJ
-.idea/
-*.iml
-
 # Python / Windows desktop
 __pycache__/
 *.py[cod]
