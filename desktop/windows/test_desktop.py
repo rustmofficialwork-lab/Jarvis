@@ -565,6 +565,32 @@ class WindowsMediaKeyTests(unittest.TestCase):
 
 
 class WindowsStartupTests(unittest.TestCase):
+    def test_development_startup_prefers_pythonw_and_quotes_paths_with_spaces(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            python = root / "Python Runtime" / "python.exe"
+            pythonw = python.with_name("pythonw.exe")
+            pythonw.parent.mkdir(parents=True)
+            pythonw.touch()
+            script = root / "JARVIS Desktop" / "jarvis_desktop.py"
+            command = jarvis_desktop.build_startup_command(
+                executable=str(python), script_path=str(script), frozen=False,
+            )
+            self.assertEqual(
+                command,
+                f'"{pythonw}" "{script}"',
+            )
+
+    def test_development_startup_falls_back_to_python_when_pythonw_is_missing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            python = Path(directory) / "python.exe"
+            command = jarvis_desktop.build_startup_command(
+                executable=str(python), script_path="jarvis_desktop.py", frozen=False,
+            )
+            self.assertEqual(command, f'"{python}" jarvis_desktop.py')
+
     def test_startup_command_uses_frozen_executable(self):
         command = jarvis_desktop.build_startup_command(
             executable=r"C:\Program Files\JARVIS\JARVIS.exe", frozen=True,
