@@ -30,6 +30,7 @@ class SystemMonitorTests(unittest.TestCase):
     def test_status_contains_live_metrics(self):
         result = get_system_status(FakePsutil(), now=lambda: datetime.fromtimestamp(1000 + 90061))
         self.assertIn("CPU usage: 23%", result)
+        self.assertIn("\nCPU usage:", result)
         self.assertIn("Memory usage: 61%", result)
         self.assertIn("System drive usage: 73%", result)
         self.assertIn("Battery: 88% (charging)", result)
