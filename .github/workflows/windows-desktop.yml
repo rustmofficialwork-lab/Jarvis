@@ -50,11 +50,28 @@ jobs:
           path: desktop/windows/dist/JARVIS.exe
           if-no-files-found: error
 
+      - name: Locate Inno Setup compiler
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          )
+          $compiler = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $compiler) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+            $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $compiler)) { throw "ISCC.exe was not found after installation." }
+          "ISCC_PATH=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Create Windows installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
-        with:
-          path: desktop/windows/installer/JARVIS.iss
-          options: /O+ /DMyAppVersion=1.1.0
+        shell: pwsh
+        run: |
+          & $env:ISCC_PATH /O+ /DMyAppVersion=1.1.0 desktop/windows/installer/JARVIS.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload JARVIS Windows installer
         uses: actions/upload-artifact@v7
