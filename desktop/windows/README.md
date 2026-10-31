@@ -25,6 +25,16 @@ JARVIS can create local reminders by typing or speaking commands such as:
 
 Reminders are stored in `%LOCALAPPDATA%\\JARVISDesktop\\reminders.sqlite3` and work without internet. On Windows, JARVIS registers a one-shot, current-user Task Scheduler task for each reminder. A small notification-only JARVIS process displays a native Windows reminder dialog even when the main app is closed. The user must still be signed in and the PC must be awake; reminders cannot wake a powered-off PC, and delivery after sleep depends on Windows Task Scheduler. If task registration fails, JARVIS reports the issue and its in-app reminder checker still works while the app remains running (including in the system tray). Uninstall removes JARVIS reminder tasks and its optional Windows sign-in startup entry; the local reminder database is preserved.
 
+## Live web search, weather and news
+
+When internet is available, JARVIS can answer these commands directly without an AI API key:
+
+- `search web for Python tutorials` (also `search for ...` or `google ...`)
+- `weather in Bhopal` (also `mausam Bhopal`; ask for a city if omitted)
+- `latest news`, `news about technology`
+
+Web search uses DuckDuckGo's HTML results, headlines use Google News RSS with India editions, and current conditions use Open-Meteo geocoding and forecast APIs. These public services do not require a separate key or paid package. Online requests use HTTPS, a 12-second timeout, and a response-size limit. Search/news results include source links; JARVIS does not execute page content or arbitrary commands. Live services require internet and do not work offline. Weather lookup needs a city name rather than assuming the Windows PC's location.
+
 ## Run from source
 
 Open PowerShell in this folder:
