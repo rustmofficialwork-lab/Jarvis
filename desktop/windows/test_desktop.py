@@ -1115,5 +1115,88 @@ class UnclearAudioOfflineFallbackTests(unittest.TestCase):
                     TimeoutError, RuntimeError, UnknownValueError,
                 )
 
+
+class SharedMemoryCommandTests(unittest.TestCase):
+    def test_memory_command_parser_handles_typed_and_voice_aliases(self):
+        cases = {
+            "Remember that I prefer Hindi.": ("remember", "I prefer Hindi"),
+            "yaad rakh lo: mujhe chai pasand hai": ("remember", "mujhe chai pasand hai"),
+            "SHOW MY MEMORIES": ("recall", None),
+            "tumhe kya yaad hai?": ("recall", None),
+            "forget all memories": ("clear", None),
+            "sab memories bhool jao": ("clear", None),
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(jarvis_desktop.parse_memory_command(prompt), expected)
+
+    def test_non_memory_prompt_is_not_intercepted(self):
+        self.assertIsNone(jarvis_desktop.parse_memory_command("Tell me about memory management in Python"))
+
+    def test_voice_clear_request_is_deferred_to_ui_for_confirmation(self):
+        import queue
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        self.assertTrue(app._handle_memory_command("forget all memories", from_voice=True))
+        self.assertEqual(
+            app.events.get_nowait(),
+            ("memory_clear_confirmation", "forget all memories"),
+        )
+
+    def test_memory_commands_are_excluded_from_online_history_by_shared_parser(self):
+        history = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi"},
+            {"role": "user", "content": "yaad rakhna: I like tea"},
+            {"role": "assistant", "content": "Saved locally"},
+            {"role": "user", "content": "Forget all memories"},
+            {"role": "assistant", "content": "Deleted"},
+            {"role": "user", "content": "What is memory management?"},
+        ]
+        self.assertEqual(
+            jarvis_desktop.filter_memory_history(history),
+            [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi"},
+                {"role": "user", "content": "What is memory management?"},
+            ],
+        )
+
+
+class SharedOnlineReplyTests(unittest.TestCase):
+    def test_online_service_result_is_used_without_calling_ai_endpoint(self):
+        from unittest.mock import patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {}
+        with patch.object(jarvis_desktop, "handle_online_command", return_value="Weather: sunny"), \\
+             patch.object(jarvis_desktop, "chat_completion") as completion:
+            self.assertEqual(app._get_online_reply("weather"), "Weather: sunny")
+        completion.assert_not_called()
+
+    def test_ai_fallback_uses_shared_memory_sharing_setting(self):
+        from unittest.mock import patch
+
+        class Store:
+            def context(self):
+                return ["User prefers Hindi"]
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {
+            "endpoint": "https://example.com/chat",
+            "model": "test-model",
+            "share_memory_with_ai": True,
+        }
+        app.ai_api_key = "test-token"
+        app.history = [{"role": "user", "content": "previous"}]
+        app.memory_store = Store()
+        with patch.object(jarvis_desktop, "handle_online_command", return_value=None), \\
+             patch.object(jarvis_desktop, "chat_completion", return_value="Namaste") as completion:
+            self.assertEqual(app._get_online_reply("hello"), "Namaste")
+        self.assertEqual(completion.call_args.args[0], "https://example.com/chat")
+        self.assertEqual(completion.call_args.args[5], ["User prefers Hindi"])
+
+
 if __name__ == "__main__":
     unittest.main()
