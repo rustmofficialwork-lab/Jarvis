@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from file_search import (parse_file_search_query, parse_open_result_index, search_files,\n                         validate_search_result_for_open)
+from file_search import (parse_file_search_query, parse_open_result_index, search_files,
+                         validate_search_result_for_open)
 
 
 class FileSearchTests(unittest.TestCase):
