@@ -26,7 +26,14 @@ class MemoryStore:
 
     def __init__(self, path: Path = DEFAULT_MEMORY_PATH):
         self.path = Path(path)
-        if str(self.path) != ":memory:":
+        self._memory_uri = None
+        self._memory_anchor = None
+        if str(self.path) == ":memory:":
+            # Keep one connection alive: separate SQLite :memory: connections
+            # otherwise see different databases and lose the schema immediately.
+            self._memory_uri = f"file:jarvis_memory_{id(self)}?mode=memory&cache=shared"
+            self._memory_anchor = sqlite3.connect(self._memory_uri, uri=True, timeout=10)
+        else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as db:
             db.execute(
@@ -45,7 +52,11 @@ class MemoryStore:
 
     @contextmanager
     def _connect(self):
-        db = sqlite3.connect(str(self.path), timeout=10)
+        db = sqlite3.connect(
+            self._memory_uri or str(self.path),
+            uri=self._memory_uri is not None,
+            timeout=10,
+        )
         db.row_factory = sqlite3.Row
         try:
             with db:
