@@ -24,6 +24,7 @@ from reminder_scheduler import (notify_due_reminders, register_reminder_task,
 from online_services import handle_online_command
 from document_reader import read_document
 from updater import check_for_update, download_verified_installer
+from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
 
 APP_NAME = "JARVIS"
 APP_VERSION = "1.1.0"
@@ -578,7 +579,7 @@ class JarvisDesktop:
         self.history: list[dict] = load_chat_history()
         self.last_file_search_results: list[str] = []
         self.memory_store = MemoryStore()
-        self.reminder_store = ReminderStore()
+        self.reminder_store = ReminderStore()\n        self.advanced_store = AdvancedFeatureStore()
         self.stop_event = threading.Event()
         self.wake_thread: threading.Thread | None = None
         self.busy = False
@@ -602,7 +603,7 @@ class JarvisDesktop:
         self.picovoice_access_key = self.picovoice_var.get()
         self.root.after(120, self._poll_events)
         self.root.after(700, self._ensure_offline_model)
-        self.root.after(1000, self._check_reminders)
+        self.root.after(1000, self._check_reminders)\n        self.root.after(5000, self._check_automations)
         self.root.after(1500, self._sync_reminder_tasks)
         self.root.after(5000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
@@ -1197,6 +1198,73 @@ class JarvisDesktop:
                 self.events.put(("status", f"Background reminder setup unavailable: {exc}"))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _execute_workflow(self, workflow: str) -> str:
+        if workflow not in WORKFLOWS:
+            raise ValueError("Unknown approved workflow.")
+        label, commands = WORKFLOWS[workflow]
+        completed = []
+        for command in commands:
+            result = run_local_command(command)
+            if result is None:
+                raise RuntimeError(f"Approved workflow action unavailable: {command}")
+            completed.append(result)
+        return f"{label} complete: " + " ".join(completed)
+
+    def _handle_advanced_command(self, prompt: str) -> bool:
+        parsed = parse_advanced_command(prompt)
+        if parsed is None:
+            return False
+        action, value = parsed
+        try:
+            if action == "focus_start":
+                end = self.advanced_store.start_focus(value)
+                reply = f"Focus Mode started for {value} minutes. Break reminder at {end.astimezone().strftime('%I:%M %p')}."
+            elif action == "focus_stop":
+                reply = "Focus Mode stopped." if self.advanced_store.stop_focus() else "No active focus session."
+            elif action == "focus_status":
+                status = self.advanced_store.focus_status()
+                reply = (f"Focus Mode active — about {status['remaining_minutes']} minute(s) left."
+                         if status and not status["expired"] else "No active focus session.")
+            elif action == "workflow":
+                reply = self._execute_workflow(value)
+            elif action == "automation_add":
+                workflow, interval = value
+                automation_id, next_run = self.advanced_store.add_automation(workflow, interval)
+                reply = f"Recurring {WORKFLOWS[workflow][0]} automation #{automation_id} saved. First run: {next_run.astimezone().strftime('%d %b %I:%M %p')}."
+            elif action == "automation_list":
+                items = self.advanced_store.list_automations()
+                reply = ("No recurring automations configured." if not items else
+                         "Recurring automations:\\n" + "\\n".join(
+                             f"#{item['id']} — {WORKFLOWS[item['workflow']][0]} every {item['interval_minutes']} min"
+                             for item in items))
+            elif action == "automation_delete":
+                reply = "Automation deleted." if self.advanced_store.delete_automation(value) else "Automation ID nahi mila."
+            else:
+                return False
+        except (ValueError, OSError, RuntimeError) as exc:
+            reply = str(exc)
+        self._append("YOU", prompt)
+        self._append("JARVIS", reply)
+        self.history.extend([{"role": "user", "content": prompt}, {"role": "assistant", "content": reply}])
+        try:
+            save_chat_history(self.history)
+        except OSError:
+            pass
+        self._set_status("Advanced feature updated.")
+        return True
+
+    def _check_automations(self):
+        try:
+            for item in self.advanced_store.claim_due_automations():
+                try:
+                    reply = self._execute_workflow(item["workflow"])
+                    self.events.put(("status", f"Scheduled workflow #{item['id']} ran: {reply}"))
+                except Exception as exc:
+                    self.events.put(("status", f"Scheduled workflow #{item['id']} failed: {exc}"))
+        except Exception as exc:
+            self._set_status(f"Automation check failed: {exc}")
+        self.root.after(5000, self._check_automations)
 
     def _check_reminders(self):
         try:
