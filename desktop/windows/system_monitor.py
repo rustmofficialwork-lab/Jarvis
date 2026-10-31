@@ -149,4 +149,4 @@ def get_top_processes(limit: int = 5, psutil_module=None) -> str:
     lines = [f"Top {min(limit, len(rows))} processes by memory usage (read-only):"]
     for memory, cpu, pid, name in rows[:limit]:
         lines.append(f"{name} (PID {pid}) — RAM {memory:.1f}% | CPU {cpu:.1f}%")
-    return "\\n".join(lines)
+    return "\n".join(lines)
