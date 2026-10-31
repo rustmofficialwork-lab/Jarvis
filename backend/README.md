@@ -1,18 +1,10 @@
 # JARVIS Backend
 
-This service provides the shared OpenRouter gateway used by the Windows desktop client. Personal memories are stored locally by each desktop installation and are never read from this backend.
-
-## Features
-
-- Fixed OpenRouter upstream destination (not an arbitrary-URL proxy).
-- Provider secret stays server-side; clients use a JARVIS client token.
-- Bearer-token authentication for chat requests.
-- Request size/message-count limits, bounded upstream timeout, generic error responses, and no response caching.
-- Docker image and Render deployment configuration.
+The backend is an authenticated AI gateway for the Windows desktop client. It forwards chat-completions requests to a fixed OpenRouter endpoint. It does **not** expose a shared memory API or store desktop memories.
 
 ## Run locally
 
-Python 3.11+ recommended:
+Python 3.11+:
 
 ```bash
 cd backend
@@ -23,33 +15,35 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set environment variables from `.env.example` in your shell or deployment dashboard (the app intentionally does not auto-load `.env`). Use a randomly generated `JARVIS_CLIENT_TOKEN` of at least 32 characters and your own `OPENROUTER_API_KEY`. Never commit real credentials.
+The app does not automatically load `.env`; export the values in your shell or configure them in your deployment dashboard. Set a random `JARVIS_CLIENT_TOKEN` of at least 32 characters and a server-side `OPENROUTER_API_KEY`. Never put the OpenRouter key in the desktop client or commit real credentials.
 
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Check `GET /health`. Protected routes require `Authorization: Bearer <JARVIS_CLIENT_TOKEN>`.
+## API
 
-## Chat API
+- `GET /health` — public minimal health response.
+- `POST /v1/chat/completions` — requires `Authorization: Bearer <JARVIS_CLIENT_TOKEN>`; accepts an OpenAI-compatible JSON object with 1–60 messages and forwards it to OpenRouter.
+- Interactive API docs are disabled.
 
-Send an OpenAI-compatible JSON body to `POST /v1/chat/completions`, including `model` and `messages`. Requests are forwarded to OpenRouter using the server-side key. The `openrouter/free` router may choose models with different capabilities; image/vision requests may fail if the selected model does not support image input.
+Requests are size-limited. Upstream calls have a bounded timeout and response-size cap. Streaming is intentionally disabled; the desktop client consumes a complete JSON response. Provider errors are normalized so secrets and upstream internals are not relayed.
 
 ## Personal memory
 
-The backend intentionally has no shared memory API. The Windows client stores memories in a local SQLite database under the current user's `%LOCALAPPDATA%\\JARVISDesktop` folder. This prevents memories from different desktop users being mixed together and keeps memory available offline.
+Personal memories are stored locally by each Windows desktop installation in the user's Local AppData SQLite database. They are not uploaded to this backend. There is no backend `/v1/memory` endpoint and no shared per-deployment memory collection.
 
-## Render deployment and persistence
+## Deployment
 
-The current Render service is configured for this repository and uses the `backend` Docker context. Confirm deployment status in the Render dashboard. Set `OPENROUTER_API_KEY` and `JARVIS_CLIENT_TOKEN` as secret environment variables. Attach persistent storage mounted at `/data` if supported by the selected plan; backend chat does not store personal memories.
+The Docker image starts Uvicorn on port 8000 and runs as an unprivileged `jarvis` user. Configure `JARVIS_CLIENT_TOKEN` and `OPENROUTER_API_KEY` as secret environment variables in the hosting dashboard. No database volume is required for backend chat because the backend does not persist chat or memory data.
 
 ## Tests
 
 ```bash
 cd backend
 pip install -r requirements.txt
-pip install httpx pytest
+python -m pip install httpx
 python -m unittest discover -s tests -v
 ```
 
-CI checks and unit tests validate code paths, but they do not prove that live provider credentials, upstream availability, or physical-device audio work. Verify `GET /health`, authenticated chat against the deployed service before relying on those features.
+Automated tests validate local code paths, not live OpenRouter credentials, external provider availability, or the deployed service. Verify `GET /health` and an authenticated chat request against the deployment before relying on live AI features.
