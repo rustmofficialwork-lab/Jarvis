@@ -1268,7 +1268,18 @@ class JarvisDesktop:
                     reply = self._execute_workflow(item["workflow"])
                     self.events.put(("status", f"Scheduled workflow #{item['id']} ran: {reply}"))
                 except Exception as exc:
-                    self.events.put(("status", f"Scheduled workflow #{item['id']} failed: {exc}"))
+                    try:
+                        retry_at = self.advanced_store.retry_automation(item["id"])
+                        retry_note = (
+                            f" It will retry at {retry_at.astimezone().strftime('%I:%M %p')}."
+                            if retry_at else " The automation may have been deleted."
+                        )
+                    except Exception as retry_error:
+                        retry_note = f" Retry scheduling also failed: {retry_error}"
+                    self.events.put((
+                        "status",
+                        f"Scheduled workflow #{item['id']} failed: {exc}.{retry_note}",
+                    ))
         except Exception as exc:
             self._set_status(f"Automation check failed: {exc}")
         self.root.after(5000, self._check_automations)
