@@ -18,6 +18,8 @@ from offline_speech import (OfflineModelUnavailable, install_offline_model,
                             model_path_for_language, transcribe_offline_vosk)
 from memory_store import MemoryStore
 from reminders import ReminderStore, parse_reminder_command
+from reminder_scheduler import (notify_due_reminders, register_reminder_task,
+                                sync_pending_reminder_tasks, unregister_reminder_task)
 
 APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
@@ -526,6 +528,7 @@ class JarvisDesktop:
         self.root.after(120, self._poll_events)
         self.root.after(700, self._ensure_offline_model)
         self.root.after(1000, self._check_reminders)
+        self.root.after(1500, self._sync_reminder_tasks)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
@@ -1043,14 +1046,37 @@ class JarvisDesktop:
         import re
         delete_match = re.match(r"^(?:delete|remove) reminder (\d+)$", normalized)
         if delete_match:
-            return ("Reminder deleted." if self.reminder_store.delete(int(delete_match.group(1)))
-                    else "Us ID ka reminder nahi mila.")
+            reminder_id = int(delete_match.group(1))
+            deleted = self.reminder_store.delete(reminder_id)
+            if deleted:
+                try:
+                    unregister_reminder_task(reminder_id)
+                except Exception:
+                    pass
+            return "Reminder deleted." if deleted else "Us ID ka reminder nahi mila."
         parsed = parse_reminder_command(prompt)
         if parsed is None:
             return None
         message, due_at = parsed
-        self.reminder_store.add(message, due_at)
-        return f"Reminder set: {message}. {due_at.astimezone().strftime('%d %b, %I:%M %p')} par yaad dilaunga."
+        item = self.reminder_store.add(message, due_at)
+        scheduling_note = ""
+        if os.name == "nt":
+            try:
+                register_reminder_task(
+                    item, executable=sys.executable,
+                    script_path=Path(__file__).resolve(),
+                    frozen=getattr(sys, "frozen", False),
+                )
+            except Exception as exc:
+                scheduling_note = (
+                    f" Background notification setup nahi ho paya ({exc}); "
+                    "JARVIS ko tray mein running rakho."
+                )
+        return (
+            f"Reminder set: {message}. "
+            f"{due_at.astimezone().strftime('%d %b, %I:%M %p')} par yaad dilaunga."
+            f"{scheduling_note}"
+        )
 
     def _handle_reminder_command(self, prompt: str) -> bool:
         try:
@@ -1090,9 +1116,34 @@ class JarvisDesktop:
             self.events.put(("status", f"Reminder saved; speech output unavailable: {exc}"))
         return True
 
+    def _sync_reminder_tasks(self):
+        """Repair one-shot scheduled tasks after app start or an app update."""
+        def worker():
+            try:
+                _created, errors = sync_pending_reminder_tasks(
+                    self.reminder_store,
+                    executable=sys.executable,
+                    script_path=Path(__file__).resolve(),
+                    frozen=getattr(sys, "frozen", False),
+                )
+                if errors:
+                    self.events.put((
+                        "status",
+                        "Some reminders could not be scheduled for app-closed delivery: "
+                        + "; ".join(errors[:3]),
+                    ))
+            except Exception as exc:
+                self.events.put(("status", f"Background reminder setup unavailable: {exc}"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def _check_reminders(self):
         try:
             for item in self.reminder_store.due():
+                try:
+                    unregister_reminder_task(item["id"])
+                except Exception:
+                    pass
                 self.events.put(("reminder", item))
         except Exception as exc:
             self._set_status(f"Reminder check failed: {exc}")
@@ -1653,11 +1704,20 @@ class JarvisDesktop:
         self.exit_app()
 
 
-def main():
+def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args == ["--reminder-check"]:
+        # Task Scheduler starts a short-lived helper instead of opening the full UI.
+        try:
+            notify_due_reminders()
+            return 0
+        except Exception:
+            return 1
     root = tk.Tk()
     JarvisDesktop(root)
     root.mainloop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
