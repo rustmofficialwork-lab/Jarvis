@@ -814,59 +814,40 @@ class JarvisDesktop:
 
     @staticmethod
     def _format_battery_status(battery) -> str:
-        """Format battery percentage and charging state without assuming a laptop battery."""
-        if battery is None:
-            return "AC POWER"
-        try:
-            percent = max(0, min(100, float(battery.percent)))
-        except (AttributeError, TypeError, ValueError):
-            return "N/A"
-        charging = getattr(battery, "power_plugged", None)
-        suffix = " • CHARGING" if charging is True and percent < 100 else (
-            " • ON BATTERY" if charging is False else ""
-        )
-        return f"{percent:.0f}%{suffix}"
+        """Delegate battery presentation to the shared system-monitor module."""
+        from system_monitor import format_battery_status
+        return format_battery_status(battery)
 
     def _get_system_metrics(self):
-        """Read each system metric independently so one unsupported sensor cannot blank the HUD."""
+        """Format the shared system snapshot for the dashboard; cache it briefly for the HUD."""
         import time
-        import psutil
+        from system_monitor import collect_system_metrics
 
         now = time.monotonic()
         cached = getattr(self, "_metrics_cache", None)
         if cached and now - cached[0] < 1.0:
             return cached[1]
 
-        def read(read_fn, fallback="N/A", formatter=str):
+        metrics = collect_system_metrics()
+        def percent(value):
             try:
-                return formatter(read_fn())
-            except Exception:
-                return fallback
+                return f"{float(value):.0f}%"
+            except (TypeError, ValueError):
+                return "N/A"
 
-        drive = os.environ.get("SystemDrive", "C:") + chr(92)
-        disk = read(lambda: psutil.disk_usage(drive), formatter=lambda value: f"{value.percent:.0f}%")
-        cpu_temp = read(
-            lambda: next(
-                (entry.current for entries in psutil.sensors_temperatures(fahrenheit=False).values()
-                 for entry in entries if entry.current is not None),
-                None,
-            ),
-            formatter=lambda value: f"{value:.0f}°C" if value is not None else "N/A",
-        )
-        network = read(
-            lambda: any(
-                info.isup for name, info in psutil.net_if_stats().items()
-                if name.lower() not in {"lo", "loopback"}
-            ),
-            fallback="OFFLINE",
-            formatter=lambda online: "ONLINE" if online else "OFFLINE",
-        )
+        temperature = metrics["cpu_temperature"]
+        try:
+            temperature = f"{float(temperature):.0f}°C" if temperature is not None else "N/A"
+        except (TypeError, ValueError):
+            temperature = "N/A"
+        online = metrics["network_online"]
+        network = "ONLINE" if online is True else "OFFLINE" if online is False else "N/A"
         values = [
-            ("CPU LOAD", read(lambda: psutil.cpu_percent(interval=None), formatter=lambda v: f"{v:.0f}%")),
-            ("MEMORY", read(lambda: psutil.virtual_memory().percent, formatter=lambda v: f"{v:.0f}%")),
-            ("DISK USED", disk),
-            ("BATTERY", read(psutil.sensors_battery, formatter=self._format_battery_status)),
-            ("CPU TEMP", cpu_temp),
+            ("CPU LOAD", percent(metrics["cpu_percent"])),
+            ("MEMORY", percent(metrics["memory_percent"])),
+            ("DISK USED", percent(metrics["disk_percent"])),
+            ("BATTERY", self._format_battery_status(metrics["battery"])),
+            ("CPU TEMP", temperature),
             ("NETWORK", network),
         ]
         self._metrics_cache = (now, values)
