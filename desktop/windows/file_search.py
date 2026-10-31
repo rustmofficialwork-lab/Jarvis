@@ -27,6 +27,7 @@ def parse_open_result_index(prompt: str) -> int | None:
     }
     patterns = (
         r"(?:open file|open result|open the result|open the file|file kholo|file khol do|result kholo|khol do|खोल दो|फाइल खोलो|फाइल खोल दो)\s+(\d{1,2})",
+        r"(?:open the )?(" + "|".join(ordinals) + r") (?:file|result)",
         r"(?:open the|open) (?:file|result) (" + "|".join(ordinals) + r")",
         r"(" + "|".join(ordinals) + r") (?:file|result) kholo",
         r"(" + "|".join(ordinals) + r") (?:file|result) khol do",
