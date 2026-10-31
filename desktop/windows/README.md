@@ -39,6 +39,10 @@ Web search uses DuckDuckGo's HTML results, headlines use Google News RSS with In
 
 Ask or type `system status`, `PC status`, `system health`, or `system status batao` to get a read-only snapshot of CPU, memory, system-drive usage, battery/charging state, network-interface status, and uptime. This uses the locally installed psutil package and works without internet. Hardware sensors that Windows does not expose are reported as unavailable; this command does not change system settings or run shell commands.
 
+## Live process and app resource usage
+
+Ask JARVIS `top processes`, `show top processes`, or `which apps use most RAM` to see a read-only snapshot of the processes using the most memory, including each process's PID and current CPU/RAM percentages. JARVIS skips processes Windows does not allow it to inspect and limits the report to five entries. This feature never terminates, changes, or launches a process and works locally without an AI API key.
+
 ## Search for and open local files
 
 Type or say `find file budget`, `look for file budget`, `file dhundo notes`, `file dhoondho notes`, or `फाइल ढूँढो report`. Choose a folder when prompted; JARVIS searches filenames only (not file contents), skips hidden files and symlinks, and caps work at 50 results / 5,000 directories. After a search, say or type `open file 2` (also `open the second file`, `second result kholo`, `file khol do 2`, or `दूसरी फाइल खोलो`) to select a numbered result from the latest search. JARVIS asks for confirmation before opening it with the Windows default application. For safety, only supported document and media formats are eligible; executables, scripts, shortcuts, and web shortcut files are not opened through search results. If a result was moved or deleted, JARVIS refuses to open it.
