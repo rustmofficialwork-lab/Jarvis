@@ -690,13 +690,13 @@ class JarvisDesktop:
                 canvas.configure(bg="#02070d", highlightthickness=0)
                 canvas.create_text(
                     width // 2, height // 2,
-                    text="JARVIS HUD image is missing or invalid\\n"
+                    text="JARVIS HUD image is missing or invalid\n"
                          "Place jarvis_hud.webp beside JARVIS.exe and restart",
                     fill="#8deeff", justify="center",
                     font=("Segoe UI", 16, "bold"),
                 )
                 self._hud_render_size = render_size
-                self._hud_asset_error = "\\n".join(load_errors)
+                self._hud_asset_error = "\n".join(load_errors)
                 return
             self._hud_asset_path = str(image_path)
 
