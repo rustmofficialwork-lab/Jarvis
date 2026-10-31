@@ -19,7 +19,8 @@ from offline_speech import (OfflineModelUnavailable, install_offline_model,
 from memory_store import MemoryStore
 from reminders import ReminderStore, parse_reminder_command
 from reminder_scheduler import (notify_due_reminders, register_reminder_task,
-                                sync_pending_reminder_tasks, unregister_reminder_task)
+                                remove_all_reminder_tasks, sync_pending_reminder_tasks,
+                                unregister_reminder_task)
 
 APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
@@ -1711,6 +1712,14 @@ def main(argv=None):
         try:
             notify_due_reminders()
             return 0
+        except Exception:
+            return 1
+    if args == ["--cleanup-uninstall"]:
+        # Inno Setup runs this before deleting the executable.
+        try:
+            _removed, errors = remove_all_reminder_tasks()
+            set_windows_startup(False)
+            return 1 if errors else 0
         except Exception:
             return 1
     root = tk.Tk()
