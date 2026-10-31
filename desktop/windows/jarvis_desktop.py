@@ -810,7 +810,7 @@ class JarvisDesktop:
         metrics = dict(stats)
         c.create_text(rx+24, 145, text="CPU TEMPERATURE (IF AVAILABLE)", fill="#55aeca", anchor="w", font=("Consolas", 9))
         c.create_text(w-92, 180, text=metrics.get("CPU TEMP", "N/A"), fill=bright, font=("Consolas", 27, "bold"))
-        network_label = "NETWORK  •  ONLINE" if metrics.get("NETWORK") == "ONLINE" else "NETWORK  •  OFFLINE"
+        network_label = "NETWORK LINK  •  UP" if metrics.get("NETWORK") == "ONLINE" else "NETWORK LINK  •  DOWN / N/A"
         c.create_text(rx+24, 220, text=network_label, fill="#62e8ff" if metrics.get("NETWORK") == "ONLINE" else "#ff8877", anchor="w", font=("Consolas", 9))
         c.create_text(rx+24, 246, text=f"BATTERY TIME  •  {metrics.get('BATTERY TIME', 'N/A')}", fill="#8af4ff", anchor="w", font=("Consolas", 9))
         c.create_text(rx+24, 266, text=f"STORAGE FREE  •  {metrics.get('STORAGE FREE', 'N/A')}", fill="#8af4ff", anchor="w", font=("Consolas", 9))
