@@ -106,7 +106,12 @@ def notify_due_reminders(store=None, notifier=None, platform_name=None) -> int:
             # remaining items so a failed dialog cannot silently lose reminders.
             store.release_claims([pending["id"] for pending in due_items[index:]])
             raise
-        unregister_reminder_task(item["id"], platform_name=platform_name)
+        try:
+            unregister_reminder_task(item["id"], platform_name=platform_name)
+        except Exception:
+            # A stale scheduled task is harmless: the reminder is already shown
+            # and its database row is marked notified. Keep processing the batch.
+            pass
     return len(due_items)
 
 
