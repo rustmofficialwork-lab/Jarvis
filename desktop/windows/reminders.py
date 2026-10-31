@@ -82,6 +82,18 @@ class ReminderStore:
                 )
         return [dict(row) for row in rows]
 
+    def release_claims(self, reminder_ids: list[int]) -> None:
+        """Return unshown reminders to the pending queue after notification failure."""
+        ids = [int(reminder_id) for reminder_id in reminder_ids]
+        if not ids:
+            return
+        placeholders = ",".join("?" for _ in ids)
+        with _connection(self.path) as db:
+            db.execute(
+                f"UPDATE reminders SET notified=0 WHERE id IN ({placeholders})",
+                ids,
+            )
+
     def delete(self, reminder_id: int) -> bool:
         with _connection(self.path) as db:
             cur = db.execute("DELETE FROM reminders WHERE id=?", (int(reminder_id),))
