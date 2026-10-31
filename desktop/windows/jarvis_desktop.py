@@ -1583,7 +1583,7 @@ class JarvisDesktop:
                 elif kind == "voice_command":
                     self._append("YOU (VOICE)", value)
                 elif kind == "reminder":
-                    message = f"Reminder: {value["message"]}"
+                    message = "Reminder: {}".format(value["message"])
                     self._append("JARVIS REMINDER", message)
                     self._set_status("Reminder due.")
                     messagebox.showinfo("JARVIS Reminder", message, parent=self.root)
