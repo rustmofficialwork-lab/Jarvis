@@ -86,7 +86,7 @@ def unregister_reminder_task(reminder_id: int, platform_name=None, runner=None) 
 
 
 def notify_due_reminders(store=None, notifier=None, platform_name=None) -> int:
-    """Claim due reminders once and show native Windows informational dialogs."""
+    """Claim due reminders and release unshown items if a notification fails."""
     if (platform_name or os.name) != "nt":
         return 0
     if store is None:
@@ -98,11 +98,15 @@ def notify_due_reminders(store=None, notifier=None, platform_name=None) -> int:
             0, message, "JARVIS Reminder", 0x40 | 0x1000
         )
     due_items = store.due()
-    for item in due_items:
+    for index, item in enumerate(due_items):
         try:
             notifier("Reminder: " + str(item["message"]))
-        finally:
-            unregister_reminder_task(item["id"], platform_name=platform_name)
+        except Exception:
+            # due() claims the whole batch atomically. Release this and all
+            # remaining items so a failed dialog cannot silently lose reminders.
+            store.release_claims([pending["id"] for pending in due_items[index:]])
+            raise
+        unregister_reminder_task(item["id"], platform_name=platform_name)
     return len(due_items)
 
 
