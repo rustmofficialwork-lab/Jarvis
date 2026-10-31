@@ -14,18 +14,32 @@ SAFE_OPEN_EXTENSIONS = {
 
 
 def parse_open_result_index(prompt: str) -> int | None:
-    """Parse an explicit numbered result selection from English/Hinglish."""
+    """Parse an explicit numbered or ordinal result selection from English/Hinglish."""
     import re
 
     normalized = " ".join(str(prompt).casefold().strip().rstrip(" .!?।॥").split())
-    match = re.fullmatch(
-        r"(?:open file|open result|file kholo|result kholo|फाइल खोलो)\s+(\d{1,2})",
-        normalized,
+    ordinals = {
+        "first": 1, "1st": 1, "pehli": 1, "pahli": 1, "पहली": 1,
+        "second": 2, "2nd": 2, "dusri": 2, "doosri": 2, "दूसरी": 2,
+        "third": 3, "3rd": 3, "teesri": 3, "तीसरी": 3,
+        "fourth": 4, "4th": 4, "chauthi": 4, "चौथी": 4,
+        "fifth": 5, "5th": 5, "paanchvi": 5, "पांचवीं": 5,
+    }
+    patterns = (
+        r"(?:open file|open result|open the result|open the file|file kholo|file khol do|result kholo|khol do|खोल दो|फाइल खोलो|फाइल खोल दो)\\s+(\\d{1,2})",
+        r"(?:open the|open) (?:file|result) (" + "|".join(ordinals) + r")",
+        r"(" + "|".join(ordinals) + r") (?:file|result) kholo",
+        r"(" + "|".join(ordinals) + r") (?:file|result) khol do",
+        r"(" + "|".join(ordinals) + r") (?:file|result) खोलो",
+        r"(" + "|".join(ordinals) + r") (?:फाइल|रिजल्ट) खोलो",
     )
-    if not match:
-        return None
-    index = int(match.group(1))
-    return index if 1 <= index <= 50 else None
+    for pattern in patterns:
+        match = re.fullmatch(pattern, normalized)
+        if match:
+            value = match.group(1)
+            index = ordinals.get(value, int(value) if value.isdigit() else None)
+            return index if index is not None and 1 <= index <= 50 else None
+    return None
 
 
 def validate_search_result_for_open(path: str | os.PathLike) -> Path:
@@ -43,9 +57,11 @@ def parse_file_search_query(prompt: str) -> str | None:
     """Extract a filename fragment from supported English/Hinglish commands."""
     normalized = " ".join(str(prompt).casefold().strip().rstrip(" .!?।॥").split())
     prefixes = (
+        "search for file ", "search for files ", "look for file ", "look for files ",
+        "locate file ", "locate files ", "find my file ", "find my files ",
         "find file ", "search file ", "find files ", "search files ",
-        "file dhundo ", "file khojo ", "file dhoondo ",
-        "फाइल ढूंढो ", "फाइल खोजो ",
+        "file dhundo ", "file dhoondo ", "file dhoondho ", "file khojo ",
+        "फाइल ढूंढो ", "फाइल ढूँढो ", "फाइल खोजो ", "फाइल ढूंढना ",
     )
     for prefix in prefixes:
         if normalized.startswith(prefix):
