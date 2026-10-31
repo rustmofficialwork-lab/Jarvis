@@ -21,6 +21,7 @@ from reminders import ReminderStore, parse_reminder_command
 from reminder_scheduler import (notify_due_reminders, register_reminder_task,
                                 remove_all_reminder_tasks, sync_pending_reminder_tasks,
                                 unregister_reminder_task)
+from online_services import handle_online_command
 
 APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
@@ -1207,14 +1208,16 @@ class JarvisDesktop:
 
     def _answer_worker(self, prompt: str):
         try:
-            answer = chat_completion(
-                self.settings.get("endpoint", DEFAULT_ENDPOINT),
-                self.settings.get("model", DEFAULT_MODEL),
-                self.ai_api_key,
-                prompt,
-                self.history,
-                self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
-            )
+            answer = handle_online_command(prompt)
+            if answer is None:
+                answer = chat_completion(
+                    self.settings.get("endpoint", DEFAULT_ENDPOINT),
+                    self.settings.get("model", DEFAULT_MODEL),
+                    self.ai_api_key,
+                    prompt,
+                    self.history,
+                    self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
+                )
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
             try:
