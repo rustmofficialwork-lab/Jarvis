@@ -39,6 +39,10 @@ Web search uses DuckDuckGo's HTML results, headlines use Google News RSS with In
 
 Type `read file` (or `document kholo`) in the JARVIS command bar and choose a file. JARVIS extracts text locally from PDF, Word DOCX, TXT, Markdown, CSV, JSON, common code and other text files. The selected document is not uploaded. After reading, you can ask JARVIS to summarize or explain it; that separate AI request uses your configured online AI service and sends the relevant conversation text. PDF extraction supports selectable text, not scanned-image OCR. Reads are limited to 15 MB, 100 PDF pages, and 40,000 extracted characters; the chat preview is capped at 12,000 characters.
 
+## Updates
+
+Open **SETTINGS → Check for updates** to check the official GitHub Releases page. JARVIS downloads the installer only after confirmation, verifies its SHA-256 against the release checksum file, and asks before launching the installer. Updates are published from version tags (`v1.1.0`, etc.); checking for updates reports that no stable release exists until the first tagged release is published.
+
 ## Run from source
 
 Open PowerShell in this folder:
