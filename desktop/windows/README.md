@@ -86,7 +86,7 @@ The executable is written to `dist\JARVIS.exe`. Keep the original `requirements.
 ## Current scope and limitations
 
 - This Windows edition has its own UI, settings, voice loop, and local chat history. It does not sync its history or settings with the separate Android edition.
-- Speech recognition supports online Google transcription with local Vosk fallback. JARVIS automatically prepares the selected small model in the background while online; Hindi (India), English (India), and English (US) have separate offline models. Hindi/Hinglish recognition quality depends on the selected model and accent; mixed-language accuracy is not guaranteed. AI replies and web/AI features still require internet. Use STOP SPEECH on the dashboard or Stop speaking in the tray menu to interrupt spoken replies.
+- Speech recognition supports online Google transcription with local Vosk fallback. JARVIS automatically prepares the selected small model in the background while online; Hindi (India), English (India), and English (US) have separate offline models. Hindi/Hinglish recognition quality depends on the selected model and accent; mixed-language accuracy is not guaranteed. AI replies and web/AI features still require internet. AI API responses are capped at 2 MB to prevent unexpectedly large payloads from exhausting desktop memory. Use STOP SPEECH on the dashboard or Stop speaking in the tray menu to interrupt spoken replies.
 - Test the microphone and wake word on the actual Windows laptop before relying on continuous listening.
 
 
