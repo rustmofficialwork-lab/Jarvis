@@ -131,4 +131,4 @@ class TopProcessTests(unittest.TestCase):
     def test_invalid_limits_are_rejected(self):
         for limit in (0, 21, True, 1.5):
             with self.subTest(limit=limit), self.assertRaises(ValueError):
-                get_top_processes(limit, FakePsutil())
+                get_top_processes(limit, object())
