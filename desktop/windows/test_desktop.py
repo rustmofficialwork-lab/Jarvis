@@ -1032,5 +1032,53 @@ class OfflineVoiceFallbackTests(unittest.TestCase):
                 )
 
 
+
+class UnclearAudioOfflineFallbackTests(unittest.TestCase):
+    def test_unclear_online_audio_uses_local_vosk_transcription(self):
+        from unittest.mock import patch
+        import threading
+
+        class UnknownValueError(Exception):
+            pass
+
+        class Recognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                return "captured-audio"
+            def recognize_google(self, audio, language):
+                raise UnknownValueError("Google could not understand the audio.")
+
+        with patch.object(
+            jarvis_desktop, "transcribe_offline_vosk", return_value="notepad kholo",
+        ) as offline:
+            result = jarvis_desktop.listen_for_voice_command(
+                Recognizer(), object(), threading.Event(), "hi-IN",
+                TimeoutError, RuntimeError, UnknownValueError,
+            )
+        self.assertEqual(result, "notepad kholo")
+        offline.assert_called_once_with("captured-audio", "hi-IN")
+
+    def test_missing_or_broken_offline_model_preserves_unclear_audio_error(self):
+        from unittest.mock import patch
+        import threading
+
+        class UnknownValueError(Exception):
+            pass
+
+        class Recognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                return "captured-audio"
+            def recognize_google(self, audio, language):
+                raise UnknownValueError("No speech detected.")
+
+        with patch.object(
+            jarvis_desktop, "transcribe_offline_vosk",
+            side_effect=jarvis_desktop.OfflineModelUnavailable("model not installed"),
+        ):
+            with self.assertRaisesRegex(UnknownValueError, "No speech detected"):
+                jarvis_desktop.listen_for_voice_command(
+                    Recognizer(), object(), threading.Event(), "en-IN",
+                    TimeoutError, RuntimeError, UnknownValueError,
+                )
+
 if __name__ == "__main__":
     unittest.main()
