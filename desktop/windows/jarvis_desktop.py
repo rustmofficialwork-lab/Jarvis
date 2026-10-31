@@ -1786,7 +1786,7 @@ class JarvisDesktop:
                     prompt = value["prompt"]
                     paths = value["results"]
                     if paths:
-                        listing = "\\n".join(f"{index}. {path}" for index, path in enumerate(paths, 1))
+                        listing = "\n".join(f"{index}. {path}" for index, path in enumerate(paths, 1))
                         suffix = "\\n\\nShowing first 50 matches." if len(paths) >= 50 else ""
                         reply = f"Found {len(paths)} matching file(s) in {value['folder']}:\\n\\n{listing}{suffix}"
                     else:
