@@ -13,6 +13,18 @@ This repository currently contains the native Windows laptop edition of JARVIS. 
 
 Wake-word inference runs locally after Porcupine initializes, but Picovoice may need internet to validate the AccessKey. Speech transcription tries Google's online recognizer first and automatically falls back to a local Vosk model when the network request fails. JARVIS automatically downloads the selected language model in the background on first launch (and after a language change) when internet is available; no Settings visit is required. After the one-time download, speech transcription and allowlisted Windows commands can work without internet. Online recognition requests have an eight-second network timeout. Offline models are stored under `%LOCALAPPDATA%\\JARVISDesktop\\models` and are not bundled into the installer. The desktop app does not hide or bypass Windows microphone privacy indicators.
 
+## Offline reminders
+
+JARVIS can create local reminders by typing or speaking commands such as:
+
+- `remind me in 10 minutes to drink water`
+- `remind me at 18:30 to call home`
+- `mujhe 2 ghante baad meeting yaad dilana`
+- `show reminders`
+- `delete reminder 3`
+
+Reminders are stored in `%LOCALAPPDATA%\\JARVISDesktop\\reminders.sqlite3` and are checked locally while JARVIS is running. They work without internet and are shown as Windows-app popups inside JARVIS. JARVIS must remain running (it can stay in the system tray) for on-time notifications; reminders are not currently registered with Windows Task Scheduler and cannot wake a fully exited app or a powered-off PC.
+
 ## Run from source
 
 Open PowerShell in this folder:
