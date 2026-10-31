@@ -652,7 +652,7 @@ class JarvisDesktop:
             return
         self.orb_phase = (self.orb_phase + 1.2) % 360.0
         self._draw_orb()
-        self.root.after(55, self._animate_orb)
+        self.root.after(150, self._animate_orb)
 
     def _get_service_statuses(self):
         """Report readiness from actual configuration and installed capabilities."""
@@ -812,6 +812,8 @@ class JarvisDesktop:
         c.create_text(w-92, 180, text=metrics.get("CPU TEMP", "N/A"), fill=bright, font=("Consolas", 27, "bold"))
         network_label = "NETWORK  •  ONLINE" if metrics.get("NETWORK") == "ONLINE" else "NETWORK  •  OFFLINE"
         c.create_text(rx+24, 220, text=network_label, fill="#62e8ff" if metrics.get("NETWORK") == "ONLINE" else "#ff8877", anchor="w", font=("Consolas", 9))
+        c.create_text(rx+24, 246, text=f"BATTERY TIME  •  {metrics.get('BATTERY TIME', 'N/A')}", fill="#8af4ff", anchor="w", font=("Consolas", 9))
+        c.create_text(rx+24, 266, text=f"STORAGE FREE  •  {metrics.get('STORAGE FREE', 'N/A')}", fill="#8af4ff", anchor="w", font=("Consolas", 9))
         panel(rx, 294, w-28, h-110, "J.A.R.V.I.S.  /  ASSISTANT")
         c.create_text(rx+24, 348, text="Always here for you.", fill=bright, anchor="w",
                       font=("Segoe UI", 14, "bold"))
@@ -862,6 +864,12 @@ class JarvisDesktop:
         c.create_text(cx, cy+radius+36, text="J A R V I S   /   REACTOR CORE",
                       fill=bright, font=("Consolas", 12, "bold"))
         # Labels and connector traces around reactor
+        shortcut_urls = {
+            "GMAIL": "https://mail.google.com/",
+            "WHATSAPP": "https://web.whatsapp.com/",
+            "DISCORD": "https://discord.com/app",
+            "CHATGPT": "https://chatgpt.com/",
+        }
         for label, x, y, side in [("IMAGES",cx-radius-165,cy-radius*.72,"left"),
                                   ("DOCUMENTS",cx-radius-165,cy-radius*.35,"left"),
                                   ("DOWNLOADS",cx-radius-165,cy+radius*.05,"left"),
@@ -870,9 +878,19 @@ class JarvisDesktop:
                                   ("WHATSAPP",cx+radius+65,cy-radius*.18,"right"),
                                   ("DISCORD",cx+radius+65,cy+radius*.18,"right"),
                                   ("CHATGPT",cx+radius+65,cy+radius*.55,"right")]:
-            c.create_oval(x-9, y-9, x+9, y+9, outline=blue, width=2)
-            c.create_text(x+18, y, text=label, fill="#8deeff", anchor="w", font=("Consolas", 9))
-            c.create_line(x+8, y+13, x+45, y+13, fill="#075477")
+            tag = "app_" + label.lower()
+            c.create_oval(x-9, y-9, x+9, y+9, outline=blue, width=2, tags=(tag,))
+            c.create_text(x+18, y, text=label, fill="#8deeff", anchor="w", font=("Consolas", 9), tags=(tag,))
+            c.create_line(x+8, y+13, x+45, y+13, fill="#075477", tags=(tag,))
+            if label in shortcut_urls:
+                c.tag_bind(tag, "<Button-1>", lambda _event, url=shortcut_urls[label]: self._open_hud_url(url))
+                c.tag_bind(tag, "<Enter>", lambda _event: c.configure(cursor="hand2"))
+                c.tag_bind(tag, "<Leave>", lambda _event: c.configure(cursor=""))
+            elif label in {"IMAGES", "DOCUMENTS", "DOWNLOADS", "MUSIC"}:
+                folder_name = {"IMAGES": "Pictures", "DOCUMENTS": "Documents", "DOWNLOADS": "Downloads", "MUSIC": "Music"}[label]
+                c.tag_bind(tag, "<Button-1>", lambda _event, name=folder_name: self.open_quick_access(name))
+                c.tag_bind(tag, "<Enter>", lambda _event: c.configure(cursor="hand2"))
+                c.tag_bind(tag, "<Leave>", lambda _event: c.configure(cursor=""))
         # Bottom telemetry strip and live command bar
         by = h-84
         c.create_line(280, by-28, w-280, by-28, fill="#087ca8")
@@ -917,6 +935,7 @@ class JarvisDesktop:
             temperature = "N/A"
         online = metrics["network_online"]
         network = "ONLINE" if online is True else "OFFLINE" if online is False else "N/A"
+        from system_monitor import _format_bytes, _format_battery_time
         values = [
             ("CPU LOAD", percent(metrics["cpu_percent"])),
             ("MEMORY", percent(metrics["memory_percent"])),
@@ -924,9 +943,27 @@ class JarvisDesktop:
             ("BATTERY", self._format_battery_status(metrics["battery"])),
             ("CPU TEMP", temperature),
             ("NETWORK", network),
+            ("BATTERY TIME", _format_battery_time(metrics.get("battery_seconds"))),
+            ("STORAGE FREE", _format_bytes(metrics.get("disk_free"))),
+            ("STORAGE TOTAL", _format_bytes(metrics.get("disk_total"))),
+            ("RAM USED", _format_bytes(metrics.get("memory_used"))),
+            ("RAM TOTAL", _format_bytes(metrics.get("memory_total"))),
         ]
         self._metrics_cache = (now, values)
         return values
+
+    @staticmethod
+    def _open_hud_url(url: str):
+        """Open only fixed, application-owned HTTPS shortcuts from the HUD."""
+        import webbrowser
+        if url not in {
+            "https://mail.google.com/",
+            "https://web.whatsapp.com/",
+            "https://discord.com/app",
+            "https://chatgpt.com/",
+        }:
+            raise ValueError("Unsupported JARVIS shortcut.")
+        webbrowser.open(url)
 
     def open_quick_access(self, name: str):
         """Open a real Windows known folder from the HUD shortcut."""
