@@ -1411,14 +1411,16 @@ class JarvisDesktop:
                     self.events.put(("status", f"Action completed; speech output unavailable: {exc}"))
                 return
 
-            answer = chat_completion(
-                self.settings.get("endpoint", DEFAULT_ENDPOINT),
-                self.settings.get("model", DEFAULT_MODEL),
-                self.ai_api_key,
-                prompt,
-                self.history,
-                self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
-            )
+            answer = handle_online_command(prompt)
+            if answer is None:
+                answer = chat_completion(
+                    self.settings.get("endpoint", DEFAULT_ENDPOINT),
+                    self.settings.get("model", DEFAULT_MODEL),
+                    self.ai_api_key,
+                    prompt,
+                    self.history,
+                    self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
+                )
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
             try:
