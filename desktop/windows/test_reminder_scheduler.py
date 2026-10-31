@@ -8,6 +8,7 @@ from reminder_scheduler import (
     build_create_task_command,
     notify_due_reminders,
     register_reminder_task,
+    remove_all_reminder_tasks,
     sync_pending_reminder_tasks,
     unregister_reminder_task,
 )
@@ -106,6 +107,23 @@ class ReminderSchedulerTests(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertEqual(messages, ["Reminder: drink water"])
         self.assertEqual(removed, [7])
+
+
+    def test_uninstall_cleanup_removes_tasks_for_saved_reminders(self):
+        store = FakeStore([self.item, {**self.item, "id": 8}])
+        removed = []
+        import reminder_scheduler
+        original = reminder_scheduler.unregister_reminder_task
+        reminder_scheduler.unregister_reminder_task = (
+            lambda reminder_id, **kwargs: removed.append(reminder_id) or True
+        )
+        try:
+            count, errors = remove_all_reminder_tasks(store, platform_name="nt")
+        finally:
+            reminder_scheduler.unregister_reminder_task = original
+        self.assertEqual(count, 2)
+        self.assertEqual(errors, [])
+        self.assertEqual(removed, [7, 8])
 
     def test_startup_sync_repairs_only_pending_reminders(self):
         items = [self.item, {**self.item, "id": 8, "notified": 1}]
