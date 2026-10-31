@@ -39,6 +39,14 @@ Web search uses DuckDuckGo's HTML results, headlines use Google News RSS with In
 
 Ask or type `system status`, `PC status`, `system health`, or `system status batao` to get a read-only snapshot of CPU, memory, system-drive usage, battery/charging state, network-interface status, and uptime. This uses the locally installed psutil package and works without internet. Hardware sensors that Windows does not expose are reported as unavailable; this command does not change system settings or run shell commands.
 
+## Focus Mode, workflows and recurring automations
+
+These features run locally and use a small SQLite database in the JARVIS app-data folder.
+
+- **Focus Mode / Pomodoro:** say `start pomodoro`, `start focus for 45 minutes`, `focus status`, or `stop focus`. Sessions persist across app restarts.
+- **Smart workflows:** `run study workflow`, `run meeting workflow`, or `run deep work workflow`. Workflows only launch fixed, allowlisted apps (Notepad, Calculator, browser, Task Manager); no shell commands or arbitrary scripts.
+- **Recurring automation:** `repeat study workflow every 60 minutes`, `list automations`, or `delete automation 1`. Intervals are limited to 5 minutes–7 days. Automations run while JARVIS is running (including its tray mode); they are not guaranteed while Windows/JARVIS is shut down.
+
 ## Live process and app resource usage
 
 Ask JARVIS `top processes`, `show top processes`, or `which apps use most RAM` to see a read-only snapshot of the processes using the most memory, including each process's PID and current CPU/RAM percentages. JARVIS skips processes Windows does not allow it to inspect and limits the report to five entries. This feature never terminates, changes, or launches a process and works locally without an AI API key.
