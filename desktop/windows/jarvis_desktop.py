@@ -611,39 +611,19 @@ class JarvisDesktop:
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
-        """Show the supplied JARVIS artwork as the desktop HUD background."""
+        """Build the image-only JARVIS HUD; legacy drawn dashboard widgets are removed."""
         self.root.title("J.A.R.V.I.S. | Desktop Command Center")
         self.root.geometry("1600x900")
         self.root.minsize(1100, 619)
         self.root.configure(bg="#02070d")
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-        style.configure("HUD.TButton", background="#061827", foreground="#8deeff",
-                        bordercolor="#087ca8", padding=(12, 8), font=("Segoe UI", 10))
-        style.map("HUD.TButton", background=[("active", "#0a2940")])
-        style.configure("HUD.TEntry", fieldbackground="#04111d", foreground="#d9faff",
-                        insertcolor="#ffffff", bordercolor="#087ca8", padding=9)
-        self.hud = tk.Canvas(self.root, bg="#02070d", highlightthickness=0)
-        self.hud.pack(fill="both", expand=True)
-        self.hud.bind("<Configure>", lambda _event: self._draw_orb())
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.chat = None
         self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
         self.prompt_var = tk.StringVar()
-        self.prompt_entry = ttk.Entry(self.root, textvariable=self.prompt_var, style="HUD.TEntry")
-        self.send_button = ttk.Button(self.root, text="TRANSMIT  ➤", style="HUD.TButton", command=self.send_text)
-        self.stop_speaking_button = ttk.Button(self.root, text="STOP SPEECH", style="HUD.TButton",
-                                               command=self.stop_speaking)
-        self.listen_button = ttk.Button(self.root, text="◉  ACTIVATE VOICE", style="HUD.TButton",
-                                        command=self.toggle_listening)
-        self.chat_button = ttk.Button(self.root, text="CHAT LOG", style="HUD.TButton", command=self.open_chat)
-        self.settings_button = ttk.Button(self.root, text="SETTINGS ⚙", style="HUD.TButton", command=self.open_settings)
-        self.power_button = ttk.Button(self.root, text="POWER", style="HUD.TButton", command=self.open_power_controls)
-        self.prompt_entry.bind("<Return>", lambda _event: self.send_text())
-        self._draw_orb()
+        self.hud = tk.Canvas(self.root, bg="#02070d", highlightthickness=0)
+        self.hud.pack(fill="both", expand=True)
+        self.hud.bind("<Configure>", lambda _event: self._render_hud_background())
+        self._render_hud_background()
 
     def _get_service_statuses(self):
         """Report readiness from actual configuration and installed capabilities."""
@@ -666,8 +646,8 @@ class JarvisDesktop:
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
         ]
 
-    def _draw_orb(self):
-        """Display the supplied JARVIS HUD artwork as the complete desktop interface."""
+    def _render_hud_background(self):
+        """Render the supplied JARVIS artwork as the complete desktop interface."""
         if not hasattr(self, "hud"):
             return
 
