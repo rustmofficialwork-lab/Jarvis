@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from file_search import parse_file_search_query, search_files
+from file_search import (parse_file_search_query, parse_open_result_index, search_files,\n                         validate_search_result_for_open)
 
 
 class FileSearchTests(unittest.TestCase):
@@ -14,6 +14,24 @@ class FileSearchTests(unittest.TestCase):
         self.assertEqual(parse_file_search_query("फाइल खोजो report"), "report")
         self.assertIsNone(parse_file_search_query("find file"))
         self.assertIsNone(parse_file_search_query("find file C:\\secret"))
+
+    def test_parse_numbered_open_commands(self):
+        self.assertEqual(parse_open_result_index("open file 2"), 2)
+        self.assertEqual(parse_open_result_index("result kholo 10"), 10)
+        self.assertEqual(parse_open_result_index("फाइल खोलो 3"), 3)
+        self.assertIsNone(parse_open_result_index("open file 0"))
+        self.assertIsNone(parse_open_result_index("open file 51"))
+        self.assertIsNone(parse_open_result_index("open file C:\\\\secret"))
+
+    def test_open_validation_allows_safe_files_and_rejects_executables(self):
+        with tempfile.TemporaryDirectory() as temp:
+            safe = Path(temp) / "notes.txt"
+            safe.touch()
+            self.assertEqual(validate_search_result_for_open(safe), safe.resolve())
+            executable = Path(temp) / "run.exe"
+            executable.touch()
+            with self.assertRaises(ValueError):
+                validate_search_result_for_open(executable)
 
     def test_searches_names_recursively_without_reading_content(self):
         with tempfile.TemporaryDirectory() as temp:
