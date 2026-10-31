@@ -22,7 +22,8 @@ class AdvancedFeatureTests(unittest.TestCase):
         self.assertEqual(status["remaining_minutes"], 21)
         self.assertEqual(status["ends_at"], end)
         expired = self.store.focus_status(now=end + timedelta(seconds=1))
-        self.assertTrue(expired["expired"])\n        self.assertEqual(expired["duration_minutes"], 25)
+        self.assertTrue(expired["expired"])
+        self.assertEqual(expired["duration_minutes"], 25)
 
     def test_focus_duration_is_bounded(self):
         for value in (0, 241, True, 1.5):
