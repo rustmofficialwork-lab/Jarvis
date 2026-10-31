@@ -24,12 +24,18 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     normalized = str(value).strip().removeprefix("v")
     if not re.fullmatch(r"\d+(?:\.\d+){1,3}", normalized):
         raise ValueError("The release version is not a valid numeric version.")
-    return tuple(int(part) for part in normalized.split("."))
+    parts = tuple(int(part) for part in normalized.split("."))
+    return parts + (0,) * (4 - len(parts))
 
 
 def _safe_github_url(value: str) -> str:
     parsed = urlparse(value)
-    if parsed.scheme != "https" or parsed.hostname != "github.com" or parsed.username or parsed.password:
+    try:
+        valid_port = parsed.port is None or parsed.port == 443
+    except ValueError:
+        valid_port = False
+    if (parsed.scheme != "https" or parsed.hostname != "github.com"
+            or parsed.username or parsed.password or not valid_port):
         raise ValueError("The update release contains an unsafe download URL.")
     return value
 
@@ -92,7 +98,7 @@ def check_for_update(current_version: str, opener=None) -> dict:
         "available": latest > current,
         "release_exists": True,
         "current_version": current_version,
-        "latest_version": ".".join(str(part) for part in latest),
+        "latest_version": str(tag).strip().removeprefix("v"),
         "tag": tag,
         "release_url": payload.get("html_url", "https://github.com/rustmofficialwork-lab/Jarvis/releases"),
         "installer_url": _safe_github_url(installer.get("browser_download_url")) if installer else None,
