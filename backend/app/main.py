@@ -8,12 +8,23 @@ from typing import Any
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field, field_validator
 
 UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
-MAX_REQUEST_BYTES = max(16_384, int(os.getenv("MAX_REQUEST_BYTES", "12582912")))
-UPSTREAM_TIMEOUT_SECONDS = max(5, min(90, int(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "45"))))
+def _bounded_int_env(name: str, default: int, minimum: int, maximum: int) -> int:
+    """Read a bounded integer setting without making a bad deployment env crash startup."""
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+MAX_REQUEST_BYTES = _bounded_int_env("MAX_REQUEST_BYTES", 12_582_912, 16_384, 25_165_824)
+MAX_UPSTREAM_RESPONSE_BYTES = _bounded_int_env(
+    "MAX_UPSTREAM_RESPONSE_BYTES", 2_000_000, 16_384, 8_388_608
+)
+UPSTREAM_TIMEOUT_SECONDS = _bounded_int_env("UPSTREAM_TIMEOUT_SECONDS", 45, 5, 90)
 
 
 @asynccontextmanager
@@ -23,7 +34,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="JARVIS Backend",
-    description="Private AI gateway and persistent memory API for the JARVIS assistant.",
+    description="Authenticated AI gateway for the JARVIS desktop assistant.",
     version="0.1.0",
     lifespan=lifespan,
     docs_url=None,
@@ -92,22 +103,31 @@ async def chat_completions(request: Request) -> Response:
     }
     try:
         async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT_SECONDS) as client:
-            upstream = await client.post(UPSTREAM_URL, headers=headers, json=payload)
+            async with client.stream(
+                "POST", UPSTREAM_URL, headers=headers, json=payload
+            ) as upstream:
+                if upstream.status_code == 429:
+                    raise HTTPException(status_code=429, detail="AI provider rate limit reached. Try again shortly.")
+                if upstream.status_code in (401, 403):
+                    raise HTTPException(status_code=502, detail="AI provider credentials were rejected.")
+                if upstream.status_code >= 500:
+                    raise HTTPException(status_code=502, detail="AI provider is temporarily unavailable.")
+                if upstream.status_code >= 400:
+                    raise HTTPException(status_code=502, detail="AI provider rejected the request.")
+                chunks = []
+                total_bytes = 0
+                async for chunk in upstream.aiter_bytes():
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_UPSTREAM_RESPONSE_BYTES:
+                        raise HTTPException(status_code=502, detail="AI provider response exceeded the size limit.")
+                    chunks.append(chunk)
+                response_body = b"".join(chunks)
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="AI provider timed out. Please try again.")
     except httpx.RequestError:
         raise HTTPException(status_code=502, detail="AI provider is temporarily unreachable.")
-    if upstream.status_code == 429:
-        raise HTTPException(status_code=429, detail="AI provider rate limit reached. Try again shortly.")
-    if upstream.status_code in (401, 403):
-        raise HTTPException(status_code=502, detail="AI provider credentials were rejected.")
-    if upstream.status_code >= 500:
-        raise HTTPException(status_code=502, detail="AI provider is temporarily unavailable.")
-    if upstream.status_code >= 400:
-        # Do not relay upstream headers or internal details.
-        raise HTTPException(status_code=502, detail="AI provider rejected the request.")
     return Response(
-        content=upstream.content,
+        content=response_body,
         status_code=200,
         media_type="application/json",
         headers={"Cache-Control": "no-store"},
