@@ -18,8 +18,8 @@ MAX_INTERVAL_MINUTES = 10080
 
 
 @contextmanager
-def _db(path):
-    db = sqlite3.connect(str(path), timeout=10)
+def _db(path, uri=False):
+    db = sqlite3.connect(str(path), uri=uri, timeout=10)
     db.row_factory = sqlite3.Row
     try:
         with db:
@@ -33,8 +33,18 @@ class AdvancedFeatureStore:
 
     def __init__(self, path: Path = DEFAULT_PATH):
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with _db(self.path) as db:
+        self._db_uri = str(self.path) == ":memory:"
+        self._db_path = (
+            f"file:jarvis_advanced_{id(self)}?mode=memory&cache=shared"
+            if self._db_uri else str(self.path)
+        )
+        self._memory_anchor = (
+            sqlite3.connect(self._db_path, uri=True, timeout=10)
+            if self._db_uri else None
+        )
+        if not self._db_uri:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        with _db(self._db_path, uri=self._db_uri) as db:
             db.execute("""CREATE TABLE IF NOT EXISTS focus_session (
                 id INTEGER PRIMARY KEY CHECK(id=1), started_at TEXT NOT NULL,
                 ends_at TEXT NOT NULL, duration_minutes INTEGER NOT NULL)""")
@@ -48,18 +58,18 @@ class AdvancedFeatureStore:
             raise ValueError("Focus duration 1 se 240 minutes ke beech honi chahiye.")
         now = (now or datetime.now().astimezone()).astimezone()
         end = now + timedelta(minutes=minutes)
-        with _db(self.path) as db:
+        with _db(self._db_path, uri=self._db_uri) as db:
             db.execute("INSERT OR REPLACE INTO focus_session(id,started_at,ends_at,duration_minutes) VALUES(1,?,?,?)",
                        (now.isoformat(timespec="seconds"), end.isoformat(timespec="seconds"), minutes))
         return end
 
     def stop_focus(self):
-        with _db(self.path) as db:
+        with _db(self._db_path, uri=self._db_uri) as db:
             return db.execute("DELETE FROM focus_session WHERE id=1").rowcount > 0
 
     def focus_status(self, now=None):
         now = (now or datetime.now().astimezone()).astimezone()
-        with _db(self.path) as db:
+        with _db(self._db_path, uri=self._db_uri) as db:
             row = db.execute("SELECT * FROM focus_session WHERE id=1").fetchone()
             if row is None:
                 return None
@@ -78,24 +88,24 @@ class AdvancedFeatureStore:
             raise ValueError("Repeat interval 5 minutes se 7 days ke beech rakho.")
         now = (now or datetime.now().astimezone()).astimezone()
         next_run = now + timedelta(minutes=interval_minutes)
-        with _db(self.path) as db:
+        with _db(self._db_path, uri=self._db_uri) as db:
             cur = db.execute("INSERT INTO automations(workflow,interval_minutes,next_run) VALUES(?,?,?)",
                              (workflow, interval_minutes, next_run.isoformat(timespec="seconds")))
             return cur.lastrowid, next_run
 
     def list_automations(self):
-        with _db(self.path) as db:
+        with _db(self._db_path, uri=self._db_uri) as db:
             return [dict(row) for row in db.execute("SELECT * FROM automations WHERE enabled=1 ORDER BY id")]
 
     def delete_automation(self, automation_id):
-        with _db(self.path) as db:
+        with _db(self._db_path, uri=self._db_uri) as db:
             return db.execute("DELETE FROM automations WHERE id=?", (int(automation_id),)).rowcount > 0
 
     def claim_due_automations(self, now=None):
         now = (now or datetime.now().astimezone()).astimezone()
         now_text = now.isoformat(timespec="seconds")
         claimed = []
-        with _db(self.path) as db:
+        with _db(self._db_path, uri=self._db_uri) as db:
             db.execute("BEGIN IMMEDIATE")
             rows = db.execute("SELECT * FROM automations WHERE enabled=1 AND julianday(next_run)<=julianday(?) ORDER BY id",
                               (now_text,)).fetchall()
