@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import tempfile
 import urllib.request
 import zipfile
@@ -24,6 +25,9 @@ MODEL_CATALOG = {
     ),
 }
 DEFAULT_MODEL_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "JARVISDesktop" / "models"
+MAX_MODEL_DOWNLOAD_BYTES = 250 * 1024 * 1024
+MAX_MODEL_EXTRACTED_BYTES = 500 * 1024 * 1024
+MAX_MODEL_ARCHIVE_ENTRIES = 20000
 
 
 class OfflineModelUnavailable(RuntimeError):
@@ -85,15 +89,32 @@ def install_offline_model(language: str, model_dir: Path = DEFAULT_MODEL_DIR,
                 if not chunk:
                     break
                 total += len(chunk)
-                if total > 250 * 1024 * 1024:
+                if total > MAX_MODEL_DOWNLOAD_BYTES:
                     raise RuntimeError("The offline model download exceeded the 250 MB safety limit.")
                 output.write(chunk)
         with zipfile.ZipFile(archive_path) as archive:
             root = extracted.resolve()
-            for member in archive.infolist():
-                target = (extracted / member.filename).resolve()
+            members = archive.infolist()
+            if len(members) > MAX_MODEL_ARCHIVE_ENTRIES:
+                raise RuntimeError("The offline model archive contains too many files.")
+            expanded_size = sum(member.file_size for member in members)
+            if expanded_size > MAX_MODEL_EXTRACTED_BYTES:
+                raise RuntimeError("The offline model archive exceeds the 500 MB extraction safety limit.")
+            for member in members:
+                # ZIP paths are POSIX-style, but backslashes and drive prefixes can
+                # become path separators on Windows. Accept only the expected model root.
+                name = member.filename
+                parts = name.replace("\\", "/").split("/")
+                if (not name or name.startswith(("/", "\\")) or "\\" in name
+                        or any(part in {"", ".", ".."} for part in parts if part)
+                        or not parts or parts[0] != model_name):
+                    raise RuntimeError("The model archive contains an unsafe file path.")
+                target = (extracted / name).resolve()
                 if target != root and root not in target.parents:
                     raise RuntimeError("The model archive contains an unsafe file path.")
+                mode = (member.external_attr >> 16) & 0xFFFF
+                if stat.S_ISLNK(mode):
+                    raise RuntimeError("The model archive contains an unsafe symbolic link.")
             archive.extractall(extracted)
         source = extracted / model_name
         if not source.is_dir() or not any(source.iterdir()):
