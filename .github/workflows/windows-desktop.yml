@@ -17,9 +17,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Compile Python source
@@ -33,9 +33,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install desktop dependencies
@@ -44,7 +44,7 @@ jobs:
         working-directory: desktop/windows
         run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all pystray --collect-all PIL --collect-all vosk --collect-all pypdf --name JARVIS jarvis_desktop.py
       - name: Upload JARVIS Windows executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JARVIS-Windows-Portable-x64
           path: desktop/windows/dist/JARVIS.exe
@@ -57,7 +57,7 @@ jobs:
           options: /O+ /DMyAppVersion=1.1.0
 
       - name: Upload JARVIS Windows installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JARVIS-Windows-Installer-x64
           path: desktop/windows/dist-installer/JARVIS-Setup-x64.exe
