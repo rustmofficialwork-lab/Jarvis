@@ -27,6 +27,7 @@ from updater import check_for_update, download_verified_installer
 
 APP_NAME = "JARVIS"
 APP_VERSION = "1.1.0"
+MAX_CHAT_RESPONSE_BYTES = 2_000_000
 KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
@@ -515,7 +516,13 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
     opener = urllib.request.build_opener(NoRedirect)
     try:
         with opener.open(request, timeout=45) as response:
-            body = json.loads(response.read().decode("utf-8"))
+            response_bytes = response.read(MAX_CHAT_RESPONSE_BYTES + 1)
+            if len(response_bytes) > MAX_CHAT_RESPONSE_BYTES:
+                raise RuntimeError("The AI endpoint response was too large; please try a shorter request.")
+            try:
+                body = json.loads(response_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise RuntimeError("The AI endpoint returned invalid JSON.") from exc
     except urllib.error.HTTPError as exc:
         if 300 <= exc.code < 400:
             raise RuntimeError("The AI endpoint redirected the request; redirects are blocked for API-key safety.") from exc
