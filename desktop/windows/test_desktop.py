@@ -499,8 +499,8 @@ class VoiceMemoryCommandTests(unittest.TestCase):
         app.speech_stop_event = threading.Event()
         with patch.object(jarvis_desktop, "save_chat_history"), \
              patch.object(jarvis_desktop, "speak_text_interruptibly") as speak:
-            self.assertTrue(app._handle_voice_memory_command("yaad rakhna I prefer Hindi"))
-            self.assertTrue(app._handle_voice_memory_command("what do you remember"))
+            self.assertTrue(app._handle_memory_command("yaad rakhna I prefer Hindi", from_voice=True))
+            self.assertTrue(app._handle_memory_command("what do you remember", from_voice=True))
         self.assertEqual(app.memory_store.list()[0]["content"], "I prefer Hindi")
         self.assertEqual(len(app.history), 4)
         self.assertEqual(speak.call_count, 2)
@@ -519,7 +519,7 @@ class VoiceMemoryCommandTests(unittest.TestCase):
         app.speech_stop_event = threading.Event()
         with patch.object(jarvis_desktop, "save_chat_history"), \
              patch.object(jarvis_desktop, "speak_text_interruptibly"):
-            self.assertTrue(app._handle_voice_memory_command("remember that my API key is secret"))
+            self.assertTrue(app._handle_memory_command("remember that my API key is secret", from_voice=True))
         self.assertEqual(app.memory_store.list(), [])
 
 
