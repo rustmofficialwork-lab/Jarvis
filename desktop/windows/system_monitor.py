@@ -19,6 +19,9 @@ def collect_system_metrics(psutil_module=None) -> dict:
 
     drive = os.environ.get("SystemDrive", "C:") + chr(92)
     battery = _safe_read(psutil_module.sensors_battery, "N/A")
+    memory = _safe_read(psutil_module.virtual_memory)
+    disk = _safe_read(lambda: psutil_module.disk_usage(drive))
+    battery_seconds = _safe_read(lambda: battery.secsleft) if battery not in (None, "N/A") else None
     temperature = _safe_read(
         lambda: next(
             (entry.current for entries in psutil_module.sensors_temperatures(fahrenheit=False).values()
@@ -34,9 +37,16 @@ def collect_system_metrics(psutil_module=None) -> dict:
     )
     return {
         "cpu_percent": _safe_read(lambda: psutil_module.cpu_percent(interval=None)),
-        "memory_percent": _safe_read(lambda: psutil_module.virtual_memory().percent),
-        "disk_percent": _safe_read(lambda: psutil_module.disk_usage(drive).percent),
+        "memory_percent": _safe_read(lambda: memory.percent) if memory is not None else None,
+        "memory_total": _safe_read(lambda: memory.total) if memory is not None else None,
+        "memory_used": _safe_read(lambda: memory.used) if memory is not None else None,
+        "disk_percent": _safe_read(lambda: disk.percent) if disk is not None else None,
+        "disk_total": _safe_read(lambda: disk.total) if disk is not None else None,
+        "disk_used": _safe_read(lambda: disk.used) if disk is not None else None,
+        "disk_free": _safe_read(lambda: disk.free) if disk is not None else None,
         "battery": battery,
+        "battery_seconds": battery_seconds,
+        "uptime_seconds": _safe_read(lambda: __import__("time").time() - psutil_module.boot_time()),
         "cpu_temperature": temperature,
         "network_online": network_online,
     }
@@ -99,6 +109,33 @@ def get_system_status(psutil_module=None, now=None) -> str:
         f"Network: {network_text}\n"
         f"Uptime: {uptime}"
     )
+
+
+def _format_bytes(value) -> str:
+    """Format a byte count; unavailable readings stay explicit."""
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return "N/A"
+    if amount < 0:
+        return "N/A"
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if amount < 1024 or unit == "TB":
+            return f"{amount:.1f} {unit}"
+        amount /= 1024
+    return "N/A"
+
+
+def _format_battery_time(seconds) -> str:
+    """Return remaining time only when the OS supplies a finite estimate."""
+    try:
+        seconds = int(seconds)
+    except (TypeError, ValueError):
+        return "N/A"
+    if seconds < 0 or seconds >= 0xFFFFFFFF:
+        return "N/A"
+    hours, remainder = divmod(seconds, 3600)
+    return f"{hours}h {remainder // 60}m"
 
 
 def _format_uptime(seconds: float) -> str:
