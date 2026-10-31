@@ -41,7 +41,7 @@ Ask or type `system status`, `PC status`, `system health`, or `system status bat
 
 ## Search for and open local files
 
-Type or say `find file budget`, `file dhundo notes`, or `फाइल खोजो report`. Choose a folder when prompted; JARVIS searches filenames only (not file contents), skips hidden files and symlinks, and caps work at 50 results / 5,000 directories. After a search, say or type `open file 2` (also `open result 2`, `file kholo 2`, or `फाइल खोलो 2`) to select a numbered result from the latest search. JARVIS asks for confirmation before opening it with the Windows default application. For safety, only supported document and media formats are eligible; executables, scripts, shortcuts, and web shortcut files are not opened through search results. If a result was moved or deleted, JARVIS refuses to open it.
+Type or say `find file budget`, `look for file budget`, `file dhundo notes`, `file dhoondho notes`, or `फाइल ढूँढो report`. Choose a folder when prompted; JARVIS searches filenames only (not file contents), skips hidden files and symlinks, and caps work at 50 results / 5,000 directories. After a search, say or type `open file 2` (also `open the second file`, `second result kholo`, `file khol do 2`, or `दूसरी फाइल खोलो`) to select a numbered result from the latest search. JARVIS asks for confirmation before opening it with the Windows default application. For safety, only supported document and media formats are eligible; executables, scripts, shortcuts, and web shortcut files are not opened through search results. If a result was moved or deleted, JARVIS refuses to open it.
 
 ## Read local documents offline
 
