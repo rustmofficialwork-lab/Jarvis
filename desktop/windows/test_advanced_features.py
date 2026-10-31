@@ -67,6 +67,14 @@ class AdvancedFeatureTests(unittest.TestCase):
             self.assertTrue(all(command in {"open notepad", "open calculator", "open browser", "open task manager"}
                                 for command in commands))
 
+    def test_in_memory_database_is_shared_across_store_operations(self):
+        store = AdvancedFeatureStore(":memory:")
+        store.start_focus(10, now=self.now)
+        self.assertEqual(store.focus_status(now=self.now)["remaining_minutes"], 10)
+        automation_id, _ = store.add_automation("study", 5, now=self.now)
+        self.assertEqual(store.list_automations()[0]["id"], automation_id)
+        self.assertTrue(store.delete_automation(automation_id))
+
 
 if __name__ == "__main__":
     unittest.main()
