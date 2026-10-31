@@ -105,7 +105,10 @@ def get_system_status(psutil_module=None, now=None) -> str:
         f"CPU usage: {percent(metrics['cpu_percent'])}\n"
         f"Memory usage: {percent(metrics['memory_percent'])}\n"
         f"System drive usage: {drive_usage}\n"
+        f"Storage total/used/free: {_format_bytes(metrics.get('disk_total'))} / {_format_bytes(metrics.get('disk_used'))} / {_format_bytes(metrics.get('disk_free'))}\n"
+        f"RAM total/used: {_format_bytes(metrics.get('memory_total'))} / {_format_bytes(metrics.get('memory_used'))}\n"
         f"Battery: {battery_text}\n"
+        f"Battery time remaining: {_format_battery_time(metrics.get('battery_seconds'))}\n"
         f"Network: {network_text}\n"
         f"Uptime: {uptime}"
     )
