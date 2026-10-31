@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime
 from types import SimpleNamespace
 
-from system_monitor import collect_system_metrics, get_system_status, _format_uptime
+from system_monitor import collect_system_metrics, get_system_status, get_top_processes, _format_uptime
 
 
 class FakePsutil:
@@ -89,3 +89,46 @@ class SystemMonitorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TopProcessTests(unittest.TestCase):
+    def test_processes_are_sorted_by_memory_and_bounded(self):
+        class Process:
+            def __init__(self, info):
+                self.info = info
+        class FakePsutil:
+            def process_iter(self, attrs):
+                self.attrs = attrs
+                return [
+                    Process({"pid": 10, "name": "Browser", "cpu_percent": 4, "memory_percent": 25}),
+                    Process({"pid": 11, "name": "Editor", "cpu_percent": 8, "memory_percent": 5}),
+                    Process({"pid": 12, "name": "Game", "cpu_percent": 20, "memory_percent": 40}),
+                ]
+        result = get_top_processes(2, FakePsutil())
+        self.assertIn("Top 2 processes", result)
+        self.assertLess(result.index("Game (PID 12)"), result.index("Browser (PID 10)"))
+        self.assertNotIn("Editor (PID 11)", result)
+
+    def test_unreadable_process_is_skipped(self):
+        class Process:
+            def __init__(self, info=None, fail=False):
+                self.info, self.fail = info, fail
+            @property
+            def info(self):
+                if self.fail:
+                    raise PermissionError("access denied")
+                return self._info
+            @info.setter
+            def info(self, value):
+                self._info = value
+        class FakePsutil:
+            def process_iter(self, attrs):
+                return [Process(fail=True), Process({"pid": 2, "name": "Safe", "cpu_percent": 1, "memory_percent": 3})]
+        result = get_top_processes(psutil_module=FakePsutil())
+        self.assertIn("Safe (PID 2)", result)
+        self.assertNotIn("access denied", result)
+
+    def test_invalid_limits_are_rejected(self):
+        for limit in (0, 21, True, 1.5):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                get_top_processes(limit, FakePsutil())
