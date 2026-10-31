@@ -37,7 +37,7 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertIn("RAM total/used: 16.0 GB / 8.0 GB", result)
         self.assertIn("Battery time remaining: 1h 30m", result)
         self.assertIn("Battery: 88% (charging)", result)
-        self.assertIn("Network: Online", result)
+        self.assertIn("Network adapter link: Online", result)
         self.assertIn("Uptime: 1d 1h 1m", result)
 
     def test_unsupported_sensor_does_not_hide_other_metrics(self):
@@ -85,6 +85,21 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertEqual(calls, {
             "cpu": 1, "memory": 1, "disk": 1, "battery": 1, "network": 1,
         })
+    def test_temperature_uses_cpu_sensor_not_first_available_sensor(self):
+        class Sensors(FakePsutil):
+            def sensors_temperatures(self, fahrenheit=False):
+                return {
+                    "gpu": [SimpleNamespace(current=72.0)],
+                    "coretemp": [SimpleNamespace(current=54.0)],
+                }
+        self.assertEqual(collect_system_metrics(Sensors())["cpu_temperature"], 54.0)
+
+    def test_gpu_only_temperature_is_not_mislabeled_as_cpu(self):
+        class Sensors(FakePsutil):
+            def sensors_temperatures(self, fahrenheit=False):
+                return {"amdgpu": [SimpleNamespace(current=72.0)]}
+        self.assertIsNone(collect_system_metrics(Sensors())["cpu_temperature"])
+
     def test_capacity_and_battery_time_formatters(self):
         self.assertEqual(_format_bytes(1024**3), "1.0 GB")
         self.assertEqual(_format_bytes(None), "N/A")
