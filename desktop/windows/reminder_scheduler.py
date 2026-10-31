@@ -122,3 +122,20 @@ def sync_pending_reminder_tasks(store=None, **kwargs) -> tuple[int, list[str]]:
         except Exception as exc:
             errors.append(f"Reminder #{item['id']}: {exc}")
     return created, errors
+
+def remove_all_reminder_tasks(store=None, platform_name=None) -> tuple[int, list[str]]:
+    """Remove all reminder tasks before uninstall, preserving the local reminder DB."""
+    if (platform_name or os.name) != "nt":
+        return 0, []
+    if store is None:
+        from reminders import ReminderStore
+        store = ReminderStore()
+    removed = 0
+    errors = []
+    for item in store.list():
+        try:
+            if unregister_reminder_task(item["id"], platform_name=platform_name):
+                removed += 1
+        except Exception as exc:
+            errors.append(f"Reminder #{item['id']}: {exc}")
+    return removed, errors
