@@ -22,12 +22,15 @@ def get_system_status(psutil_module=None, now=None) -> str:
     memory = read(lambda: f"{psutil_module.virtual_memory().percent:.0f}%")
     drive = os.environ.get("SystemDrive", "C:") + chr(92)
     disk = read(lambda: f"{psutil_module.disk_usage(drive).percent:.0f}%")
-    battery = read(
-        lambda: (
-            f"{psutil_module.sensors_battery().percent:.0f}%"
-            + (" (charging)" if psutil_module.sensors_battery().power_plugged else "")
-        ) if psutil_module.sensors_battery() is not None else "No battery detected"
-    )
+    def battery_status():
+        battery_info = psutil_module.sensors_battery()
+        if battery_info is None:
+            return "No battery detected"
+        return f"{battery_info.percent:.0f}%" + (
+            " (charging)" if battery_info.power_plugged else ""
+        )
+
+    battery = read(battery_status)
     network = read(
         lambda: "Online" if any(
             item.isup for name, item in psutil_module.net_if_stats().items()
