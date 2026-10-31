@@ -1170,9 +1170,9 @@ class SharedOnlineReplyTests(unittest.TestCase):
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.settings = {}
-        with patch.object(jarvis_desktop, "handle_online_command", return_value="Weather: sunny"), \\
-             patch.object(jarvis_desktop, "chat_completion") as completion:
-            self.assertEqual(app._get_online_reply("weather"), "Weather: sunny")
+        with patch.object(jarvis_desktop, "handle_online_command", return_value="Weather: sunny"):
+            with patch.object(jarvis_desktop, "chat_completion") as completion:
+                self.assertEqual(app._get_online_reply("weather"), "Weather: sunny")
         completion.assert_not_called()
 
     def test_ai_fallback_uses_shared_memory_sharing_setting(self):
@@ -1191,9 +1191,9 @@ class SharedOnlineReplyTests(unittest.TestCase):
         app.ai_api_key = "test-token"
         app.history = [{"role": "user", "content": "previous"}]
         app.memory_store = Store()
-        with patch.object(jarvis_desktop, "handle_online_command", return_value=None), \\
-             patch.object(jarvis_desktop, "chat_completion", return_value="Namaste") as completion:
-            self.assertEqual(app._get_online_reply("hello"), "Namaste")
+        with patch.object(jarvis_desktop, "handle_online_command", return_value=None):
+            with patch.object(jarvis_desktop, "chat_completion", return_value="Namaste") as completion:
+                self.assertEqual(app._get_online_reply("hello"), "Namaste")
         self.assertEqual(completion.call_args.args[0], "https://example.com/chat")
         self.assertEqual(completion.call_args.args[5], ["User prefers Hindi"])
 
