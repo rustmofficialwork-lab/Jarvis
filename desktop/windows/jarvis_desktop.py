@@ -17,6 +17,7 @@ from tkinter import messagebox, ttk
 from offline_speech import (OfflineModelUnavailable, install_offline_model,
                             model_path_for_language, transcribe_offline_vosk)
 from memory_store import MemoryStore
+from reminders import ReminderStore, parse_reminder_command
 
 APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
@@ -500,6 +501,7 @@ class JarvisDesktop:
         self.events: queue.Queue = queue.Queue()
         self.history: list[dict] = load_chat_history()
         self.memory_store = MemoryStore()
+        self.reminder_store = ReminderStore()
         self.stop_event = threading.Event()
         self.wake_thread: threading.Thread | None = None
         self.busy = False
@@ -523,6 +525,7 @@ class JarvisDesktop:
         self.picovoice_access_key = self.picovoice_var.get()
         self.root.after(120, self._poll_events)
         self.root.after(700, self._ensure_offline_model)
+        self.root.after(1000, self._check_reminders)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
@@ -1025,7 +1028,79 @@ class JarvisDesktop:
     def _set_status(self, text: str):
         self.status_var.set(text)
 
+    def _process_reminder_command(self, prompt: str) -> str | None:
+        normalized = " ".join(prompt.casefold().split())
+        if normalized in {"show reminders", "list reminders", "mere reminders dikhao", "reminders dikhao"}:
+            items = self.reminder_store.list()
+            if not items:
+                return "Abhi koi pending reminder nahi hai."
+            lines = []
+            for item in items[:20]:
+                due = item["due_at"].replace("T", " ")[:16]
+                status = "notified" if item["notified"] else "pending"
+                lines.append(f"#{item['id']} — {item['message']} ({due}, {status})")
+            return "Tumhare local reminders:\n" + "\n".join(lines)
+        import re
+        delete_match = re.match(r"^(?:delete|remove) reminder (\d+)$", normalized)
+        if delete_match:
+            return ("Reminder deleted." if self.reminder_store.delete(int(delete_match.group(1)))
+                    else "Us ID ka reminder nahi mila.")
+        parsed = parse_reminder_command(prompt)
+        if parsed is None:
+            return None
+        message, due_at = parsed
+        self.reminder_store.add(message, due_at)
+        return f"Reminder set: {message}. {due_at.astimezone().strftime('%d %b, %I:%M %p')} par yaad dilaunga."
+
+    def _handle_reminder_command(self, prompt: str) -> bool:
+        try:
+            response = self._process_reminder_command(prompt)
+        except (ValueError, OSError) as exc:
+            response = str(exc)
+        if response is None:
+            return False
+        self._append("YOU", prompt)
+        self._append("JARVIS", response)
+        self.history.extend([{"role": "user", "content": prompt},
+                             {"role": "assistant", "content": response}])
+        try:
+            save_chat_history(self.history)
+        except OSError:
+            pass
+        self._set_status("Local reminders updated.")
+        return True
+
+    def _handle_voice_reminder_command(self, prompt: str) -> bool:
+        try:
+            response = self._process_reminder_command(prompt)
+        except (ValueError, OSError) as exc:
+            response = str(exc)
+        if response is None:
+            return False
+        self.history.extend([{"role": "user", "content": prompt},
+                             {"role": "assistant", "content": response}])
+        try:
+            save_chat_history(self.history)
+        except OSError as exc:
+            self.events.put(("status", f"Reminder saved; history could not be saved: {exc}"))
+        self.events.put(("answer", response))
+        try:
+            speak_text_interruptibly(response, self.speech_stop_event)
+        except Exception as exc:
+            self.events.put(("status", f"Reminder saved; speech output unavailable: {exc}"))
+        return True
+
+    def _check_reminders(self):
+        try:
+            for item in self.reminder_store.due():
+                self.events.put(("reminder", item))
+        except Exception as exc:
+            self._set_status(f"Reminder check failed: {exc}")
+        self.root.after(1000, self._check_reminders)
+
     def _try_local_command(self, prompt: str) -> bool:
+        if self._handle_reminder_command(prompt):
+            return True
         if self._handle_memory_command(prompt):
             return True
         try:
@@ -1257,6 +1332,8 @@ class JarvisDesktop:
         # Clear a previous stop request only after this voice request owns the worker.
         self.speech_stop_event.clear()
         try:
+            if self._handle_voice_reminder_command(prompt):
+                return
             if self._handle_voice_memory_command(prompt):
                 return
             try:
@@ -1505,6 +1582,11 @@ class JarvisDesktop:
                     self._set_status(value)
                 elif kind == "voice_command":
                     self._append("YOU (VOICE)", value)
+                elif kind == "reminder":
+                    message = f"Reminder: {value["message"]}"
+                    self._append("JARVIS REMINDER", message)
+                    self._set_status("Reminder due.")
+                    messagebox.showinfo("JARVIS Reminder", message, parent=self.root)
                 elif kind == "listener_stopped":
                     self.listen_button.configure(text="Start wake listening", state="normal")
                     self._set_status("Wake listener stopped.")
