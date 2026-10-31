@@ -22,6 +22,7 @@ from reminder_scheduler import (notify_due_reminders, register_reminder_task,
                                 remove_all_reminder_tasks, sync_pending_reminder_tasks,
                                 unregister_reminder_task)
 from online_services import handle_online_command
+from document_reader import read_document
 
 APP_NAME = "JARVIS"
 KEYRING_SERVICE = "JARVIS-Desktop"
@@ -1183,11 +1184,59 @@ class JarvisDesktop:
         self._set_status("Local action completed.")
         return True
 
+    def _try_document_command(self, prompt: str) -> bool:
+        """Open a user-selected local document and extract it on a worker thread."""
+        normalized = " ".join(prompt.casefold().strip().rstrip(" .!?।॥").split())
+        commands = {"read file", "open file", "read document", "open document",
+                    "document kholo", "file kholo", "pdf kholo"}
+        if normalized not in commands:
+            return False
+        from tkinter import filedialog
+        selected = filedialog.askopenfilename(
+            parent=self.root,
+            title="Choose a document to read locally",
+            filetypes=[
+                ("Supported documents", "*.pdf *.docx *.txt *.md *.csv *.json *.py *.log *.ini *.yaml *.yml *.xml *.html *.htm *.rst"),
+                ("PDF files", "*.pdf"),
+                ("Word documents", "*.docx"),
+                ("Text files", "*.txt *.md *.csv *.json *.py *.log"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not selected:
+            self._set_status("Document selection cancelled.")
+            return True
+        if not self.request_lock.acquire(blocking=False):
+            self._set_status("JARVIS is busy; try reading the document again shortly.")
+            return True
+        self.busy = True
+        self._append("YOU", prompt)
+        self._set_status("Reading document locally…")
+        try:
+            threading.Thread(
+                target=self._document_worker, args=(selected, prompt), daemon=True
+            ).start()
+        except Exception:
+            self.busy = False
+            self.request_lock.release()
+            raise
+        return True
+
+    def _document_worker(self, file_path: str, prompt: str):
+        try:
+            result = read_document(file_path)
+            self.events.put(("document", {"prompt": prompt, **result}))
+        except Exception as exc:
+            self.events.put(("document_error", str(exc)))
+            self.events.put(("document_prompt", prompt))
+
     def send_text(self):
         prompt = self.prompt_var.get().strip()
         if not prompt or self.busy:
             return
         self.prompt_var.set("")
+        if self._try_document_command(prompt):
+            return
         if self._try_local_command(prompt):
             return
         if not self.request_lock.acquire(blocking=False):
@@ -1635,6 +1684,31 @@ class JarvisDesktop:
                     self._append("JARVIS ERROR", value, "error")
                     self.busy = False
                     self._set_status("Something needs attention.")
+                elif kind == "document":
+                    prompt = value["prompt"]
+                    excerpt = value["text"][:12000]
+                    reply = (
+                        f"Read locally: {value['name']} ({value['characters']:,} characters"
+                        + (f", {value['pages']} pages" if value.get("pages") is not None else "")
+                        + ").\n\n" + excerpt
+                    )
+                    self.history.extend([{"role": "user", "content": prompt},
+                                         {"role": "assistant", "content": reply}])
+                    try:
+                        save_chat_history(self.history)
+                    except OSError as exc:
+                        self._set_status(f"Document read; chat history could not be saved: {exc}")
+                    self._append("JARVIS", reply)
+                    self.busy = False
+                    self._set_status("Document read on this PC; it was not uploaded.")
+                    self.request_lock.release()
+                elif kind == "document_error":
+                    self._append("JARVIS ERROR", value, "error")
+                    self.busy = False
+                    self._set_status("Could not read the selected document.")
+                    self.request_lock.release()
+                elif kind == "document_prompt":
+                    self.history.append({"role": "user", "content": value})
                 elif kind == "status":
                     self._set_status(value)
                 elif kind == "voice_command":
