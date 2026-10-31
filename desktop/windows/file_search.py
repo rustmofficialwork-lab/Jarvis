@@ -6,6 +6,37 @@ from pathlib import Path
 
 MAX_RESULTS = 50
 MAX_DIRECTORIES = 5000
+SAFE_OPEN_EXTENSIONS = {
+    ".pdf", ".docx", ".txt", ".md", ".csv", ".json", ".log", ".ini",
+    ".yaml", ".yml", ".xml", ".png", ".jpg", ".jpeg", ".gif", ".bmp",
+    ".webp", ".mp3", ".wav", ".mp4", ".m4a", ".flac",
+}
+
+
+def parse_open_result_index(prompt: str) -> int | None:
+    """Parse an explicit numbered result selection from English/Hinglish."""
+    import re
+
+    normalized = " ".join(str(prompt).casefold().strip().rstrip(" .!?।॥").split())
+    match = re.fullmatch(
+        r"(?:open file|open result|file kholo|result kholo|फाइल खोलो)\s+(\d{1,2})",
+        normalized,
+    )
+    if not match:
+        return None
+    index = int(match.group(1))
+    return index if 1 <= index <= 50 else None
+
+
+def validate_search_result_for_open(path: str | os.PathLike) -> Path:
+    """Validate a selected search result as a regular, non-link, passive file."""
+    candidate = Path(path).expanduser()
+    if candidate.is_symlink() or candidate.suffix.casefold() not in SAFE_OPEN_EXTENSIONS:
+        raise ValueError("For safety, JARVIS opens only supported document and media file types.")
+    resolved = candidate.resolve(strict=True)
+    if not resolved.is_file():
+        raise ValueError("The selected search result is no longer a regular file.")
+    return resolved
 
 
 def parse_file_search_query(prompt: str) -> str | None:
