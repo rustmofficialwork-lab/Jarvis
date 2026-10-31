@@ -12,6 +12,20 @@ def _safe_read(callback, fallback=None):
         return fallback
 
 
+def _read_cpu_temperature(psutil_module):
+    """Return a CPU/core/package sensor reading; never mislabel GPU or board temps."""
+    sensors = psutil_module.sensors_temperatures(fahrenheit=False)
+    for name, entries in sensors.items():
+        sensor_name = str(name).casefold()
+        if not any(token in sensor_name for token in ("cpu", "core", "package", "k10temp", "coretemp")):
+            continue
+        for entry in entries:
+            current = getattr(entry, "current", None)
+            if current is not None:
+                return current
+    return None
+
+
 def collect_system_metrics(psutil_module=None) -> dict:
     """Read each hardware metric once; shared by the HUD and spoken PC-status command."""
     if psutil_module is None:
@@ -22,13 +36,7 @@ def collect_system_metrics(psutil_module=None) -> dict:
     memory = _safe_read(psutil_module.virtual_memory)
     disk = _safe_read(lambda: psutil_module.disk_usage(drive))
     battery_seconds = _safe_read(lambda: battery.secsleft) if battery not in (None, "N/A") else None
-    temperature = _safe_read(
-        lambda: next(
-            (entry.current for entries in psutil_module.sensors_temperatures(fahrenheit=False).values()
-             for entry in entries if entry.current is not None),
-            None,
-        )
-    )
+    temperature = _safe_read(lambda: _read_cpu_temperature(psutil_module))
     network_online = _safe_read(
         lambda: any(
             item.isup for name, item in psutil_module.net_if_stats().items()
