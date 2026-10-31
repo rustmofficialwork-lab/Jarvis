@@ -27,6 +27,9 @@ class FakeStore:
     def list(self):
         return self.items
 
+    def release_claims(self, reminder_ids):
+        self.released = list(reminder_ids)
+
 
 class ReminderSchedulerTests(unittest.TestCase):
     def setUp(self):
@@ -108,6 +111,30 @@ class ReminderSchedulerTests(unittest.TestCase):
         self.assertEqual(messages, ["Reminder: drink water"])
         self.assertEqual(removed, [7])
 
+
+    def test_notification_failure_releases_current_and_remaining_reminders(self):
+        second = {**self.item, "id": 8, "message": "take a break"}
+        store = FakeStore([self.item, second])
+        store.released = []
+        removed = []
+
+        import reminder_scheduler
+        original = reminder_scheduler.unregister_reminder_task
+        reminder_scheduler.unregister_reminder_task = (
+            lambda reminder_id, **kwargs: removed.append(reminder_id)
+        )
+        try:
+            with self.assertRaisesRegex(RuntimeError, "dialog failed"):
+                notify_due_reminders(
+                    store,
+                    notifier=lambda _message: (_ for _ in ()).throw(RuntimeError("dialog failed")),
+                    platform_name="nt",
+                )
+        finally:
+            reminder_scheduler.unregister_reminder_task = original
+
+        self.assertEqual(store.released, [7, 8])
+        self.assertEqual(removed, [])
 
     def test_uninstall_cleanup_removes_tasks_for_saved_reminders(self):
         store = FakeStore([self.item, {**self.item, "id": 8}])
