@@ -12,6 +12,9 @@ on:
       - "desktop/windows/**"
       - ".github/workflows/windows-desktop.yml"
 
+permissions:
+  contents: write
+
 jobs:
   source-checks:
     runs-on: windows-latest
@@ -74,3 +77,27 @@ jobs:
           name: JARVIS-Windows-Installer-x64
           path: desktop/windows/dist-installer/JARVIS-Setup-x64.exe
           if-no-files-found: error
+
+      # Publish stable, direct download links for Windows users. GitHub's
+      # Actions artifact table UI varies by viewport; release assets are easier
+      # to find and can be downloaded without opening the artifact details.
+      - name: Publish latest Windows downloads
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: jarvis-latest
+          target_commitish: main
+          name: JARVIS Latest Windows Build
+          body: |
+            Latest successful Windows desktop build from the main branch.
+
+            - Installer: JARVIS-Setup-x64.exe
+            - Portable executable: JARVIS.exe
+
+            These links are updated by the Windows Desktop workflow.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: |
+            desktop/windows/dist-installer/JARVIS-Setup-x64.exe
+            desktop/windows/dist/JARVIS.exe
