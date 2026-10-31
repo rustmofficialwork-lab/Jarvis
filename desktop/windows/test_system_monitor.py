@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime
 from types import SimpleNamespace
 
-from system_monitor import collect_system_metrics, get_system_status, get_top_processes, _format_uptime
+from system_monitor import collect_system_metrics, get_system_status, get_top_processes, _format_uptime, _format_bytes, _format_battery_time
 
 
 class FakePsutil:
@@ -11,13 +11,13 @@ class FakePsutil:
         return 23.4
 
     def virtual_memory(self):
-        return SimpleNamespace(percent=61.2)
+        return SimpleNamespace(percent=61.2, total=16 * 1024**3, used=8 * 1024**3)
 
     def disk_usage(self, path):
-        return SimpleNamespace(percent=72.8)
+        return SimpleNamespace(percent=72.8, total=512 * 1024**3, used=256 * 1024**3, free=256 * 1024**3)
 
     def sensors_battery(self):
-        return SimpleNamespace(percent=88, power_plugged=True)
+        return SimpleNamespace(percent=88, power_plugged=True, secsleft=5400)
 
     def net_if_stats(self):
         return {"Ethernet": SimpleNamespace(isup=True), "Loopback": SimpleNamespace(isup=True)}
@@ -33,6 +33,9 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertIn("\nCPU usage:", result)
         self.assertIn("Memory usage: 61%", result)
         self.assertIn("System drive usage: 73%", result)
+        self.assertIn("Storage total/used/free: 512.0 GB / 256.0 GB / 256.0 GB", result)
+        self.assertIn("RAM total/used: 16.0 GB / 8.0 GB", result)
+        self.assertIn("Battery time remaining: 1h 30m", result)
         self.assertIn("Battery: 88% (charging)", result)
         self.assertIn("Network: Online", result)
         self.assertIn("Uptime: 1d 1h 1m", result)
@@ -82,6 +85,12 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertEqual(calls, {
             "cpu": 1, "memory": 1, "disk": 1, "battery": 1, "network": 1,
         })
+    def test_capacity_and_battery_time_formatters(self):
+        self.assertEqual(_format_bytes(1024**3), "1.0 GB")
+        self.assertEqual(_format_bytes(None), "N/A")
+        self.assertEqual(_format_battery_time(3660), "1h 1m")
+        self.assertEqual(_format_battery_time(0xFFFFFFFF), "N/A")
+
     def test_uptime_format(self):
         self.assertEqual(_format_uptime(0), "0m")
         self.assertEqual(_format_uptime(3661), "1h 1m")
