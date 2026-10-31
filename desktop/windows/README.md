@@ -39,6 +39,10 @@ Web search uses DuckDuckGo's HTML results, headlines use Google News RSS with In
 
 Ask or type `system status`, `PC status`, `system health`, or `system status batao` to get a read-only snapshot of CPU, memory, system-drive usage, battery/charging state, network-interface status, and uptime. This uses the locally installed psutil package and works without internet. Hardware sensors that Windows does not expose are reported as unavailable; this command does not change system settings or run shell commands.
 
+## Search for and open local files
+
+Type or say `find file budget`, `file dhundo notes`, or `फाइल खोजो report`. Choose a folder when prompted; JARVIS searches filenames only (not file contents), skips hidden files and symlinks, and caps work at 50 results / 5,000 directories. After a search, say or type `open file 2` (also `open result 2`, `file kholo 2`, or `फाइल खोलो 2`) to select a numbered result from the latest search. JARVIS asks for confirmation before opening it with the Windows default application. For safety, only supported document and media formats are eligible; executables, scripts, shortcuts, and web shortcut files are not opened through search results. If a result was moved or deleted, JARVIS refuses to open it.
+
 ## Read local documents offline
 
 Type `read file` (or `document kholo`) in the JARVIS command bar and choose a file. JARVIS extracts text locally from PDF, Word DOCX, TXT, Markdown, CSV, JSON, common code and other text files. The selected document is not uploaded. After reading, you can ask JARVIS to summarize or explain it; that separate AI request uses your configured online AI service and sends the relevant conversation text. PDF extraction supports selectable text, not scanned-image OCR. Reads are limited to 15 MB, 100 PDF pages, and 40,000 extracted characters; the chat preview is capped at 12,000 characters.
