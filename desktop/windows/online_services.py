@@ -83,8 +83,8 @@ def web_search(query: str, opener=None) -> str:
         return f'Web search mein "{query}" ke liye readable results nahi mile. Browser mein search try karo.'
     lines = [f'Web results for: {query}']
     for index, item in enumerate(results, 1):
-        title = re.sub(r"\\s+", " ", item["title"]).strip()
-        snippet = re.sub(r"\\s+", " ", item["snippet"]).strip()
+        title = re.sub(r"\s+", " ", item["title"]).strip()
+        snippet = re.sub(r"\s+", " ", item["snippet"]).strip()
         lines.append(f"{index}. {title}")
         if snippet:
             lines.append(f"   {snippet[:350]}")
