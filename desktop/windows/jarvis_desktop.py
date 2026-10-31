@@ -740,171 +740,195 @@ class JarvisDesktop:
                            fill="#69dfff", font=("Consolas", max(7, int(9*sx)), "bold"))
 
     def _draw_orb(self):
+        """Draw a responsive JARVIS dashboard with separated panels and readable controls."""
         if not hasattr(self, "hud"):
             return
         import math
         from datetime import datetime
+
         c = self.hud
-        w, h = max(c.winfo_width(), 1100), max(c.winfo_height(), 700)
+        w = max(c.winfo_width(), 1100)
+        h = max(c.winfo_height(), 700)
         c.delete("all")
-        c.configure(bg="#02070d")
-        blue, bright, dim = "#00bfff", "#8af4ff", "#075477"
+        c.configure(bg="#06111b")
+        blue, bright, muted = "#16b9e8", "#d8f7ff", "#6ba8bd"
         phase = math.radians(self.orb_phase)
-        c.create_rectangle(0, 0, w, h, fill="#02070d", outline="")
-        # Fine HUD grid and edge frame
-        for x in range(0, w, 48):
-            c.create_line(x, 0, x, h, fill="#041522")
-        for y in range(0, h, 48):
-            c.create_line(0, y, w, y, fill="#041522")
-        c.create_rectangle(14, 14, w-14, h-14, outline="#075477", width=1)
-        self._draw_iron_man_helmet(c, w, h)
+
+        # Background and frame
+        c.create_rectangle(0, 0, w, h, fill="#06111b", outline="")
+        for x in range(0, w, 64):
+            c.create_line(x, 0, x, h, fill="#0a1d2a")
+        for y in range(0, h, 64):
+            c.create_line(0, y, w, y, fill="#0a1d2a")
+        c.create_rectangle(12, 12, w-12, h-12, outline="#16465d", width=1)
+
+        # Header
+        c.create_text(34, 35, text="◈  J A R V I S", fill=bright, anchor="w",
+                      font=("Segoe UI Semibold", 20))
+        c.create_text(245, 36, text="PERSONAL COMMAND INTERFACE", fill=muted,
+                      anchor="w", font=("Consolas", 9))
+        c.create_oval(w-468, 29, w-456, 41, fill="#00d69a", outline="")
+        c.create_text(w-448, 35, text="SYSTEM ONLINE", fill=bright, anchor="w",
+                      font=("Consolas", 9, "bold"))
+        c.create_window(w-330, 35, window=self.chat_button, width=100, height=30)
+        c.create_window(w-220, 35, window=self.settings_button, width=110, height=30)
+        c.create_window(w-105, 35, window=self.power_button, width=90, height=30)
         c.create_line(24, 62, w-24, 62, fill=blue, width=2)
-        c.create_text(42, 35, text="◈  J A R V I S", fill=bright, anchor="w",
-                      font=("Segoe UI Semibold", 21))
-        c.create_text(250, 36, text="PERSONAL COMMAND INTERFACE  /  V 1.0",
-                      fill="#328aa8", anchor="w", font=("Consolas", 9))
-        c.create_window(w-365, 35, window=self.chat_button, width=105, height=30)
-        c.create_window(w-250, 35, window=self.settings_button, width=115, height=30)
-        c.create_window(w-125, 35, window=self.power_button, width=90, height=30)
-        c.create_oval(w-480, 25, w-468, 37, fill="#00f0a0", outline="")
-        c.create_text(w-455, 31, text="SYSTEM ONLINE", fill=bright, anchor="w",
-                      font=("Consolas", 10, "bold"))
-        # Panel helper
+
         def panel(x1, y1, x2, y2, title):
-            c.create_rectangle(x1, y1, x2, y2, fill="#03101b", outline="#087ca8", width=1)
-            c.create_line(x1+12, y1, x1+145, y1, fill=bright, width=2)
-            c.create_text(x1+14, y1+13, text=title, fill=bright, anchor="w",
-                          font=("Consolas", 10, "bold"))
-        left, right = 28, 290
-        panel(left, 88, 260, 278, "DATE / TIME")
+            c.create_rectangle(x1, y1, x2, y2, fill="#0a1b28", outline="#1b6079", width=1)
+            c.create_text(x1+14, y1+16, text=title, fill=bright, anchor="w",
+                          font=("Consolas", 9, "bold"))
+            c.create_line(x1+12, y1+31, x2-12, y1+31, fill="#12394c")
+
+        # Three-column layout: fixed side rails and a centered reactor.
+        left_x, left_w = 28, 218
+        right_w, right_x = 226, w-254
+        panel(left_x, 82, left_x+left_w, 214, "DATE / TIME")
         now = datetime.now()
-        c.create_text(144, 145, text=now.strftime("%H:%M"), fill=bright, font=("Consolas", 36, "bold"))
-        c.create_text(144, 184, text=now.strftime("%A  •  %d %B %Y").upper(),
-                      fill="#56cce9", font=("Consolas", 10))
-        panel(left, 294, 260, 488, "SYSTEM RESOURCES")
+        c.create_text(left_x+left_w/2, 139, text=now.strftime("%H:%M"),
+                      fill=bright, font=("Consolas", 32, "bold"))
+        c.create_text(left_x+left_w/2, 177,
+                      text=now.strftime("%a  •  %d %b %Y").upper(),
+                      fill=muted, font=("Consolas", 9))
+
         stats = self._get_system_metrics()
+        panel(left_x, 228, left_x+left_w, 414, "SYSTEM RESOURCES")
         for i, (label, value) in enumerate(stats[:4]):
-            yy = 338 + i*35
-            c.create_text(48, yy, text=label, fill="#55aeca", anchor="w", font=("Consolas", 9))
-            c.create_text(238, yy, text=value, fill=bright, anchor="e", font=("Consolas", 12, "bold"))
-            c.create_rectangle(48, yy+12, 238, yy+18, outline="#075477")
+            yy = 276 + i*32
+            c.create_text(left_x+16, yy, text=label, fill=muted, anchor="w",
+                          font=("Consolas", 8))
+            c.create_text(left_x+left_w-16, yy, text=value, fill=bright, anchor="e",
+                          font=("Consolas", 10, "bold"))
+            c.create_rectangle(left_x+16, yy+9, left_x+left_w-16, yy+14,
+                               outline="#16465d")
             try:
-                pct = float(value.rstrip("%"))
-                c.create_rectangle(48, yy+12, 48+190*pct/100, yy+18, fill=blue, outline="")
-            except Exception:
+                pct = max(0, min(100, float(value.rstrip("%"))))
+                c.create_rectangle(left_x+16, yy+9,
+                                   left_x+16+(left_w-32)*pct/100, yy+14,
+                                   fill=blue, outline="")
+            except (TypeError, ValueError):
                 pass
-        panel(left, 504, 260, h-110, "QUICK ACCESS")
-        quick = [("▣", "Documents"), ("▧", "Pictures"), ("♫", "Music"), ("⌁", "Downloads"), ("◉", "This PC")]
+
+        panel(left_x, 428, left_x+left_w, h-126, "QUICK ACCESS")
+        quick = [("▣", "Documents"), ("▧", "Pictures"), ("♫", "Music"), ("↓", "Downloads")]
         for i, (symbol, label) in enumerate(quick):
-            yy = 550 + i*42
-            tag = "quick_" + label.lower().replace(" ", "_")
-            c.create_text(52, yy, text=symbol, fill=blue, font=("Segoe UI", 15), tags=(tag,))
-            c.create_text(78, yy, text=label, fill="#a8eaff", anchor="w", font=("Segoe UI", 10), tags=(tag,))
-            c.tag_bind(tag, "<Button-1>", lambda _event, name=label: self.open_quick_access(name))
+            yy = 474 + i*27
+            tag = "quick_" + label.lower()
+            c.create_text(left_x+22, yy, text=symbol, fill=blue,
+                          font=("Segoe UI", 12), tags=(tag,))
+            c.create_text(left_x+44, yy, text=label, fill="#c4eaf5",
+                          anchor="w", font=("Segoe UI", 9), tags=(tag,))
+            c.tag_bind(tag, "<Button-1>",
+                       lambda _event, name=label: self.open_quick_access(name))
             c.tag_bind(tag, "<Enter>", lambda _event: c.configure(cursor="hand2"))
             c.tag_bind(tag, "<Leave>", lambda _event: c.configure(cursor=""))
-            c.create_line(46, yy+18, 240, yy+18, fill="#092b3b")
-        # Right-side system status and JARVIS info
-        rx = w-270
-        panel(rx, 88, w-28, 278, "ENVIRONMENT")
+
+        panel(right_x, 82, right_x+right_w, 244, "ENVIRONMENT")
         metrics = dict(stats)
-        c.create_text(rx+24, 145, text="CPU TEMPERATURE (IF AVAILABLE)", fill="#55aeca", anchor="w", font=("Consolas", 9))
-        c.create_text(w-92, 180, text=metrics.get("CPU TEMP", "N/A"), fill=bright, font=("Consolas", 27, "bold"))
-        network_label = "NETWORK LINK  •  UP" if metrics.get("NETWORK") == "ONLINE" else "NETWORK LINK  •  DOWN / N/A"
-        c.create_text(rx+24, 220, text=network_label, fill="#62e8ff" if metrics.get("NETWORK") == "ONLINE" else "#ff8877", anchor="w", font=("Consolas", 9))
-        c.create_text(rx+24, 246, text=f"BATTERY TIME  •  {metrics.get('BATTERY TIME', 'N/A')}", fill="#8af4ff", anchor="w", font=("Consolas", 9))
-        c.create_text(rx+24, 266, text=f"STORAGE FREE  •  {metrics.get('STORAGE FREE', 'N/A')}", fill="#8af4ff", anchor="w", font=("Consolas", 9))
-        panel(rx, 294, w-28, h-110, "J.A.R.V.I.S.  /  ASSISTANT")
-        c.create_text(rx+24, 348, text="Always here for you.", fill=bright, anchor="w",
-                      font=("Segoe UI", 14, "bold"))
-        c.create_text(rx+24, 386, text="VOICE INTERFACE", fill="#55aeca", anchor="w", font=("Consolas", 9))
-        c.create_text(rx+24, 422, text="Say  “Hey JARVIS”  to begin", fill="#b7eaff", anchor="w",
-                      font=("Segoe UI", 10))
-        c.create_text(rx+24, 478, text="CORE SERVICES", fill="#55aeca", anchor="w", font=("Consolas", 9))
+        c.create_text(right_x+16, 132, text="CPU TEMPERATURE", fill=muted,
+                      anchor="w", font=("Consolas", 8))
+        c.create_text(right_x+right_w-16, 160, text=metrics.get("CPU TEMP", "N/A"),
+                      fill=bright, anchor="e", font=("Consolas", 22, "bold"))
+        network = "CONNECTED" if metrics.get("NETWORK") == "ONLINE" else "NOT AVAILABLE"
+        c.create_text(right_x+16, 194, text="NETWORK", fill=muted, anchor="w",
+                      font=("Consolas", 8))
+        c.create_text(right_x+right_w-16, 194, text=network,
+                      fill="#00d69a" if network == "CONNECTED" else "#ffb454",
+                      anchor="e", font=("Consolas", 8, "bold"))
+        c.create_text(right_x+16, 220,
+                      text=f"BATTERY  {metrics.get('BATTERY TIME', 'N/A')}",
+                      fill="#a9dce9", anchor="w", font=("Consolas", 8))
+
+        panel(right_x, 258, right_x+right_w, h-126, "J.A.R.V.I.S.  /  ASSISTANT")
+        c.create_text(right_x+16, 306, text="At your service.", fill=bright,
+                      anchor="w", font=("Segoe UI", 13, "bold"))
+        c.create_text(right_x+16, 342, text="VOICE INTERFACE", fill=muted,
+                      anchor="w", font=("Consolas", 8, "bold"))
+        c.create_text(right_x+16, 368, text="Use Activate Voice below",
+                      fill="#c4eaf5", anchor="w", font=("Segoe UI", 9))
+        c.create_text(right_x+16, 414, text="CORE SERVICES", fill=muted,
+                      anchor="w", font=("Consolas", 8, "bold"))
         for i, (label, ready, detail) in enumerate(self._get_service_statuses()):
-            yy = 512+i*35
-            c.create_oval(rx+25, yy-5, rx+35, yy+5,
-                          fill="#00e5a0" if ready else "#ffb454", outline="")
-            c.create_text(rx+48, yy, text=label, fill="#a8eaff", anchor="w",
-                          font=("Consolas", 9))
-            c.create_text(w-45, yy, text=detail, fill="#65d9ef" if ready else "#ffb454",
+            yy = 444 + i*27
+            c.create_oval(right_x+16, yy-4, right_x+24, yy+4,
+                          fill="#00d69a" if ready else "#ffb454", outline="")
+            c.create_text(right_x+32, yy, text=label, fill="#c4eaf5",
+                          anchor="w", font=("Consolas", 8))
+            c.create_text(right_x+right_w-12, yy, text=detail, fill=bright if ready else "#ffb454",
                           anchor="e", font=("Consolas", 7))
-        # Central reactor: concentric animated rings and radial energy arcs
-        cx, cy = w/2, h*0.43
-        radius = min(w*0.19, h*0.29, 245)
-        for i in range(9, 0, -1):
-            r = radius*(1+i*0.095)
-            c.create_oval(cx-r, cy-r, cx+r, cy+r, outline="#06334b", width=1)
+
+        # Compact reactor stays entirely inside the center column.
+        center_left, center_right = left_x+left_w+18, right_x-18
+        cx = (center_left+center_right)/2
+        top, bottom = 92, h-174
+        cy = (top+bottom)/2
+        available_r = min((center_right-center_left)/2.0, (bottom-top)/2.0)
+        radius = max(76, min(126, available_r/1.9))
+        for i in range(8, 0, -1):
+            r = radius*(1+i*.095)
+            c.create_oval(cx-r, cy-r, cx+r, cy+r, outline="#10394c", width=1)
         for i in range(4):
-            r = radius*(1.0+i*0.18)
-            c.create_arc(cx-r, cy-r, cx+r, cy+r, start=self.orb_phase*(1 if i%2==0 else -1)+i*35,
-                         extent=235, style="arc", outline=blue if i%2==0 else "#087ca8", width=3)
+            r = radius*(1.0+i*.15)
+            c.create_arc(cx-r, cy-r, cx+r, cy+r,
+                         start=self.orb_phase*(1 if i%2 == 0 else -1)+i*35,
+                         extent=220, style="arc",
+                         outline=blue if i%2 == 0 else "#24718b", width=3)
         for i in range(3):
-            r = radius*(0.78-i*0.17)
-            c.create_oval(cx-r, cy-r, cx+r, cy+r, outline="#087ca8", width=2)
-        c.create_oval(cx-radius*.62, cy-radius*.62, cx+radius*.62, cy+radius*.62,
-                      fill="#031b2c", outline=bright, width=3)
-        c.create_oval(cx-radius*.48, cy-radius*.48, cx+radius*.48, cy+radius*.48,
-                      outline=blue, width=2)
-        for i in range(48):
-            a = math.tau*i/48 + phase*.25
-            r1, r2 = radius*.68, radius*.79
+            r = radius*(.78-i*.17)
+            c.create_oval(cx-r, cy-r, cx+r, cy+r, outline="#24718b", width=2)
+        c.create_oval(cx-radius*.55, cy-radius*.55, cx+radius*.55, cy+radius*.55,
+                      fill="#0b2637", outline=bright, width=2)
+        for i in range(36):
+            a = math.tau*i/36 + phase*.25
+            r1, r2 = radius*.63, radius*.75
             c.create_line(cx+math.cos(a)*r1, cy+math.sin(a)*r1,
                           cx+math.cos(a)*r2, cy+math.sin(a)*r2,
-                          fill=bright if i%4==0 else "#087ca8", width=2 if i%4==0 else 1)
-        for i in range(80):
-            a = i*2.399 + phase*(.2+(i%4)*.02)
-            r = radius*(.18+((i*37)%100)/100*.76)
-            x, y = cx+math.cos(a)*r, cy+math.sin(a)*r
-            c.create_oval(x-1.5, y-1.5, x+1.5, y+1.5, fill=bright if i%5==0 else blue, outline="")
-        c.create_oval(cx-radius*.18, cy-radius*.18, cx+radius*.18, cy+radius*.18,
-                      fill="#06466a", outline=bright, width=2)
-        c.create_oval(cx-radius*.09, cy-radius*.09, cx+radius*.09, cy+radius*.09,
-                      fill="#9afaff", outline="#ffffff", width=2)
-        c.create_text(cx, cy+radius+36, text="J A R V I S   /   REACTOR CORE",
-                      fill=bright, font=("Consolas", 12, "bold"))
-        # Labels and connector traces around reactor
-        shortcut_urls = {
-            "GMAIL": "https://mail.google.com/",
-            "WHATSAPP": "https://web.whatsapp.com/",
-            "DISCORD": "https://discord.com/app",
-            "CHATGPT": "https://chatgpt.com/",
-        }
-        for label, x, y, side in [("IMAGES",cx-radius-165,cy-radius*.72,"left"),
-                                  ("DOCUMENTS",cx-radius-165,cy-radius*.35,"left"),
-                                  ("DOWNLOADS",cx-radius-165,cy+radius*.05,"left"),
-                                  ("MUSIC",cx-radius-165,cy+radius*.45,"left"),
-                                  ("GMAIL",cx+radius+65,cy-radius*.55,"right"),
-                                  ("WHATSAPP",cx+radius+65,cy-radius*.18,"right"),
-                                  ("DISCORD",cx+radius+65,cy+radius*.18,"right"),
-                                  ("CHATGPT",cx+radius+65,cy+radius*.55,"right")]:
-            tag = "app_" + label.lower()
-            c.create_oval(x-9, y-9, x+9, y+9, outline=blue, width=2, tags=(tag,))
-            c.create_text(x+18, y, text=label, fill="#8deeff", anchor="w", font=("Consolas", 9), tags=(tag,))
-            c.create_line(x+8, y+13, x+45, y+13, fill="#075477", tags=(tag,))
-            if label in shortcut_urls:
-                c.tag_bind(tag, "<Button-1>", lambda _event, url=shortcut_urls[label]: self._open_hud_url(url))
-                c.tag_bind(tag, "<Enter>", lambda _event: c.configure(cursor="hand2"))
-                c.tag_bind(tag, "<Leave>", lambda _event: c.configure(cursor=""))
-            elif label in {"IMAGES", "DOCUMENTS", "DOWNLOADS", "MUSIC"}:
-                folder_name = {"IMAGES": "Pictures", "DOCUMENTS": "Documents", "DOWNLOADS": "Downloads", "MUSIC": "Music"}[label]
-                c.tag_bind(tag, "<Button-1>", lambda _event, name=folder_name: self.open_quick_access(name))
-                c.tag_bind(tag, "<Enter>", lambda _event: c.configure(cursor="hand2"))
-                c.tag_bind(tag, "<Leave>", lambda _event: c.configure(cursor=""))
-        # Bottom telemetry strip and live command bar
-        by = h-84
-        c.create_line(280, by-28, w-280, by-28, fill="#087ca8")
-        c.create_text(300, by-10, text="SYSTEM STATUS  •  SECURE CONNECTION  •  ALL SYSTEMS NOMINAL",
-                      fill="#58cbe8", anchor="w", font=("Consolas", 9))
-        c.create_window(360, h-35, window=self.prompt_entry, width=max(350, w-780), height=34)
-        c.create_window(w-190, h-35, window=self.send_button, width=120, height=34)
-        c.create_window(w-330, h-35, window=self.stop_speaking_button, width=110, height=34)
-        c.create_window(130, h-35, window=self.listen_button, width=190, height=34)
-        c.create_text(w/2, h-91, text=self.status_var.get().upper(), fill=bright,
-                      font=("Consolas", 9, "bold"))
-        c.create_text(w-35, h-35, text="ESC  /  EXIT", fill="#328aa8", anchor="e",
-                      font=("Consolas", 8))
+                          fill=bright if i%3 == 0 else "#24718b",
+                          width=2 if i%3 == 0 else 1)
+        for i in range(42):
+            a = i*2.399 + phase*.2
+            r = radius*(.18+((i*37)%100)/100*.68)
+            px, py = cx+math.cos(a)*r, cy+math.sin(a)*r
+            c.create_oval(px-1.3, py-1.3, px+1.3, py+1.3,
+                          fill=bright if i%5 == 0 else blue, outline="")
+        c.create_oval(cx-radius*.16, cy-radius*.16, cx+radius*.16, cy+radius*.16,
+                      fill="#075477", outline=bright, width=2)
+        c.create_oval(cx-radius*.07, cy-radius*.07, cx+radius*.07, cy+radius*.07,
+                      fill="#e8ffff", outline="#ffffff", width=1)
+        c.create_text(cx, cy+radius+25, text="JARVIS  /  REACTOR CORE",
+                      fill=bright, font=("Consolas", 10, "bold"))
 
+        # Shortcuts sit in a dedicated row instead of colliding with the reactor.
+        shortcuts = [
+            ("GMAIL", "https://mail.google.com/"),
+            ("WHATSAPP", "https://web.whatsapp.com/"),
+            ("DISCORD", "https://discord.com/app"),
+            ("CHATGPT", "https://chatgpt.com/"),
+        ]
+        row_y = h-158
+        slot = (center_right-center_left)/len(shortcuts)
+        for i, (label, url) in enumerate(shortcuts):
+            x = center_left+slot*(i+.5)
+            tag = "app_" + label.lower()
+            c.create_oval(x-5, row_y-5, x+5, row_y+5,
+                          outline=blue, width=2, tags=(tag,))
+            c.create_text(x+12, row_y, text=label, fill="#bdeeff",
+                          anchor="w", font=("Consolas", 8), tags=(tag,))
+            c.tag_bind(tag, "<Button-1>", lambda _event, target=url: self._open_hud_url(target))
+            c.tag_bind(tag, "<Enter>", lambda _event: c.configure(cursor="hand2"))
+            c.tag_bind(tag, "<Leave>", lambda _event: c.configure(cursor=""))
+
+        # Dedicated status and command rows; no overlap with the content panels.
+        status_y = h-104
+        c.create_line(28, status_y-16, w-28, status_y-16, fill="#16465d")
+        c.create_text(w/2, status_y, text=self.status_var.get().upper(),
+                      fill=bright, font=("Consolas", 8, "bold"))
+        c.create_window(125, h-43, window=self.listen_button, width=174, height=34)
+        c.create_window(315, h-43, window=self.stop_speaking_button, width=112, height=34)
+        entry_width = max(280, w-850)
+        c.create_window(w/2, h-43, window=self.prompt_entry, width=entry_width, height=34)
+        c.create_window(w-145, h-43, window=self.send_button, width=112, height=34)
     @staticmethod
     def _format_battery_status(battery) -> str:
         """Delegate battery presentation to the shared system-monitor module."""
