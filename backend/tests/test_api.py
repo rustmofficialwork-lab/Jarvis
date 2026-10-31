@@ -16,8 +16,7 @@ from app.main import app  # noqa: E402
 
 class BackendApiTests(unittest.TestCase):
     def setUp(self) -> None:
-        # Entering TestClient as a context manager runs FastAPI's lifespan,
-        # which initializes the SQLite schema before each test.
+        # Entering TestClient as a context manager runs FastAPI lifespan hooks.
         self.client = TestClient(app)
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
@@ -28,6 +27,13 @@ class BackendApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
         self.assertNotIn("OPENROUTER_API_KEY", response.text)
+
+    def test_chat_requires_a_valid_bearer_token(self) -> None:
+        payload = {"model": "openrouter/free", "messages": [{"role": "user", "content": "hi"}]}
+        for headers in ({}, {"Authorization": "Bearer wrong-token"}):
+            with self.subTest(headers=headers):
+                response = self.client.post("/v1/chat/completions", headers=headers, json=payload)
+                self.assertEqual(response.status_code, 401)
 
     def test_shared_memory_api_is_not_exposed(self) -> None:
         response = self.client.get("/v1/memory", headers=self.headers)
