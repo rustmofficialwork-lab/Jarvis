@@ -438,40 +438,37 @@ def validate_chat_configuration(endpoint: str, model: str) -> tuple[str, str]:
     return endpoint, model
 
 
-def filter_memory_history(history: list[dict]) -> list[dict]:
-    """Keep explicit memory-management exchanges out of online chat history."""
+MEMORY_RECALL_COMMANDS = frozenset({
+    "what do you remember", "what do you remember about me",
+    "tumhe kya yaad hai", "mujhe kya yaad hai", "meri memories dikhao",
+    "show my memories", "show memories",
+})
+MEMORY_CLEAR_COMMANDS = frozenset({
+    "forget all memories", "sab memories bhool jao", "saari yaadein delete karo",
+})
+
+
+def parse_memory_command(prompt: str) -> tuple[str, str | None] | None:
+    """Parse explicit local memory commands once for both typed and spoken input."""
     import re
-    filtered = []
-    skip_reply = False
-    recall = {
-        "what do you remember", "what do you remember about me",
-        "tumhe kya yaad hai", "mujhe kya yaad hai", "meri memories dikhao",
-        "show my memories", "show memories", "forget all memories",
-        "sab memories bhool jao", "saari yaadein delete karo",
-    }
-    for item in history[-16:]:
-        if not isinstance(item, dict):
-            continue
-        role = item.get("role")
-        content = str(item.get("content", ""))
-        if role == "user":
-            normalized = " ".join(content.casefold().split())
-            is_memory = bool(re.match(
-                r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\b",
-                normalized,
-            )) or normalized in recall
-            skip_reply = is_memory
-            if is_memory:
-                continue
-        elif role == "assistant" and skip_reply:
-            skip_reply = False
-            continue
-        else:
-            skip_reply = False
-        filtered.append(item)
-    return filtered
+
+    text = str(prompt).strip()
+    match = re.match(
+        r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\s*[:,-]?\s*(.+)$",
+        text,
+        re.IGNORECASE,
+    )
+    if match:
+        return ("remember", match.group(1).strip().rstrip(".!?।"))
+    normalized = " ".join(text.casefold().split()).rstrip(".!?।")
+    if normalized in MEMORY_RECALL_COMMANDS:
+        return ("recall", None)
+    if normalized in MEMORY_CLEAR_COMMANDS:
+        return ("clear", None)
+    return None
 
 
+def filter_memory_history(history: list[dict]) -> list[dict]:
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     history: list[dict], memories: list[str] | None = None) -> str:
     endpoint, model = validate_chat_configuration(endpoint, model)
@@ -909,42 +906,57 @@ class JarvisDesktop:
                    command=win.withdraw).pack(side="right")
 
 
-    def _handle_memory_command(self, prompt: str) -> bool:
-        """Handle explicit remember/recall/forget requests without sending them online."""
-        import re
-        text = prompt.strip()
-        match = re.match(r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\s*[:,-]?\s*(.+)$", text, re.IGNORECASE)
-        if match:
-            content = match.group(1).strip().rstrip(".!?।")
+    def _handle_memory_command(
+        self, prompt: str, *, from_voice: bool = False, display_user: bool = True,
+    ) -> bool:
+        """Run the shared local-memory command path for typed and spoken requests."""
+        parsed = parse_memory_command(prompt)
+        if parsed is None:
+            return False
+        action, content = parsed
+
+        if action == "clear":
+            # Voice requests are confirmed on the Tk/UI thread, never from the audio worker.
+            if from_voice:
+                self.events.put(("memory_clear_confirmation", prompt))
+                return True
+            if messagebox.askyesno(
+                "Delete all memories",
+                "Permanently delete every locally saved JARVIS memory?",
+                parent=self.root,
+            ):
+                removed = self.memory_store.clear()
+                reply = f"{removed} memories deleted from this PC."
+            else:
+                reply = "The saved memories were kept."
+        elif action == "remember":
             try:
-                self.memory_store.add(content, "general")
+                self.memory_store.add(content or "", "general")
                 reply = "Yaad rakh liya. Ye memory sirf is PC par save hui hai."
             except ValueError as exc:
                 reply = str(exc)
-            self._append("YOU", prompt)
-            self._append("JARVIS", reply)
-            self.history.extend([{"role": "user", "content": prompt},
-                                 {"role": "assistant", "content": reply}])
-            try:
-                save_chat_history(self.history)
-            except OSError:
-                pass
-            self._set_status("Local memory updated.")
-            return True
-
-        normalized = " ".join(text.casefold().split())
-        recall_phrases = {
-            "what do you remember", "what do you remember about me",
-            "tumhe kya yaad hai", "mujhe kya yaad hai", "meri memories dikhao",
-            "show my memories", "show memories",
-        }
-        if normalized in recall_phrases:
+        else:
             items = self.memory_store.list()
             reply = ("Abhi koi saved memory nahi hai." if not items else
                      "Mujhe ye baatein yaad hain:\n" + "\n".join(
                          f"• {item['content']}" for item in items[:20]
                      ))
+
+        if not from_voice and display_user:
             self._append("YOU", prompt)
+        if from_voice:
+            self.history.extend([{"role": "user", "content": prompt},
+                                 {"role": "assistant", "content": reply}])
+            try:
+                save_chat_history(self.history)
+            except OSError as exc:
+                self.events.put(("status", f"Memory action completed; history could not be saved: {exc}"))
+            self.events.put(("answer", reply))
+            try:
+                speak_text_interruptibly(reply, self.speech_stop_event)
+            except Exception as exc:
+                self.events.put(("status", f"Memory action completed; speech output unavailable: {exc}"))
+        else:
             self._append("JARVIS", reply)
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": reply}])
@@ -952,19 +964,8 @@ class JarvisDesktop:
                 save_chat_history(self.history)
             except OSError:
                 pass
-            self._set_status(f"{len(items)} local memories.")
-            return True
-
-        if normalized in {"forget all memories", "sab memories bhool jao", "saari yaadein delete karo"}:
-            if messagebox.askyesno("Delete all memories", "Permanently delete every locally saved JARVIS memory?", parent=self.root):
-                removed = self.memory_store.clear()
-                reply = f"{removed} memories deleted from this PC."
-            else:
-                reply = "The saved memories were kept."
-            self._append("JARVIS", reply)
             self._set_status("Local memory updated.")
-            return True
-        return False
+        return True
 
     def open_memory_manager(self):
         """Show, add, edit, and delete memories stored only on this PC."""
@@ -1388,18 +1389,28 @@ class JarvisDesktop:
             self.request_lock.release()
             raise
 
+    def _get_online_reply(self, prompt: str) -> str:
+        """Resolve online service commands first, then use the configured AI endpoint."""
+        answer = handle_online_command(prompt)
+        if answer is not None:
+            return answer
+        memories = (
+            self.memory_store.context()
+            if self.settings.get("share_memory_with_ai", False)
+            else []
+        )
+        return chat_completion(
+            self.settings.get("endpoint", DEFAULT_ENDPOINT),
+            self.settings.get("model", DEFAULT_MODEL),
+            self.ai_api_key,
+            prompt,
+            self.history,
+            memories,
+        )
+
     def _answer_worker(self, prompt: str):
         try:
-            answer = handle_online_command(prompt)
-            if answer is None:
-                answer = chat_completion(
-                    self.settings.get("endpoint", DEFAULT_ENDPOINT),
-                    self.settings.get("model", DEFAULT_MODEL),
-                    self.ai_api_key,
-                    prompt,
-                    self.history,
-                    self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
-                )
+            answer = self._get_online_reply(prompt)
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
             try:
@@ -1522,46 +1533,6 @@ class JarvisDesktop:
                     pass
             self.events.put(("listener_stopped", None))
 
-    def _handle_voice_memory_command(self, prompt: str) -> bool:
-        """Handle spoken remember/recall requests without touching Tk from a worker."""
-        import re
-        match = re.match(
-            r"^(?:remember that|remember|yaad rakhna|yaad rakh lo)\s*[:,-]?\s*(.+)$",
-            prompt.strip(),
-            re.IGNORECASE,
-        )
-        if match:
-            try:
-                self.memory_store.add(match.group(1).strip().rstrip(".!?।"), "general")
-                reply = "Yaad rakh liya. Ye memory sirf is PC par save hui hai."
-            except ValueError as exc:
-                reply = str(exc)
-        elif " ".join(prompt.casefold().split()) in {
-            "what do you remember", "what do you remember about me",
-            "tumhe kya yaad hai", "mujhe kya yaad hai",
-            "meri memories dikhao", "show my memories", "show memories",
-        }:
-            items = self.memory_store.list()
-            reply = ("Abhi koi saved memory nahi hai." if not items else
-                     "Mujhe ye baatein yaad hain: " + "; ".join(
-                         item["content"] for item in items[:12]
-                     ))
-        else:
-            return False
-
-        self.history.extend([{"role": "user", "content": prompt},
-                             {"role": "assistant", "content": reply}])
-        try:
-            save_chat_history(self.history)
-        except OSError as exc:
-            self.events.put(("status", f"Memory action completed; history could not be saved: {exc}"))
-        self.events.put(("answer", reply))
-        try:
-            speak_text_interruptibly(reply, self.speech_stop_event)
-        except Exception as exc:
-            self.events.put(("status", f"Memory action completed; speech output unavailable: {exc}"))
-        return True
-
     def _answer_voice(self, prompt: str):
         self.events.put(("voice_command", prompt))
         if not self.request_lock.acquire(blocking=False):
@@ -1572,7 +1543,7 @@ class JarvisDesktop:
         try:
             if self._handle_voice_reminder_command(prompt):
                 return
-            if self._handle_voice_memory_command(prompt):
+            if self._handle_memory_command(prompt, from_voice=True):
                 return
             from file_search import parse_file_search_query, parse_open_result_index
             if parse_open_result_index(prompt) is not None:
@@ -1601,16 +1572,7 @@ class JarvisDesktop:
                     self.events.put(("status", f"Action completed; speech output unavailable: {exc}"))
                 return
 
-            answer = handle_online_command(prompt)
-            if answer is None:
-                answer = chat_completion(
-                    self.settings.get("endpoint", DEFAULT_ENDPOINT),
-                    self.settings.get("model", DEFAULT_MODEL),
-                    self.ai_api_key,
-                    prompt,
-                    self.history,
-                    self.memory_store.context() if self.settings.get("share_memory_with_ai", False) else [],
-                )
+            answer = self._get_online_reply(prompt)
             self.history.extend([{"role": "user", "content": prompt},
                                  {"role": "assistant", "content": answer}])
             try:
@@ -1970,6 +1932,8 @@ class JarvisDesktop:
                     else:
                         messagebox.showerror("JARVIS update", value, parent=self.root)
                         self._set_status("Update download failed.")
+                elif kind == "memory_clear_confirmation":
+                    self._handle_memory_command(value, display_user=False)
                 elif kind == "status":
                     self._set_status(value)
                 elif kind == "voice_command":
