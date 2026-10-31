@@ -193,6 +193,40 @@ class ChatCompletionValidationTests(unittest.TestCase):
                 [],
             )
 
+    def test_rejects_oversized_ai_response(self):
+        class FakeResponse:
+            def __enter__(self): return self
+            def __exit__(self, *_args): return False
+            def read(self, size=-1): return b"x" * size
+
+        class FakeOpener:
+            def open(self, _request, timeout):
+                self.timeout = timeout
+                return FakeResponse()
+
+        fake = FakeOpener()
+        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=fake):
+            with self.assertRaisesRegex(RuntimeError, "too large"):
+                jarvis_desktop.chat_completion(
+                    "https://example.com/chat", "model", "test-key", "hello", []
+                )
+        self.assertEqual(fake.timeout, 45)
+
+    def test_rejects_invalid_json_from_ai_endpoint(self):
+        class FakeResponse:
+            def __enter__(self): return self
+            def __exit__(self, *_args): return False
+            def read(self, _size=-1): return b"not-json"
+
+        class FakeOpener:
+            def open(self, _request, timeout): return FakeResponse()
+
+        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=FakeOpener()):
+            with self.assertRaisesRegex(RuntimeError, "invalid JSON"):
+                jarvis_desktop.chat_completion(
+                    "https://example.com/chat", "model", "test-key", "hello", []
+                )
+
     def test_requires_model_name(self):
         with self.assertRaisesRegex(ValueError, "model name"):
             jarvis_desktop.chat_completion(
