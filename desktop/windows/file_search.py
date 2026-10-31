@@ -6,6 +6,8 @@ from pathlib import Path
 
 MAX_RESULTS = 50
 MAX_DIRECTORIES = 5000
+# Windows junctions and other reparse points are not always reported as symlinks.
+FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 SAFE_OPEN_EXTENSIONS = {
     ".pdf", ".docx", ".txt", ".md", ".csv", ".json", ".log", ".ini",
     ".yaml", ".yml", ".xml", ".png", ".jpg", ".jpeg", ".gif", ".bmp",
@@ -43,10 +45,20 @@ def parse_open_result_index(prompt: str) -> int | None:
     return None
 
 
+def _is_reparse_point(path: Path) -> bool:
+    """Detect Windows junctions and other reparse points as well as POSIX symlinks."""
+    try:
+        info = path.stat(follow_symlinks=False)
+    except OSError:
+        return True
+    attributes = getattr(info, "st_file_attributes", 0)
+    return path.is_symlink() or bool(attributes & FILE_ATTRIBUTE_REPARSE_POINT)
+
+
 def validate_search_result_for_open(path: str | os.PathLike) -> Path:
     """Validate a selected search result as a regular, non-link, passive file."""
     candidate = Path(path).expanduser()
-    if candidate.is_symlink() or candidate.suffix.casefold() not in SAFE_OPEN_EXTENSIONS:
+    if _is_reparse_point(candidate) or candidate.suffix.casefold() not in SAFE_OPEN_EXTENSIONS:
         raise ValueError("For safety, JARVIS opens only supported document and media file types.")
     resolved = candidate.resolve(strict=True)
     if not resolved.is_file():
@@ -97,7 +109,7 @@ def search_files(root: str | os.PathLike, query: str, *,
         for name in dirs:
             candidate = current_path / name
             try:
-                if name.startswith(".") or candidate.is_symlink():
+                if name.startswith(".") or _is_reparse_point(candidate):
                     continue
                 attrs = getattr(candidate.stat(follow_symlinks=False), "st_file_attributes", 0)
                 if attrs & 0x2:  # Windows FILE_ATTRIBUTE_HIDDEN
@@ -111,7 +123,7 @@ def search_files(root: str | os.PathLike, query: str, *,
                 continue
             candidate = current_path / name
             try:
-                if candidate.is_symlink() or not candidate.is_file():
+                if _is_reparse_point(candidate) or not candidate.is_file():
                     continue
                 attrs = getattr(candidate.stat(follow_symlinks=False), "st_file_attributes", 0)
                 if attrs & 0x2:
