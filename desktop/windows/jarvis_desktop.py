@@ -515,6 +515,7 @@ class JarvisDesktop:
         self.settings = load_settings()
         self.events: queue.Queue = queue.Queue()
         self.history: list[dict] = load_chat_history()
+        self.last_file_search_results: list[str] = []
         self.memory_store = MemoryStore()
         self.reminder_store = ReminderStore()
         self.stop_event = threading.Event()
@@ -1239,6 +1240,43 @@ class JarvisDesktop:
         except Exception as exc:
             self.events.put(("file_search_error", str(exc)))
 
+    def _try_open_file_result_command(self, prompt: str) -> bool:
+        """Open only a numbered item from the latest search, after explicit confirmation."""
+        from file_search import parse_open_result_index, validate_search_result_for_open
+
+        index = parse_open_result_index(prompt)
+        if index is None:
+            return False
+        if not self.last_file_search_results or index > len(self.last_file_search_results):
+            self._append("JARVIS", "Pehle file search karo, ya latest search mein valid result number choose karo.")
+            self._set_status("No matching recent search result.")
+            return True
+        selected = self.last_file_search_results[index - 1]
+        try:
+            safe_path = validate_search_result_for_open(selected)
+        except (OSError, ValueError) as exc:
+            self._append("JARVIS", f"File open nahi kar sakta: {exc}")
+            self._set_status("Selected result is unavailable or not a supported safe file type.")
+            return True
+        if not messagebox.askyesno(
+            "Open selected file?",
+            f"Open this file with its Windows default application?\n\n{safe_path}",
+            parent=self.root,
+        ):
+            self._set_status("File opening cancelled.")
+            return True
+        if os.name != "nt":
+            self._set_status("Opening search results is supported only on Windows.")
+            return True
+        try:
+            os.startfile(str(safe_path))
+            self._append("JARVIS", f"Opening result {index}: {safe_path.name}")
+            self._set_status("Selected file opened with its default Windows application.")
+        except OSError as exc:
+            self._append("JARVIS ERROR", f"Could not open selected file: {exc}", "error")
+            self._set_status("Windows could not open the selected file.")
+        return True
+
     def _try_document_command(self, prompt: str) -> bool:
         """Open a user-selected local document and extract it on a worker thread."""
         normalized = " ".join(prompt.casefold().strip().rstrip(" .!?।॥").split())
@@ -1290,6 +1328,8 @@ class JarvisDesktop:
         if not prompt or self.busy:
             return
         self.prompt_var.set("")
+        if self._try_open_file_result_command(prompt):
+            return
         if self._try_file_search_command(prompt):
             return
         if self._try_document_command(prompt):
@@ -1497,7 +1537,10 @@ class JarvisDesktop:
                 return
             if self._handle_voice_memory_command(prompt):
                 return
-            from file_search import parse_file_search_query
+            from file_search import parse_file_search_query, parse_open_result_index
+            if parse_open_result_index(prompt) is not None:
+                self.events.put(("open_file_request", prompt))
+                return
             if parse_file_search_query(prompt) is not None:
                 self.events.put(("file_search_request", prompt))
                 return
@@ -1782,9 +1825,12 @@ class JarvisDesktop:
                     self._set_status("Something needs attention.")
                 elif kind == "file_search_request":
                     self._try_file_search_command(value)
+                elif kind == "open_file_request":
+                    self._try_open_file_result_command(value)
                 elif kind == "file_search_result":
                     prompt = value["prompt"]
                     paths = value["results"]
+                    self.last_file_search_results = list(paths)
                     if paths:
                         listing = "\n".join(f"{index}. {path}" for index, path in enumerate(paths, 1))
                         suffix = "\n\nShowing first 50 matches." if len(paths) >= 50 else ""
