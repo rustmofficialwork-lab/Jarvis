@@ -91,12 +91,12 @@ def get_system_status(psutil_module=None, now=None) -> str:
     )
     drive_usage = percent(metrics["disk_percent"])
     return (
-        "PC status (live snapshot)\\n"
-        f"CPU usage: {percent(metrics['cpu_percent'])}\\n"
-        f"Memory usage: {percent(metrics['memory_percent'])}\\n"
-        f"System drive usage: {drive_usage}\\n"
-        f"Battery: {battery_text}\\n"
-        f"Network: {network_text}\\n"
+        "PC status (live snapshot)\n"
+        f"CPU usage: {percent(metrics['cpu_percent'])}\n"
+        f"Memory usage: {percent(metrics['memory_percent'])}\n"
+        f"System drive usage: {drive_usage}\n"
+        f"Battery: {battery_text}\n"
+        f"Network: {network_text}\n"
         f"Uptime: {uptime}"
     )
 
