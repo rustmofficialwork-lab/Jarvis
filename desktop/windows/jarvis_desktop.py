@@ -135,6 +135,22 @@ def adjust_windows_brightness(direction: str, brightness_module=None, platform_n
     return target
 
 
+def normalize_local_command(command: str) -> str:
+    """Normalize polite voice phrasing while keeping the action allowlist exact."""
+    import re
+
+    normalized = " ".join(str(command).casefold().split())
+    normalized = normalized.strip(" \\t\\r\\n,;:.!?।॥")
+    # Speech recognizers often include the wake word and conversational courtesy words.
+    prefix = re.compile(r"^(?:(?:hey\\s+)?jarvis|please|zara|can you|could you)\\b")
+    while prefix.match(normalized):
+        normalized = prefix.sub("", normalized, count=1).strip(" \\t\\r\\n,;:.!?।॥")
+    suffix = re.compile(r"(?:please|now|zara)$")
+    while suffix.search(normalized):
+        normalized = suffix.sub("", normalized).strip(" \\t\\r\\n,;:.!?।॥")
+    return normalized
+
+
 def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     """Run only fixed, explicitly allowlisted desktop actions; never invoke a shell."""
     import subprocess
@@ -142,7 +158,7 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
 
     launch = popen or subprocess.Popen
     browse = open_url or webbrowser.open
-    normalized = " ".join(command.casefold().strip().rstrip(" .!?।॥").split())
+    normalized = normalize_local_command(command)
     actions = {
         "open notepad": ("app", ["notepad.exe"], "Opening Notepad."),
         "start notepad": ("app", ["notepad.exe"], "Opening Notepad."),
