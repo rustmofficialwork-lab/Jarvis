@@ -1200,3 +1200,15 @@ class SharedOnlineReplyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HudAssetIntegrityTests(unittest.TestCase):
+    def test_hud_asset_is_a_decodable_webp_image(self):
+        from PIL import Image
+        asset = Path(__file__).with_name("jarvis_hud.webp")
+        self.assertTrue(asset.is_file(), "HUD image must be packaged beside the desktop source")
+        with Image.open(asset) as image:
+            self.assertEqual(image.format, "WEBP")
+            self.assertGreater(image.width, 300)
+            self.assertGreater(image.height, 150)
+            image.verify()

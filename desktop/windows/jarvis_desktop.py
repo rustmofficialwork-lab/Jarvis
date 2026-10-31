@@ -758,7 +758,23 @@ class JarvisDesktop:
             else:
                 asset_root = Path(__file__).resolve().parent
             image_path = asset_root / "jarvis_hud.webp"
-            self._hud_source_image = Image.open(image_path).convert("RGB")
+            try:
+                with Image.open(image_path) as source_image:
+                    source_image.load()
+                    self._hud_source_image = source_image.convert("RGB")
+            except (OSError, ValueError) as exc:
+                # Keep the desktop app usable if a packaged resource is missing/corrupt.
+                canvas.delete("all")
+                canvas.configure(bg="#02070d", highlightthickness=0)
+                canvas.create_text(
+                    width // 2, height // 2,
+                    text="JARVIS HUD image is missing or invalid\\nReinstall the latest verified build",
+                    fill="#8deeff", justify="center",
+                    font=("Segoe UI", 16, "bold"),
+                )
+                self._hud_render_size = render_size
+                self._hud_asset_error = str(exc)
+                return
 
         # Fill the window while preserving the reference image's proportions.
         fitted = ImageOps.fit(
