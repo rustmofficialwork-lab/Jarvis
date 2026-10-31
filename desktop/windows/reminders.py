@@ -91,7 +91,7 @@ def parse_reminder_command(text: str, now: datetime | None = None) -> tuple[str,
     text = " ".join(text.strip().split())
     patterns = [
         (r"^(?:remind me|reminder) in (\d+) (seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|second|minute|ghante?|ghanta|din) to (.+)$", "relative"),
-        (r"^(?:mujhe )?(\d+) (seconds?|secs?|minutes?|mins?|hours?|hrs?|days?) baad (.+?)(?: yaad dilana| yaad dila dena)$", "relative_hi"),
+        (r"^(?:mujhe )?(\d+) (seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|second|minute|ghante?|ghanta|din) baad (.+?)(?: yaad dilana| yaad dila dena)$", "relative_hi"),
         (r"^(?:remind me|set a reminder) at (\d{1,2}):(\d{2}) to (.+)$", "clock"),
         (r"^(\d{1,2}):(\d{2}) par (.+?)(?: ke liye )?reminder laga do$", "clock_hi"),
     ]
