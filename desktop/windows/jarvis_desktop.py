@@ -23,8 +23,10 @@ from reminder_scheduler import (notify_due_reminders, register_reminder_task,
                                 unregister_reminder_task)
 from online_services import handle_online_command
 from document_reader import read_document
+from updater import check_for_update, download_verified_installer
 
 APP_NAME = "JARVIS"
+APP_VERSION = "1.1.0"
 KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
@@ -1649,8 +1651,43 @@ class JarvisDesktop:
             self._ensure_offline_model(self.settings["language"])
             window.destroy()
 
+        ttk.Button(window, text="Check for updates", command=self._check_for_updates).grid(
+            row=10, column=0, sticky="w", padx=14, pady=(4, 16))
         ttk.Button(window, text="Save settings", command=save).grid(
             row=10, column=1, sticky="e", padx=14, pady=(4, 16))
+
+    def _check_for_updates(self):
+        """Check GitHub Releases off the UI thread; install only after user approval."""
+        if getattr(self, "update_check_running", False) or getattr(self, "update_download_running", False):
+            self._set_status("An update check or download is already running.")
+            return
+        self.update_check_running = True
+        self._set_status("Checking for JARVIS updates…")
+
+        def worker():
+            try:
+                result = check_for_update(APP_VERSION)
+                self.events.put(("update_check", result))
+            except Exception as exc:
+                self.events.put(("update_error", str(exc)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _download_update(self, result: dict):
+        self.update_download_running = True
+        self._set_status("Downloading and verifying JARVIS update…")
+
+        def worker():
+            try:
+                update_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "JARVISDesktop" / "updates"
+                installer = download_verified_installer(
+                    result["installer_url"], result["checksums_url"], update_dir
+                )
+                self.events.put(("update_downloaded", str(installer)))
+            except Exception as exc:
+                self.events.put(("update_error", str(exc)))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def clear_chat(self):
         # Do not clear shared history while a background AI request may append to it.
@@ -1709,6 +1746,51 @@ class JarvisDesktop:
                     self.request_lock.release()
                 elif kind == "document_prompt":
                     self.history.append({"role": "user", "content": value})
+                elif kind == "update_check":
+                    self.update_check_running = False
+                    if not value.get("release_exists"):
+                        messagebox.showinfo(
+                            "JARVIS updates",
+                            "Abhi koi stable GitHub release publish nahi hui hai.",
+                            parent=self.root,
+                        )
+                        self._set_status("No stable release available yet.")
+                    elif not value.get("available"):
+                        messagebox.showinfo(
+                            "JARVIS updates",
+                            f"JARVIS {APP_VERSION} is up to date.",
+                            parent=self.root,
+                        )
+                        self._set_status("JARVIS is up to date.")
+                    elif messagebox.askyesno(
+                        "JARVIS update available",
+                        f"Version {value['latest_version']} is available.\n\n"
+                        "Download the installer and verify its SHA-256 checksum?",
+                        parent=self.root,
+                    ):
+                        self._download_update(value)
+                elif kind == "update_downloaded":
+                    self.update_download_running = False
+                    if messagebox.askyesno(
+                        "Update verified",
+                        "Installer downloaded and SHA-256 verified. Launch the installer now?",
+                        parent=self.root,
+                    ):
+                        try:
+                            if os.name == "nt":
+                                os.startfile(value)
+                                self._set_status("Verified installer launched.")
+                            else:
+                                messagebox.showinfo("Installer ready", value, parent=self.root)
+                        except Exception as exc:
+                            messagebox.showerror("Could not launch installer", str(exc), parent=self.root)
+                    else:
+                        self._set_status("Verified installer saved in the JARVIS updates folder.")
+                elif kind == "update_error":
+                    self.update_check_running = False
+                    self.update_download_running = False
+                    messagebox.showerror("JARVIS update", value, parent=self.root)
+                    self._set_status("Update check/download failed.")
                 elif kind == "status":
                     self._set_status(value)
                 elif kind == "voice_command":
