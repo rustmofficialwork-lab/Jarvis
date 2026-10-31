@@ -87,9 +87,6 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertEqual(_format_uptime(90061), "1d 1h 1m")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TopProcessTests(unittest.TestCase):
     def test_processes_are_sorted_by_memory_and_bounded(self):
@@ -132,3 +129,7 @@ class TopProcessTests(unittest.TestCase):
         for limit in (0, 21, True, 1.5):
             with self.subTest(limit=limit), self.assertRaises(ValueError):
                 get_top_processes(limit, object())
+
+
+if __name__ == "__main__":
+    unittest.main()
