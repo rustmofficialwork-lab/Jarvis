@@ -41,7 +41,7 @@ Type `read file` (or `document kholo`) in the JARVIS command bar and choose a fi
 
 ## Updates
 
-Open **SETTINGS → Check for updates** to check the official GitHub Releases page. JARVIS downloads the installer only after confirmation, verifies its SHA-256 against the release checksum file, and asks before launching the installer. Updates are published from version tags (`v1.1.0`, etc.); checking for updates reports that no stable release exists until the first tagged release is published.
+JARVIS checks the official GitHub Releases page once at startup. You can also use **SETTINGS → Check for updates** to check manually. JARVIS downloads the installer only after confirmation, verifies its SHA-256 against the release checksum file, and asks before launching the installer. Updates are published from version tags (`v1.1.0`, etc.); checking for updates reports that no stable release exists until the first tagged release is published.
 
 ## Run from source
 
