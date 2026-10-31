@@ -29,7 +29,7 @@ def search_files(root: str | os.PathLike, query: str, *,
                  max_results: int = MAX_RESULTS,
                  max_directories: int = MAX_DIRECTORIES) -> list[str]:
     """Search names only; never follows symlinks or reads file contents."""
-    base = Path(root).expanduser().resolve(strict=True)
+    base = Path(root).expanduser().resolve()
     if not base.is_dir():
         raise NotADirectoryError(str(base))
     needle = str(query).strip().casefold()
