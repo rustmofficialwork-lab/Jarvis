@@ -220,6 +220,13 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     }:
         from system_monitor import get_system_status
         return get_system_status()
+    if normalized in {
+        "top processes", "show top processes", "process usage",
+        "ram usage by apps", "which apps use most ram",
+        "top process dikhao", "kaun sa app zyada ram le raha hai",
+    }:
+        from system_monitor import get_top_processes
+        return get_top_processes()
 
     action = actions.get(normalized)
     if action is None:
