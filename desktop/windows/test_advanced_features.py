@@ -45,6 +45,19 @@ class AdvancedFeatureTests(unittest.TestCase):
         listed = self.store.list_automations()
         self.assertEqual(datetime.fromisoformat(listed[0]["next_run"]), due + timedelta(seconds=1) + timedelta(minutes=30))
 
+    def test_failed_automation_can_be_retried_after_five_minutes(self):
+        automation_id, due = self.store.add_automation("study", 30, now=self.now)
+        self.store.claim_due_automations(now=due)
+        failed_at = due + timedelta(minutes=2)
+        retry_at = self.store.retry_automation(automation_id, now=failed_at)
+        self.assertEqual(retry_at, failed_at + timedelta(minutes=5))
+        self.assertEqual(self.store.claim_due_automations(now=retry_at - timedelta(seconds=1)), [])
+        claimed = self.store.claim_due_automations(now=retry_at)
+        self.assertEqual([item["id"] for item in claimed], [automation_id])
+
+    def test_retry_missing_automation_returns_none(self):
+        self.assertIsNone(self.store.retry_automation(999, now=self.now))
+
     def test_delete_automation(self):
         automation_id, _ = self.store.add_automation("meeting", 60, now=self.now)
         self.assertTrue(self.store.delete_automation(automation_id))
