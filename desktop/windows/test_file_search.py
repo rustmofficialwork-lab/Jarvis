@@ -3,9 +3,12 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from file_search import (parse_file_search_query, parse_open_result_index, search_files,
-                         validate_search_result_for_open)
+                         validate_search_result_for_open, _is_reparse_point,
+                         FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 class FileSearchTests(unittest.TestCase):
@@ -41,6 +44,17 @@ class FileSearchTests(unittest.TestCase):
             executable.touch()
             with self.assertRaises(ValueError):
                 validate_search_result_for_open(executable)
+
+    def test_detects_windows_reparse_points(self):
+        path = Path("junction")
+        with patch.object(Path, "stat", return_value=SimpleNamespace(
+            st_file_attributes=FILE_ATTRIBUTE_REPARSE_POINT
+        )), patch.object(Path, "is_symlink", return_value=False):
+            self.assertTrue(_is_reparse_point(path))
+
+    def test_unavailable_path_is_treated_as_unsafe(self):
+        with patch.object(Path, "stat", side_effect=OSError("access denied")):
+            self.assertTrue(_is_reparse_point(Path("unavailable")))
 
     def test_searches_names_recursively_without_reading_content(self):
         with tempfile.TemporaryDirectory() as temp:
