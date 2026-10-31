@@ -611,10 +611,10 @@ class JarvisDesktop:
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
-        """Build the blue holographic laptop dashboard while keeping the assistant controls live."""
+        """Show the supplied JARVIS artwork as the desktop HUD background."""
         self.root.title("J.A.R.V.I.S. | Desktop Command Center")
-        self.root.geometry("1500x900")
-        self.root.minsize(1100, 700)
+        self.root.geometry("1600x900")
+        self.root.minsize(1100, 619)
         self.root.configure(bg="#02070d")
         style = ttk.Style()
         try:
@@ -629,7 +629,6 @@ class JarvisDesktop:
         self.hud = tk.Canvas(self.root, bg="#02070d", highlightthickness=0)
         self.hud.pack(fill="both", expand=True)
         self.hud.bind("<Configure>", lambda _event: self._draw_orb())
-        self.orb_phase = 0.0
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.chat = None
         self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
@@ -645,13 +644,6 @@ class JarvisDesktop:
         self.power_button = ttk.Button(self.root, text="POWER", style="HUD.TButton", command=self.open_power_controls)
         self.prompt_entry.bind("<Return>", lambda _event: self.send_text())
         self._draw_orb()
-
-    def _animate_orb(self):
-        if not self.root.winfo_exists():
-            return
-        self.orb_phase = (self.orb_phase + 1.2) % 360.0
-        self._draw_orb()
-        self.root.after(150, self._animate_orb)
 
     def _get_service_statuses(self):
         """Report readiness from actual configuration and installed capabilities."""
@@ -673,70 +665,6 @@ class JarvisDesktop:
             ("SYSTEM CONTROL", os.name == "nt",
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
         ]
-
-    def _draw_iron_man_helmet(self, canvas, width, height):
-        """Draw a stylized red-and-gold armored helmet as part of the live HUD."""
-        cx = width - 390
-        cy = height * 0.52
-        sx = min(1.0, max(0.72, height / 900))
-        half_w = 128 * sx
-        half_h = 285 * sx
-        top = cy - half_h
-        bottom = cy + half_h
-
-        # Dark halo and red outer armor shell.
-        canvas.create_oval(cx-half_w-18, top-18, cx+half_w+18, bottom+18,
-                           outline="#075477", width=2)
-        canvas.create_polygon(
-            cx, top, cx+half_w*.72, top+half_h*.12,
-            cx+half_w, top+half_h*.48, cx+half_w*.88, bottom-half_h*.20,
-            cx+half_w*.48, bottom, cx, bottom-half_h*.08,
-            cx-half_w*.48, bottom, cx-half_w*.88, bottom-half_h*.20,
-            cx-half_w, top+half_h*.48, cx-half_w*.72, top+half_h*.12,
-            fill="#651b20", outline="#e34b35", width=3,
-        )
-        # Gold face plate with angular cheek and chin geometry.
-        canvas.create_polygon(
-            cx, top+half_h*.10, cx+half_w*.66, top+half_h*.22,
-            cx+half_w*.72, cy+half_h*.28, cx+half_w*.42, bottom-half_h*.18,
-            cx, bottom-half_h*.02, cx-half_w*.42, bottom-half_h*.18,
-            cx-half_w*.72, cy+half_h*.28, cx-half_w*.66, top+half_h*.22,
-            fill="#b87927", outline="#ffd36a", width=3,
-        )
-        canvas.create_polygon(
-            cx-half_w*.60, top+half_h*.22, cx-half_w*.18, top+half_h*.14,
-            cx, top+half_h*.19, cx+half_w*.18, top+half_h*.14,
-            cx+half_w*.60, top+half_h*.22, cx+half_w*.43, top+half_h*.37,
-            cx, top+half_h*.32, cx-half_w*.43, top+half_h*.37,
-            fill="#e2a94c", outline="#ffdf83", width=2,
-        )
-        # Bright cyan eye slits and central nose/chin details.
-        eye_y = cy - half_h*.10
-        for direction in (-1, 1):
-            ex = cx + direction*half_w*.39
-            canvas.create_polygon(
-                ex-direction*half_w*.27, eye_y-half_h*.035,
-                ex+direction*half_w*.19, eye_y-half_h*.01,
-                ex+direction*half_w*.12, eye_y+half_h*.035,
-                ex-direction*half_w*.30, eye_y+half_h*.02,
-                fill="#e9ffff", outline="#00cfff", width=3,
-            )
-            canvas.create_line(
-                ex-direction*half_w*.27, eye_y,
-                ex+direction*half_w*.16, eye_y+half_h*.01,
-                fill="#00bfff", width=2,
-            )
-        canvas.create_polygon(
-            cx, cy-half_h*.02, cx-half_w*.10, cy+half_h*.27,
-            cx, cy+half_h*.34, cx+half_w*.10, cy+half_h*.27,
-            fill="#8b4d22", outline="#ffd36a", width=2,
-        )
-        canvas.create_line(cx-half_w*.28, bottom-half_h*.16,
-                           cx, bottom-half_h*.10,
-                           cx+half_w*.28, bottom-half_h*.16,
-                           fill="#ffdc79", width=3)
-        canvas.create_text(cx, bottom+18*sx, text="STARK ARMOR  /  MARK VII",
-                           fill="#69dfff", font=("Consolas", max(7, int(9*sx)), "bold"))
 
     def _draw_orb(self):
         """Display the supplied JARVIS HUD artwork as the complete desktop interface."""
