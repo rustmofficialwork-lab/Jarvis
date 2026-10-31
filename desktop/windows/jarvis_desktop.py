@@ -1226,7 +1226,9 @@ class JarvisDesktop:
             elif action == "focus_status":
                 status = self.advanced_store.focus_status()
                 reply = (f"Focus Mode active — about {status['remaining_minutes']} minute(s) left."
-                         if status and not status["expired"] else "No active focus session.")
+                         if status and not status["expired"] else
+                         "Focus session complete. Take a short break." if status and status["expired"] else
+                         "No active focus session.")
             elif action == "workflow":
                 reply = self._execute_workflow(value)
             elif action == "automation_add":
@@ -1257,6 +1259,9 @@ class JarvisDesktop:
 
     def _check_automations(self):
         try:
+            focus = self.advanced_store.focus_status()
+            if focus and focus["expired"]:
+                self.events.put(("focus_complete", focus["duration_minutes"]))
             for item in self.advanced_store.claim_due_automations():
                 try:
                     reply = self._execute_workflow(item["workflow"])
@@ -1907,6 +1912,9 @@ class JarvisDesktop:
                     self._set_status("Something needs attention.")
                 elif kind == "advanced_voice_request":
                     self._handle_advanced_command(value)
+                elif kind == "focus_complete":
+                    self._append("JARVIS", f"Focus session complete ({value} minutes). Time for a short break.")
+                    self._set_status("Focus session complete — take a break.")
                 elif kind == "file_search_request":
                     self._try_file_search_command(value)
                 elif kind == "open_file_request":
