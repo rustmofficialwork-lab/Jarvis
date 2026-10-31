@@ -42,7 +42,13 @@ class _SearchParser(HTMLParser):
         classes = attrs.get("class", "").split()
         if tag == "a" and "result__a" in classes and len(self.results) < 6:
             href = attrs.get("href", "")
+            if href.startswith("//"):
+                href = "https:" + href
             parsed = urllib.parse.urlparse(href)
+            if parsed.hostname and parsed.hostname.endswith("duckduckgo.com"):
+                target = urllib.parse.parse_qs(parsed.query).get("uddg", [""])[0]
+                href = target
+                parsed = urllib.parse.urlparse(href)
             if parsed.scheme in {"http", "https"} and parsed.hostname:
                 self._active = {"title": "", "url": href, "snippet": ""}
                 self.results.append(self._active)
@@ -83,7 +89,7 @@ def web_search(query: str, opener=None) -> str:
         if snippet:
             lines.append(f"   {snippet[:350]}")
         lines.append(f"   {item['url']}")
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def _xml_text(element, path: str) -> str:
@@ -122,7 +128,7 @@ def get_news(query: str = "", opener=None) -> str:
                 lines.append(f"   {published[:45]}")
             if link and urllib.parse.urlparse(link).scheme == "https":
                 lines.append(f"   {link}")
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def get_weather(city: str, opener=None) -> str:
@@ -160,11 +166,11 @@ def get_weather(city: str, opener=None) -> str:
         raise RuntimeError("Weather data abhi available nahi hai.") from exc
     location = ", ".join(str(x) for x in [place.get("name"), place.get("admin1"), place.get("country")] if x)
     return (
-        f"Current weather — {location}\\n"
+        f"Current weather — {location}\n"
         f"Temperature: {temp}{units.get('temperature_2m', '°C')} "
-        f"(feels like {feels}{units.get('apparent_temperature', '°C')})\\n"
-        f"Humidity: {humidity}{units.get('relative_humidity_2m', '%')}\\n"
-        f"Wind: {wind} {units.get('wind_speed_10m', 'km/h')}\\n"
+        f"(feels like {feels}{units.get('apparent_temperature', '°C')})\n"
+        f"Humidity: {humidity}{units.get('relative_humidity_2m', '%')}\n"
+        f"Wind: {wind} {units.get('wind_speed_10m', 'km/h')}\n"
         f"Updated: {current.get('time', 'now')} ({forecast.get('timezone', 'local time')})"
     )
 
