@@ -579,7 +579,8 @@ class JarvisDesktop:
         self.history: list[dict] = load_chat_history()
         self.last_file_search_results: list[str] = []
         self.memory_store = MemoryStore()
-        self.reminder_store = ReminderStore()\n        self.advanced_store = AdvancedFeatureStore()
+        self.reminder_store = ReminderStore()
+        self.advanced_store = AdvancedFeatureStore()
         self.stop_event = threading.Event()
         self.wake_thread: threading.Thread | None = None
         self.busy = False
