@@ -1033,7 +1033,7 @@ class JarvisDesktop:
         if normalized in {"show reminders", "list reminders", "mere reminders dikhao", "reminders dikhao"}:
             items = self.reminder_store.list()
             if not items:
-                return "Abhi koi pending reminder nahi hai."
+                return "Abhi koi saved reminder nahi hai."
             lines = []
             for item in items[:20]:
                 due = item["due_at"].replace("T", " ")[:16]
