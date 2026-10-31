@@ -1239,7 +1239,7 @@ class JarvisDesktop:
             elif action == "automation_list":
                 items = self.advanced_store.list_automations()
                 reply = ("No recurring automations configured." if not items else
-                         "Recurring automations:\\n" + "\\n".join(
+                         "Recurring automations:\n" + "\n".join(
                              f"#{item['id']} — {WORKFLOWS[item['workflow']][0]} every {item['interval_minutes']} min"
                              for item in items))
             elif action == "automation_delete":
