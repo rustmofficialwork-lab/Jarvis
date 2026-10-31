@@ -325,6 +325,25 @@ class LocalCommandHistoryTests(unittest.TestCase):
 
 
 class LocalCommandTests(unittest.TestCase):
+    def test_polite_voice_phrases_normalize_to_the_same_allowlisted_command(self):
+        cases = [
+            ("Jarvis, open Notepad please!", "open notepad"),
+            ("Please open Notepad.", "open notepad"),
+            ("Hey Jarvis, zara Notepad kholo!", "notepad kholo"),
+            ("could you open calculator now", "open calculator"),
+        ]
+        for phrase, expected in cases:
+            with self.subTest(phrase=phrase):
+                self.assertEqual(jarvis_desktop.normalize_local_command(phrase), expected)
+
+    def test_polite_normalization_keeps_extra_command_text_rejected(self):
+        phrase = "please open notepad and delete files"
+        self.assertEqual(
+            jarvis_desktop.normalize_local_command(phrase),
+            "open notepad and delete files",
+        )
+        self.assertIsNone(jarvis_desktop.run_local_command(phrase))
+
     def test_allowlisted_app_uses_shell_false(self):
         calls = []
         result = jarvis_desktop.run_local_command(
