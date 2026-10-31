@@ -6,7 +6,6 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import os
 
 DEFAULT_REMINDER_PATH = (
@@ -91,7 +90,7 @@ def parse_reminder_command(text: str, now: datetime | None = None) -> tuple[str,
     now = now or datetime.now().astimezone()
     text = " ".join(text.strip().split())
     patterns = [
-        (r"^(?:remind me|reminder) in (\d+) (seconds?|secs?|minutes?|mins?|hours?|hrs?|days?) to (.+)$", "relative"),
+        (r"^(?:remind me|reminder) in (\d+) (seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|second|minute|ghante?|ghanta|din) to (.+)$", "relative"),
         (r"^(?:mujhe )?(\d+) (seconds?|secs?|minutes?|mins?|hours?|hrs?|days?) baad (.+?)(?: yaad dilana| yaad dila dena)$", "relative_hi"),
         (r"^(?:remind me|set a reminder) at (\d{1,2}):(\d{2}) to (.+)$", "clock"),
         (r"^(\d{1,2}):(\d{2}) par (.+?)(?: ke liye )?reminder laga do$", "clock_hi"),
@@ -111,8 +110,10 @@ def parse_reminder_command(text: str, now: datetime | None = None) -> tuple[str,
                 delta = timedelta(seconds=amount)
             elif unit.startswith(("min",)):
                 delta = timedelta(minutes=amount)
-            elif unit.startswith(("hour", "hr")):
+            elif unit.startswith(("hour", "hr", "ghant")):
                 delta = timedelta(hours=amount)
+            elif unit.startswith("din"):
+                delta = timedelta(days=amount)
             else:
                 delta = timedelta(days=amount)
             return message.strip(" .!?।"), now + delta
