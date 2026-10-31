@@ -1279,6 +1279,8 @@ class JarvisDesktop:
         self.root.after(1000, self._check_reminders)
 
     def _try_local_command(self, prompt: str) -> bool:
+        if self._handle_advanced_command(prompt):
+            return True
         if self._handle_reminder_command(prompt):
             return True
         if self._handle_memory_command(prompt):
