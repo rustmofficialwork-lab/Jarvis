@@ -400,13 +400,20 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
                 raise
             try:
                 offline_text = transcribe_offline_vosk(audio, language)
-            except Exception:
-                # Keep the original Google error if the local model is missing or unusable.
+            except Exception as offline_error:
+                if network_failure and isinstance(offline_error, OfflineModelUnavailable):
+                    raise request_error(
+                        f"Online speech recognition is unavailable. {offline_error}"
+                    ) from offline_error
+                # Keep the original Google error if local recovery is unavailable.
                 raise online_error
             if offline_text:
                 return offline_text
-            # Preserve the original error so the UI can distinguish unclear audio from
-            # a network outage and display the appropriate recovery message.
+            if network_failure:
+                raise request_error(
+                    "Online speech recognition is unavailable and offline speech did not detect words."
+                ) from online_error
+            # Preserve the unclear-audio error so the UI can ask the user to try again.
             raise online_error
     return None
 
