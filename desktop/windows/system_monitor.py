@@ -117,7 +117,7 @@ def get_system_status(psutil_module=None, now=None) -> str:
         f"RAM total/used: {_format_bytes(metrics.get('memory_total'))} / {_format_bytes(metrics.get('memory_used'))}\n"
         f"Battery: {battery_text}\n"
         f"Battery time remaining: {_format_battery_time(metrics.get('battery_seconds'))}\n"
-        f"Network: {network_text}\n"
+        f"Network adapter link: {network_text}\n"
         f"Uptime: {uptime}"
     )
 
