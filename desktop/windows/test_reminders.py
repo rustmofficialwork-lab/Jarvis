@@ -47,6 +47,30 @@ class ReminderStoreTests(unittest.TestCase):
         self.assertEqual(reopened.due()[0]["message"], "take a break")
         self.assertEqual(reopened.due(), [])
 
+    def test_due_check_compares_absolute_time_across_utc_offsets(self):
+        # A 12:00 reminder at UTC+02:00 is already due at 10:30 UTC.
+        # Plain ISO text comparison gets this wrong because it compares the hour text.
+        import sqlite3
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "INSERT INTO reminders(message,due_at,created_at,notified) VALUES(?,?,?,0)",
+                ("timezone check", "2026-10-31T12:00:00+02:00", "2026-10-31T09:00:00+00:00"),
+            )
+        due = self.store.due(datetime(2026, 10, 31, 10, 30, tzinfo=timezone.utc))
+        self.assertEqual([item["message"] for item in due], ["timezone check"])
+
+    def test_future_reminder_in_another_offset_is_not_due(self):
+        import sqlite3
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "INSERT INTO reminders(message,due_at,created_at,notified) VALUES(?,?,?,0)",
+                ("not yet", "2026-10-31T12:00:00+02:00", "2026-10-31T09:00:00+00:00"),
+            )
+        self.assertEqual(
+            self.store.due(datetime(2026, 10, 31, 9, 30, tzinfo=timezone.utc)),
+            [],
+        )
+
     def test_delete_reminder(self):
         item = self.store.add("test", datetime.now(timezone.utc) + timedelta(minutes=1))
         self.assertTrue(self.store.delete(item["id"]))
