@@ -197,6 +197,14 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         if not press_windows_media_key(key_name):
             raise RuntimeError("Windows media controls are available only on Windows.")
         return response
+    if normalized in {
+        "system status", "pc status", "system health", "computer status",
+        "system status batao", "pc ka status", "system ki health batao",
+        "computer ka status batao", "system dikhao",
+    }:
+        from system_monitor import get_system_status
+        return get_system_status()
+
     action = actions.get(normalized)
     if action is None:
         return None
