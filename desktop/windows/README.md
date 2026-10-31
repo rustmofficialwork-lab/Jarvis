@@ -23,7 +23,7 @@ JARVIS can create local reminders by typing or speaking commands such as:
 - `show reminders`
 - `delete reminder 3`
 
-Reminders are stored in `%LOCALAPPDATA%\\JARVISDesktop\\reminders.sqlite3` and are checked locally while JARVIS is running. They work without internet and are shown as Windows-app popups inside JARVIS. JARVIS must remain running (it can stay in the system tray) for on-time notifications; reminders are not currently registered with Windows Task Scheduler and cannot wake a fully exited app or a powered-off PC.
+Reminders are stored in `%LOCALAPPDATA%\\JARVISDesktop\\reminders.sqlite3` and work without internet. On Windows, JARVIS registers a one-shot, current-user Task Scheduler task for each reminder. A small notification-only JARVIS process displays a native Windows reminder dialog even when the main app is closed. The user must still be signed in and the PC must be awake; reminders cannot wake a powered-off PC, and delivery after sleep depends on Windows Task Scheduler. If task registration fails, JARVIS reports the issue and its in-app reminder checker still works while the app remains running (including in the system tray).
 
 ## Run from source
 
