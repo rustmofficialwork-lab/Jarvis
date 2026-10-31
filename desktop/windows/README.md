@@ -35,6 +35,10 @@ When internet is available, JARVIS can answer these commands directly without an
 
 Web search uses DuckDuckGo's HTML results, headlines use Google News RSS with India editions, and current conditions use Open-Meteo geocoding and forecast APIs. These public services do not require a separate key or paid package. Online requests use HTTPS, a 12-second timeout, and a response-size limit. Search/news results include source links; JARVIS does not execute page content or arbitrary commands. Live services require internet and do not work offline. Weather lookup needs a city name rather than assuming the Windows PC's location.
 
+## Read local documents offline
+
+Type `read file` (or `document kholo`) in the JARVIS command bar and choose a file. JARVIS extracts text locally from PDF, Word DOCX, TXT, Markdown, CSV, JSON, common code and other text files. The selected document is not uploaded. After reading, you can ask JARVIS to summarize or explain it; that separate AI request uses your configured online AI service and sends the relevant conversation text. PDF extraction supports selectable text, not scanned-image OCR. Reads are limited to 15 MB, 100 PDF pages, and 40,000 extracted characters; the chat preview is capped at 12,000 characters.
+
 ## Run from source
 
 Open PowerShell in this folder:
