@@ -534,6 +534,7 @@ class JarvisDesktop:
         self.root.after(700, self._ensure_offline_model)
         self.root.after(1000, self._check_reminders)
         self.root.after(1500, self._sync_reminder_tasks)
+        self.root.after(5000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
@@ -1656,7 +1657,7 @@ class JarvisDesktop:
         ttk.Button(window, text="Save settings", command=save).grid(
             row=10, column=1, sticky="e", padx=14, pady=(4, 16))
 
-    def _check_for_updates(self):
+    def _check_for_updates(self, silent: bool = False):
         """Check GitHub Releases off the UI thread; install only after user approval."""
         if getattr(self, "update_check_running", False) or getattr(self, "update_download_running", False):
             self._set_status("An update check or download is already running.")
@@ -1667,9 +1668,9 @@ class JarvisDesktop:
         def worker():
             try:
                 result = check_for_update(APP_VERSION)
-                self.events.put(("update_check", result))
+                self.events.put(("update_check", {"result": result, "silent": silent}))
             except Exception as exc:
-                self.events.put(("update_error", str(exc)))
+                self.events.put(("update_error", {"message": str(exc), "silent": silent}))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1748,27 +1749,33 @@ class JarvisDesktop:
                     self.history.append({"role": "user", "content": value})
                 elif kind == "update_check":
                     self.update_check_running = False
-                    if not value.get("release_exists"):
-                        messagebox.showinfo(
-                            "JARVIS updates",
-                            "Abhi koi stable GitHub release publish nahi hui hai.",
-                            parent=self.root,
-                        )
+                    result = value["result"]
+                    silent = value.get("silent", False)
+                    if not result.get("release_exists"):
+                        if not silent:
+                            messagebox.showinfo(
+                                "JARVIS updates",
+                                "Abhi koi stable GitHub release publish nahi hui hai.",
+                                parent=self.root,
+                            )
                         self._set_status("No stable release available yet.")
-                    elif not value.get("available"):
-                        messagebox.showinfo(
-                            "JARVIS updates",
-                            f"JARVIS {APP_VERSION} is up to date.",
-                            parent=self.root,
-                        )
+                    elif not result.get("available"):
+                        if not silent:
+                            messagebox.showinfo(
+                                "JARVIS updates",
+                                f"JARVIS {APP_VERSION} is up to date.",
+                                parent=self.root,
+                            )
                         self._set_status("JARVIS is up to date.")
                     elif messagebox.askyesno(
                         "JARVIS update available",
-                        f"Version {value['latest_version']} is available.\n\n"
+                        f"Version {result['latest_version']} is available.\n\n"
                         "Download the installer and verify its SHA-256 checksum?",
                         parent=self.root,
                     ):
-                        self._download_update(value)
+                        self._download_update(result)
+                    else:
+                        self._set_status("Update available; download skipped.")
                 elif kind == "update_downloaded":
                     self.update_download_running = False
                     if messagebox.askyesno(
@@ -1789,8 +1796,13 @@ class JarvisDesktop:
                 elif kind == "update_error":
                     self.update_check_running = False
                     self.update_download_running = False
-                    messagebox.showerror("JARVIS update", value, parent=self.root)
-                    self._set_status("Update check/download failed.")
+                    if isinstance(value, dict):
+                        if not value.get("silent"):
+                            messagebox.showerror("JARVIS update", value.get("message", "Update check failed."), parent=self.root)
+                        self._set_status("Automatic update check unavailable.")
+                    else:
+                        messagebox.showerror("JARVIS update", value, parent=self.root)
+                        self._set_status("Update download failed.")
                 elif kind == "status":
                     self._set_status(value)
                 elif kind == "voice_command":
