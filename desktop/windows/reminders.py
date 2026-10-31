@@ -72,7 +72,7 @@ class ReminderStore:
             # Task Scheduler helper cannot both claim and display the same item.
             db.execute("BEGIN IMMEDIATE")
             rows = db.execute(
-                "SELECT * FROM reminders WHERE notified=0 AND due_at<=? ORDER BY due_at",
+                "SELECT * FROM reminders WHERE notified=0 AND julianday(due_at)<=julianday(?) ORDER BY julianday(due_at)",
                 (now,),
             ).fetchall()
             if rows:
