@@ -54,7 +54,7 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
         with:
           path: desktop/windows/installer/JARVIS.iss
-          options: /O+ /DMyAppVersion=1.0.0
+          options: /O+ /DMyAppVersion=1.1.0
 
       - name: Upload JARVIS Windows installer
         uses: actions/upload-artifact@v4
