@@ -21,7 +21,7 @@ class ReminderStoreTests(unittest.TestCase):
 
     def test_relative_hinglish_reminder(self):
         now = datetime(2026, 10, 31, 12, 0, tzinfo=timezone.utc)
-        message, due = parse_reminder_command("mujhe 2 hours baad meeting yaad dilana", now)
+        message, due = parse_reminder_command("mujhe 2 ghante baad meeting yaad dilana", now)
         self.assertEqual(message, "meeting")
         self.assertEqual(due, now + timedelta(hours=2))
 
