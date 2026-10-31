@@ -11,9 +11,10 @@ on:
     paths:
       - "desktop/windows/**"
       - ".github/workflows/windows-desktop.yml"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   source-checks:
@@ -34,6 +35,8 @@ jobs:
 
   package-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -83,7 +86,7 @@ jobs:
       # to find and can be downloaded without opening the artifact details.
       - name: Publish latest Windows downloads
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: jarvis-latest
           target_commitish: main
