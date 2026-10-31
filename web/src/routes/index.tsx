@@ -90,9 +90,9 @@ function Index() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background font-body text-hud">
-      <img src={helmet} alt="Armored helmet with glowing eye" className="pointer-events-none absolute right-0 top-0 hidden h-full w-[38%] object-cover object-left helmet-fade xl:block" />
+      <img src={helmet} alt="Armored helmet with glowing eye" className="pointer-events-none absolute right-0 top-0 hidden h-full w-[32%] object-cover object-left helmet-fade 2xl:block" />
 
-      <div className="relative grid gap-6 p-4 lg:grid-cols-[300px_1fr] xl:grid-cols-[300px_1fr_260px] xl:pr-6">
+      <div className="relative grid gap-6 p-4 lg:grid-cols-[300px_1fr] 2xl:grid-cols-[300px_1fr_260px] 2xl:pr-6">
         {/* LEFT COLUMN */}
         <section className="space-y-5 border-l-2 border-hud pl-4">
           <div className="flex items-start gap-3">
@@ -197,7 +197,7 @@ function Index() {
         </section>
 
         {/* RIGHT */}
-        <section className="relative space-y-5 lg:col-span-2 xl:col-span-1">
+        <section className="relative space-y-5 lg:col-span-2 2xl:col-span-1">
           <div className="flex justify-end"><span className="grid h-11 w-11 place-items-center rounded-full border-2 border-hud glow-box"><ArrowRight className="h-5 w-5" /></span></div>
           <div className="flex items-center justify-end gap-3">
             <div className="text-center text-sm">
