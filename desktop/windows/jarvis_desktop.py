@@ -1788,7 +1788,7 @@ class JarvisDesktop:
                     if paths:
                         listing = "\n".join(f"{index}. {path}" for index, path in enumerate(paths, 1))
                         suffix = "\n\nShowing first 50 matches." if len(paths) >= 50 else ""
-                        reply = f"Found {len(paths)} matching file(s) in {value['folder']}:\\n\\n{listing}{suffix}"
+                        reply = f"Found {len(paths)} matching file(s) in {value['folder']}:\n\n{listing}{suffix}"
                     else:
                         reply = f"No files matching “{value['query']}” found in the selected folder."
                     self.history.extend([{"role": "user", "content": prompt},
