@@ -68,6 +68,9 @@ class ReminderStore:
     def due(self, now: datetime | None = None) -> list[dict]:
         now = (now or datetime.now().astimezone()).astimezone().isoformat(timespec="seconds")
         with _connection(self.path) as db:
+            # Acquire the write lock before selecting so the desktop poller and
+            # Task Scheduler helper cannot both claim and display the same item.
+            db.execute("BEGIN IMMEDIATE")
             rows = db.execute(
                 "SELECT * FROM reminders WHERE notified=0 AND due_at<=? ORDER BY due_at",
                 (now,),
