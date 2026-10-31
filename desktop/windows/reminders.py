@@ -61,7 +61,7 @@ class ReminderStore:
     def list(self, limit: int = 100) -> list[dict]:
         with _connection(self.path) as db:
             rows = db.execute(
-                "SELECT * FROM reminders ORDER BY due_at LIMIT ?", (max(1, min(limit, 500)),)
+                "SELECT * FROM reminders ORDER BY julianday(due_at) LIMIT ?", (max(1, min(limit, 500)),)
             ).fetchall()
         return [dict(row) for row in rows]
 
