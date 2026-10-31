@@ -113,3 +113,40 @@ def _format_uptime(seconds: float) -> str:
         parts.append(f"{hours}h")
     parts.append(f"{minutes}m")
     return " ".join(parts)
+
+
+def get_top_processes(limit: int = 5, psutil_module=None) -> str:
+    """Return a bounded, read-only snapshot of processes using the most memory."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
+        raise ValueError("Process limit must be an integer from 1 to 20.")
+    if psutil_module is None:
+        import psutil as psutil_module
+
+    rows = []
+    try:
+        processes = psutil_module.process_iter(
+            attrs=["pid", "name", "cpu_percent", "memory_percent"]
+        )
+        for process in processes:
+            try:
+                info = process.info
+                name = str(info.get("name") or "Unknown").strip() or "Unknown"
+                pid = int(info.get("pid", 0))
+                memory = float(info.get("memory_percent", 0.0) or 0.0)
+                cpu = float(info.get("cpu_percent", 0.0) or 0.0)
+                if not (0 <= memory <= 100 and 0 <= cpu <= 10000):
+                    continue
+                rows.append((memory, cpu, pid, name[:48]))
+            except (AttributeError, KeyError, TypeError, ValueError, OSError):
+                # Processes can exit or become inaccessible during enumeration.
+                continue
+    except Exception as exc:
+        return f"Process information unavailable: {exc}"
+
+    rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    if not rows:
+        return "No process information is currently available."
+    lines = [f"Top {min(limit, len(rows))} processes by memory usage (read-only):"]
+    for memory, cpu, pid, name in rows[:limit]:
+        lines.append(f"{name} (PID {pid}) — RAM {memory:.1f}% | CPU {cpu:.1f}%")
+    return "\\n".join(lines)
