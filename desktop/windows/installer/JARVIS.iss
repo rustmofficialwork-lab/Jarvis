@@ -30,3 +30,6 @@ Name: "{autodesktop}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"; Tasks: deskt
 
 [Run]
 Filename: "{app}\JARVIS.exe"; Description: "Launch JARVIS Desktop"; Flags: postinstall nowait skipifsilent
+
+[UninstallRun]
+Filename: "{app}\JARVIS.exe"; Parameters: "--cleanup-uninstall"; Flags: runhidden waituntilterminated skipifdoesntexist
