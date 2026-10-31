@@ -116,6 +116,17 @@ class AdvancedFeatureStore:
                 claimed.append(dict(row))
         return claimed
 
+    def retry_automation(self, automation_id, now=None):
+        """Retry a failed workflow after five minutes instead of silently skipping its cycle."""
+        now = (now or datetime.now().astimezone()).astimezone()
+        retry_at = now + timedelta(minutes=5)
+        with _db(self._db_path, uri=self._db_uri) as db:
+            cursor = db.execute(
+                "UPDATE automations SET next_run=? WHERE id=? AND enabled=1",
+                (retry_at.isoformat(timespec="seconds"), int(automation_id)),
+            )
+        return retry_at if cursor.rowcount else None
+
 
 def parse_advanced_command(prompt):
     text = " ".join(str(prompt).strip().split())
