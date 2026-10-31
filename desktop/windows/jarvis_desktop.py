@@ -1195,6 +1195,50 @@ class JarvisDesktop:
         self._set_status("Local action completed.")
         return True
 
+    def _try_file_search_command(self, prompt: str) -> bool:
+        """Search filenames only inside a folder explicitly selected by the user."""
+        from file_search import parse_file_search_query
+
+        query = parse_file_search_query(prompt)
+        if query is None:
+            return False
+        from tkinter import filedialog
+        selected = filedialog.askdirectory(
+            parent=self.root,
+            title=f"Choose a folder to search for: {query}",
+            mustexist=True,
+        )
+        if not selected:
+            self._set_status("File search cancelled.")
+            return True
+        if not self.request_lock.acquire(blocking=False):
+            self._set_status("JARVIS is busy; try the file search again shortly.")
+            return True
+        self.busy = True
+        self._append("YOU", prompt)
+        self._set_status(f"Searching filenames for “{query}”…")
+        try:
+            threading.Thread(
+                target=self._file_search_worker,
+                args=(selected, query, prompt),
+                daemon=True,
+            ).start()
+        except Exception:
+            self.busy = False
+            self.request_lock.release()
+            raise
+        return True
+
+    def _file_search_worker(self, folder: str, query: str, prompt: str):
+        try:
+            from file_search import search_files
+            results = search_files(folder, query)
+            self.events.put(("file_search_result", {
+                "prompt": prompt, "query": query, "folder": folder, "results": results,
+            }))
+        except Exception as exc:
+            self.events.put(("file_search_error", str(exc)))
+
     def _try_document_command(self, prompt: str) -> bool:
         """Open a user-selected local document and extract it on a worker thread."""
         normalized = " ".join(prompt.casefold().strip().rstrip(" .!?।॥").split())
@@ -1246,6 +1290,8 @@ class JarvisDesktop:
         if not prompt or self.busy:
             return
         self.prompt_var.set("")
+        if self._try_file_search_command(prompt):
+            return
         if self._try_document_command(prompt):
             return
         if self._try_local_command(prompt):
@@ -1450,6 +1496,10 @@ class JarvisDesktop:
             if self._handle_voice_reminder_command(prompt):
                 return
             if self._handle_voice_memory_command(prompt):
+                return
+            from file_search import parse_file_search_query
+            if parse_file_search_query(prompt) is not None:
+                self.events.put(("file_search_request", prompt))
                 return
             try:
                 local_response = run_local_command(prompt)
@@ -1730,6 +1780,32 @@ class JarvisDesktop:
                     self._append("JARVIS ERROR", value, "error")
                     self.busy = False
                     self._set_status("Something needs attention.")
+                elif kind == "file_search_request":
+                    self._try_file_search_command(value)
+                elif kind == "file_search_result":
+                    prompt = value["prompt"]
+                    paths = value["results"]
+                    if paths:
+                        listing = "\\n".join(f"{index}. {path}" for index, path in enumerate(paths, 1))
+                        suffix = "\\n\\nShowing first 50 matches." if len(paths) >= 50 else ""
+                        reply = f"Found {len(paths)} matching file(s) in {value['folder']}:\\n\\n{listing}{suffix}"
+                    else:
+                        reply = f"No files matching “{value['query']}” found in the selected folder."
+                    self.history.extend([{"role": "user", "content": prompt},
+                                         {"role": "assistant", "content": reply}])
+                    try:
+                        save_chat_history(self.history)
+                    except OSError as exc:
+                        self._set_status(f"Search complete; chat history could not be saved: {exc}")
+                    self._append("JARVIS", reply)
+                    self.busy = False
+                    self._set_status("Filename search complete. No file contents were opened.")
+                    self.request_lock.release()
+                elif kind == "file_search_error":
+                    self._append("JARVIS ERROR", value, "error")
+                    self.busy = False
+                    self._set_status("File search failed.")
+                    self.request_lock.release()
                 elif kind == "document":
                     prompt = value["prompt"]
                     excerpt = value["text"][:12000]
