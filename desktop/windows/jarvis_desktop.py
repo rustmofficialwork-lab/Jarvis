@@ -675,6 +675,70 @@ class JarvisDesktop:
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
         ]
 
+    def _draw_iron_man_helmet(self, canvas, width, height):
+        """Draw a stylized red-and-gold armored helmet as part of the live HUD."""
+        cx = width - 390
+        cy = height * 0.52
+        sx = min(1.0, max(0.72, height / 900))
+        half_w = 128 * sx
+        half_h = 285 * sx
+        top = cy - half_h
+        bottom = cy + half_h
+
+        # Dark halo and red outer armor shell.
+        canvas.create_oval(cx-half_w-18, top-18, cx+half_w+18, bottom+18,
+                           outline="#075477", width=2)
+        canvas.create_polygon(
+            cx, top, cx+half_w*.72, top+half_h*.12,
+            cx+half_w, top+half_h*.48, cx+half_w*.88, bottom-half_h*.20,
+            cx+half_w*.48, bottom, cx, bottom-half_h*.08,
+            cx-half_w*.48, bottom, cx-half_w*.88, bottom-half_h*.20,
+            cx-half_w, top+half_h*.48, cx-half_w*.72, top+half_h*.12,
+            fill="#651b20", outline="#e34b35", width=3,
+        )
+        # Gold face plate with angular cheek and chin geometry.
+        canvas.create_polygon(
+            cx, top+half_h*.10, cx+half_w*.66, top+half_h*.22,
+            cx+half_w*.72, cy+half_h*.28, cx+half_w*.42, bottom-half_h*.18,
+            cx, bottom-half_h*.02, cx-half_w*.42, bottom-half_h*.18,
+            cx-half_w*.72, cy+half_h*.28, cx-half_w*.66, top+half_h*.22,
+            fill="#b87927", outline="#ffd36a", width=3,
+        )
+        canvas.create_polygon(
+            cx-half_w*.60, top+half_h*.22, cx-half_w*.18, top+half_h*.14,
+            cx, top+half_h*.19, cx+half_w*.18, top+half_h*.14,
+            cx+half_w*.60, top+half_h*.22, cx+half_w*.43, top+half_h*.37,
+            cx, top+half_h*.32, cx-half_w*.43, top+half_h*.37,
+            fill="#e2a94c", outline="#ffdf83", width=2,
+        )
+        # Bright cyan eye slits and central nose/chin details.
+        eye_y = cy - half_h*.10
+        for direction in (-1, 1):
+            ex = cx + direction*half_w*.39
+            canvas.create_polygon(
+                ex-direction*half_w*.27, eye_y-half_h*.035,
+                ex+direction*half_w*.19, eye_y-half_h*.01,
+                ex+direction*half_w*.12, eye_y+half_h*.035,
+                ex-direction*half_w*.30, eye_y+half_h*.02,
+                fill="#e9ffff", outline="#00cfff", width=3,
+            )
+            canvas.create_line(
+                ex-direction*half_w*.27, eye_y,
+                ex+direction*half_w*.16, eye_y+half_h*.01,
+                fill="#00bfff", width=2,
+            )
+        canvas.create_polygon(
+            cx, cy-half_h*.02, cx-half_w*.10, cy+half_h*.27,
+            cx, cy+half_h*.34, cx+half_w*.10, cy+half_h*.27,
+            fill="#8b4d22", outline="#ffd36a", width=2,
+        )
+        canvas.create_line(cx-half_w*.28, bottom-half_h*.16,
+                           cx, bottom-half_h*.10,
+                           cx+half_w*.28, bottom-half_h*.16,
+                           fill="#ffdc79", width=3)
+        canvas.create_text(cx, bottom+18*sx, text="STARK ARMOR  /  MARK VII",
+                           fill="#69dfff", font=("Consolas", max(7, int(9*sx)), "bold"))
+
     def _draw_orb(self):
         if not hasattr(self, "hud"):
             return
@@ -693,6 +757,7 @@ class JarvisDesktop:
         for y in range(0, h, 48):
             c.create_line(0, y, w, y, fill="#041522")
         c.create_rectangle(14, 14, w-14, h-14, outline="#075477", width=1)
+        self._draw_iron_man_helmet(c, w, h)
         c.create_line(24, 62, w-24, 62, fill=blue, width=2)
         c.create_text(42, 35, text="◈  J A R V I S", fill=bright, anchor="w",
                       font=("Segoe UI Semibold", 21))
