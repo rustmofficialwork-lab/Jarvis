@@ -1622,6 +1622,9 @@ class JarvisDesktop:
         try:
             if self._handle_voice_reminder_command(prompt):
                 return
+            if parse_advanced_command(prompt) is not None:
+                self.events.put(("advanced_voice_request", prompt))
+                return
             if self._handle_memory_command(prompt, from_voice=True):
                 return
             from file_search import parse_file_search_query, parse_open_result_index
@@ -1901,6 +1904,8 @@ class JarvisDesktop:
                     self._append("JARVIS ERROR", value, "error")
                     self.busy = False
                     self._set_status("Something needs attention.")
+                elif kind == "advanced_voice_request":
+                    self._handle_advanced_command(value)
                 elif kind == "file_search_request":
                     self._try_file_search_command(value)
                 elif kind == "open_file_request":
