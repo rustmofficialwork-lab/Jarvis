@@ -54,6 +54,14 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertEqual(self.store.clear(), 2)
         self.assertEqual(self.store.list(), [])
 
+    def test_in_memory_database_is_shared_across_store_operations(self):
+        store = MemoryStore(":memory:")
+        item = store.add("Temporary memory")
+        self.assertEqual(store.list()[0]["id"], item["id"])
+        self.assertEqual(store.search("Temporary")[0]["content"], "Temporary memory")
+        self.assertTrue(store.delete(item["id"]))
+        self.assertEqual(store.list(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
