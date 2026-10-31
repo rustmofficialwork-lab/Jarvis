@@ -375,8 +375,9 @@ def configure_voice_recognizer(recognizer, request_timeout: float = 8.0):
 
 
 def listen_for_voice_command(recognizer, source, stop_event, language: str,
-                             wait_timeout_error, request_error=None) -> str | None:
-    """Try online transcription first, then fall back to local Vosk when the network fails."""
+                             wait_timeout_error, request_error=None,
+                             unknown_value_error=None) -> str | None:
+    """Try online transcription, using local Vosk for network failures or unclear audio."""
     while not stop_event.is_set():
         try:
             audio = recognizer.listen(source, timeout=1, phrase_time_limit=12)
@@ -388,19 +389,25 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
         try:
             return recognizer.recognize_google(audio, language=language)
         except Exception as online_error:
-            if request_error is None or not isinstance(online_error, request_error):
+            network_failure = (
+                request_error is not None and isinstance(online_error, request_error)
+            )
+            unclear_audio = (
+                unknown_value_error is not None
+                and isinstance(online_error, unknown_value_error)
+            )
+            if not network_failure and not unclear_audio:
                 raise
             try:
                 offline_text = transcribe_offline_vosk(audio, language)
-            except OfflineModelUnavailable as offline_error:
-                raise request_error(
-                    f"Online speech recognition is unavailable. {offline_error}"
-                ) from offline_error
+            except Exception:
+                # Keep the original Google error if the local model is missing or unusable.
+                raise online_error
             if offline_text:
                 return offline_text
-            raise request_error(
-                "Online speech recognition is unavailable and offline speech did not detect words."
-            ) from online_error
+            # Preserve the original error so the UI can distinguish unclear audio from
+            # a network outage and display the appropriate recovery message.
+            raise online_error
     return None
 
 
@@ -1464,6 +1471,7 @@ class JarvisDesktop:
                                 recognizer, source, self.stop_event,
                                 self.settings.get("language", "en-IN"),
                                 sr.WaitTimeoutError, sr.RequestError,
+                                sr.UnknownValueError,
                             )
                         if self.stop_event.is_set():
                             break
