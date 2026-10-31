@@ -1,4 +1,5 @@
 import subprocess
+import tempfile
 import unittest
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -49,11 +50,16 @@ class ReminderSchedulerTests(unittest.TestCase):
         self.assertIn("--reminder-check", command[command.index("/TR") + 1])
 
     def test_task_command_uses_pythonw_for_source_run(self):
-        command = build_create_task_command(
-            self.item, executable=r"C:\Python311\python.exe",
-            script_path=r"C:\JARVIS\jarvis_desktop.py", frozen=False,
-            now=self.now,
-        )
+        with tempfile.TemporaryDirectory() as folder:
+            python_exe = Path(folder) / "python.exe"
+            pythonw_exe = Path(folder) / "pythonw.exe"
+            python_exe.touch()
+            pythonw_exe.touch()
+            command = build_create_task_command(
+                self.item, executable=str(python_exe),
+                script_path=r"C:\\JARVIS\\jarvis_desktop.py", frozen=False,
+                now=self.now,
+            )
         action = command[command.index("/TR") + 1]
         self.assertIn("pythonw.exe", action)
         self.assertIn("jarvis_desktop.py", action)
