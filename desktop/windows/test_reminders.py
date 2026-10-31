@@ -51,21 +51,29 @@ class ReminderStoreTests(unittest.TestCase):
         # A 12:00 reminder at UTC+02:00 is already due at 10:30 UTC.
         # Plain ISO text comparison gets this wrong because it compares the hour text.
         import sqlite3
-        with sqlite3.connect(self.path) as db:
+        db = sqlite3.connect(self.path)
+        try:
             db.execute(
                 "INSERT INTO reminders(message,due_at,created_at,notified) VALUES(?,?,?,0)",
                 ("timezone check", "2026-10-31T12:00:00+02:00", "2026-10-31T09:00:00+00:00"),
             )
+            db.commit()
+        finally:
+            db.close()
         due = self.store.due(datetime(2026, 10, 31, 10, 30, tzinfo=timezone.utc))
         self.assertEqual([item["message"] for item in due], ["timezone check"])
 
     def test_future_reminder_in_another_offset_is_not_due(self):
         import sqlite3
-        with sqlite3.connect(self.path) as db:
+        db = sqlite3.connect(self.path)
+        try:
             db.execute(
                 "INSERT INTO reminders(message,due_at,created_at,notified) VALUES(?,?,?,0)",
                 ("not yet", "2026-10-31T12:00:00+02:00", "2026-10-31T09:00:00+00:00"),
             )
+            db.commit()
+        finally:
+            db.close()
         self.assertEqual(
             self.store.due(datetime(2026, 10, 31, 9, 30, tzinfo=timezone.utc)),
             [],
