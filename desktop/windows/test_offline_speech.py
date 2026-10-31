@@ -77,5 +77,49 @@ class OfflineSpeechTests(unittest.TestCase):
             self.assertFalse((Path(temp).parent / "outside.txt").exists())
 
 
+    def test_installer_rejects_files_outside_expected_model_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive_bytes = io.BytesIO()
+            with zipfile.ZipFile(archive_bytes, "w") as archive:
+                archive.writestr("other-folder/payload.txt", "unexpected")
+            with self.assertRaisesRegex(RuntimeError, "unsafe file path"):
+                install_offline_model(
+                    "hi-IN", Path(temp), lambda _url, timeout: io.BytesIO(archive_bytes.getvalue())
+                )
+
+    def test_installer_rejects_symbolic_links(self):
+        import stat
+        with tempfile.TemporaryDirectory() as temp:
+            archive_bytes = io.BytesIO()
+            info = zipfile.ZipInfo(MODEL_CATALOG["hi-IN"][0] + "/link")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFLNK | 0o777) << 16
+            with zipfile.ZipFile(archive_bytes, "w") as archive:
+                archive.writestr(info, "target")
+            with self.assertRaisesRegex(RuntimeError, "symbolic link"):
+                install_offline_model(
+                    "hi-IN", Path(temp), lambda _url, timeout: io.BytesIO(archive_bytes.getvalue())
+                )
+
+    def test_installer_rejects_excessive_expanded_archive_size(self):
+        from unittest.mock import patch
+        class FakeMember:
+            filename = MODEL_CATALOG["hi-IN"][0] + "/large.bin"
+            file_size = 500 * 1024 * 1024 + 1
+        class FakeArchive:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def infolist(self):
+                return [FakeMember()]
+        with tempfile.TemporaryDirectory() as temp:
+            def fake_urlopen(_url, timeout):
+                return io.BytesIO(b"not-used")
+            with patch("offline_speech.zipfile.ZipFile", return_value=FakeArchive()):
+                with self.assertRaisesRegex(RuntimeError, "500 MB"):
+                    install_offline_model("hi-IN", Path(temp), fake_urlopen)
+
+
 if __name__ == "__main__":
     unittest.main()
