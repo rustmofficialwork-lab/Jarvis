@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime
 from types import SimpleNamespace
 
-from system_monitor import get_system_status, _format_uptime
+from system_monitor import collect_system_metrics, get_system_status, _format_uptime
 
 
 class FakePsutil:
@@ -45,6 +45,42 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertIn("Battery: Unavailable", result)
         self.assertIn("CPU usage: 23%", result)
 
+    def test_shared_collector_reads_metrics_once_for_both_surfaces(self):
+        calls = {"cpu": 0, "memory": 0, "disk": 0, "battery": 0, "network": 0}
+
+        class CountingPsutil(FakePsutil):
+            def cpu_percent(self, interval=None):
+                calls["cpu"] += 1
+                return super().cpu_percent(interval)
+
+            def virtual_memory(self):
+                calls["memory"] += 1
+                return super().virtual_memory()
+
+            def disk_usage(self, path):
+                calls["disk"] += 1
+                return super().disk_usage(path)
+
+            def sensors_battery(self):
+                calls["battery"] += 1
+                return super().sensors_battery()
+
+            def net_if_stats(self):
+                calls["network"] += 1
+                return super().net_if_stats()
+
+            def sensors_temperatures(self, **kwargs):
+                raise NotImplementedError
+
+        metrics = collect_system_metrics(CountingPsutil())
+        self.assertEqual(metrics["cpu_percent"], 23.4)
+        self.assertEqual(metrics["memory_percent"], 61.2)
+        self.assertEqual(metrics["disk_percent"], 72.8)
+        self.assertEqual(metrics["network_online"], True)
+        self.assertIsNone(metrics["cpu_temperature"])
+        self.assertEqual(calls, {
+            "cpu": 1, "memory": 1, "disk": 1, "battery": 1, "network": 1,
+        })
     def test_uptime_format(self):
         self.assertEqual(_format_uptime(0), "0m")
         self.assertEqual(_format_uptime(3661), "1h 1m")
