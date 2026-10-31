@@ -45,7 +45,7 @@ These features run locally and use a small SQLite database in the JARVIS app-dat
 
 - **Focus Mode / Pomodoro:** say `start pomodoro`, `start focus for 45 minutes`, `focus status`, or `stop focus`. Sessions persist across app restarts.
 - **Smart workflows:** `run study workflow`, `run meeting workflow`, or `run deep work workflow`. Workflows only launch fixed, allowlisted apps (Notepad, Calculator, browser, Task Manager); no shell commands or arbitrary scripts.
-- **Recurring automation:** `repeat study workflow every 60 minutes`, `list automations`, or `delete automation 1`. Intervals are limited to 5 minutes–7 days. Automations run while JARVIS is running (including its tray mode); they are not guaranteed while Windows/JARVIS is shut down.
+- **Recurring automation:** `repeat study workflow every 60 minutes`, `list automations`, or `delete automation 1`. Intervals are limited to 5 minutes–7 days. If a workflow launch fails, JARVIS schedules a retry in five minutes instead of silently losing that run. Automations run while JARVIS is running (including its tray mode); they are not guaranteed while Windows/JARVIS is shut down.
 
 ## Live process and app resource usage
 
