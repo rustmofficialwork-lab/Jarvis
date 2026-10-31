@@ -469,6 +469,27 @@ def parse_memory_command(prompt: str) -> tuple[str, str | None] | None:
 
 
 def filter_memory_history(history: list[dict]) -> list[dict]:
+    """Keep explicit memory-management exchanges out of online chat history."""
+    filtered = []
+    skip_reply = False
+    for item in history[-16:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = str(item.get("content", ""))
+        if role == "user":
+            skip_reply = parse_memory_command(content) is not None
+            if skip_reply:
+                continue
+        elif role == "assistant" and skip_reply:
+            skip_reply = False
+            continue
+        else:
+            skip_reply = False
+        filtered.append(item)
+    return filtered
+
+
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     history: list[dict], memories: list[str] | None = None) -> str:
     endpoint, model = validate_chat_configuration(endpoint, model)
