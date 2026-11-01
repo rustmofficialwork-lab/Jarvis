@@ -636,6 +636,7 @@ class JarvisDesktop:
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
+        self.root.after(1500, self._refresh_dashboard_metrics)
         self.root.after(120, self._poll_events)
         self.root.after(700, self._ensure_offline_model)
         self.root.after(1000, self._check_reminders)
@@ -684,6 +685,36 @@ class JarvisDesktop:
         tk.Label(status, textvariable=self.status_var, bg="#0b1d2b", fg="#45d7b5",
                  font=("Segoe UI", 9, "bold"), anchor="w", padx=12, pady=9).pack(fill="x")
 
+        # Native live telemetry dashboard: real OS readings, never browser estimates.
+        telemetry = tk.Frame(shell, bg="#07111b")
+        telemetry.pack(fill="x", pady=(0, 12))
+        telemetry_header = tk.Frame(telemetry, bg="#07111b")
+        telemetry_header.pack(fill="x", pady=(0, 7))
+        tk.Label(telemetry_header, text="LIVE SYSTEM TELEMETRY", bg="#07111b", fg="#42dfff",
+                 font=("Segoe UI", 9, "bold")).pack(side="left")
+        tk.Label(telemetry_header, text="LOCAL WINDOWS SENSOR SNAPSHOT  •  AUTO REFRESH",
+                 bg="#07111b", fg="#66899a", font=("Segoe UI", 8)).pack(side="right")
+        self.metric_value_labels = {}
+        self.metric_detail_var = tk.StringVar(value="Collecting hardware readings…")
+        telemetry_grid = tk.Frame(telemetry, bg="#07111b")
+        telemetry_grid.pack(fill="x")
+        metric_names = ("CPU LOAD", "MEMORY", "DISK USED", "BATTERY",
+                        "CPU TEMP", "NETWORK", "STORAGE FREE", "STORAGE TOTAL")
+        for index, metric_name in enumerate(metric_names):
+            card = tk.Frame(telemetry_grid, bg="#0b1d2b", highlightbackground="#16445b", highlightthickness=1)
+            card.grid(row=index // 4, column=index % 4, sticky="nsew", padx=(0 if index % 4 == 0 else 5, 0),
+                      pady=(0, 5 if index < 4 else 0))
+            tk.Label(card, text=metric_name, bg="#0b1d2b", fg="#789eaf",
+                     font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
+            value = tk.Label(card, text="—", bg="#0b1d2b", fg="#dffaff",
+                             font=("Segoe UI", 14, "bold"))
+            value.pack(anchor="w", padx=10, pady=(0, 8))
+            self.metric_value_labels[metric_name] = value
+        for column in range(4):
+            telemetry_grid.grid_columnconfigure(column, weight=1, uniform="telemetry")
+        tk.Label(telemetry, textvariable=self.metric_detail_var, bg="#07111b", fg="#66899a",
+                 font=("Segoe UI", 8), anchor="w").pack(fill="x", pady=(5, 0))
+
         panel = tk.Frame(shell, bg="#0b1722", highlightbackground="#16445b", highlightthickness=1)
         panel.pack(fill="both", expand=True)
         tk.Label(panel, text="CONVERSATION", bg="#0b1722", fg="#42dfff",
@@ -711,6 +742,36 @@ class JarvisDesktop:
         tk.Label(shell, text="Enter a message or try: system status  •  weather in Bhopal  •  find file",
                  bg="#07111b", fg="#66899a", font=("Segoe UI", 9)).pack(anchor="w", pady=(9,0))
         entry.focus_set()
+
+    def _refresh_dashboard_metrics(self):
+        """Refresh the native dashboard from local psutil readings without blocking Tk."""
+        try:
+            metrics = dict(self._get_system_metrics())
+            for name, label in getattr(self, "metric_value_labels", {}).items():
+                label.configure(text=metrics.get(name, "N/A"))
+            cpu_temp = metrics.get("CPU TEMP", "N/A")
+            if cpu_temp == "N/A":
+                self.metric_detail_var.set(
+                    "Live local readings • CPU/GPU temperature depends on sensor support; unavailable sensors are shown as N/A."
+                )
+            else:
+                self.metric_detail_var.set(
+                    "Live local readings • Temperature from the Windows-exposed CPU sensor."
+                )
+            network = metrics.get("NETWORK", "N/A")
+            self.status_var.set(
+                "SYSTEM ONLINE  •  JARVIS READY" if network == "ONLINE"
+                else "JARVIS READY  •  NETWORK " + str(network)
+            )
+        except Exception as exc:
+            if hasattr(self, "metric_detail_var"):
+                self.metric_detail_var.set(f"System telemetry unavailable: {exc}")
+        finally:
+            try:
+                if self.root.winfo_exists():
+                    self.root.after(2500, self._refresh_dashboard_metrics)
+            except tk.TclError:
+                pass
 
     def _get_service_statuses(self):
         """Report readiness from actual configuration and installed capabilities."""
