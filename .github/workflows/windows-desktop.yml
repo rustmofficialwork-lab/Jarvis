@@ -117,6 +117,7 @@ jobs:
           name: JARVIS Latest Windows Build
           body: |
             Latest successful Windows desktop build from the main branch.
+            Version: ${{ env.JARVIS_VERSION }}
             Installer: JARVIS-Setup-x64.exe
             Portable executable: JARVIS.exe
             The release is updated by the Windows Desktop workflow.
