@@ -648,8 +648,15 @@ class JarvisDesktop:
     def _build_ui(self):
         """Build the native JARVIS command center using native desktop widgets."""
         self.root.title("J.A.R.V.I.S. | Desktop Assistant")
-        self.root.geometry("1180x760")
-        self.root.minsize(820,600)
+        # Start at the usable desktop size so Windows DPI scaling cannot push
+        # the composer below the visible client area.
+        self.root.minsize(820, 600)
+        try:
+            self.root.state("zoomed")
+        except tk.TclError:
+            screen_w = self.root.winfo_screenwidth()
+            screen_h = self.root.winfo_screenheight()
+            self.root.geometry(f"{min(1180, screen_w - 80)}x{min(760, screen_h - 100)}")
         self.root.configure(bg="#07111b")
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.chat = None
@@ -725,7 +732,7 @@ class JarvisDesktop:
         panel.pack(fill="both", expand=True)
         tk.Label(panel, text="CONVERSATION", bg="#0b1722", fg="#42dfff",
                  font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x", padx=14, pady=(12,6))
-        self.chat = tk.Text(panel, wrap="word", bg="#06101a", fg="#d8edf5",
+        self.chat = tk.Text(panel, height=8, wrap="word", bg="#06101a", fg="#d8edf5",
                             insertbackground="#42dfff", relief="flat", padx=16, pady=14,
                             font=("Segoe UI", 11), state="disabled")
         self.chat.pack(fill="both", expand=True, padx=12, pady=(0,12))
