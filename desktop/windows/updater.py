@@ -32,7 +32,7 @@ def _release_version(payload: dict) -> tuple[str, tuple[int, ...]]:
     """Read the numeric build version from a rolling release or a versioned tag."""
     body = payload.get("body", "")
     if isinstance(body, str):
-        match = re.search(r"(?im)^Version:\\s*(v?\\d+(?:\\.\\d+){1,3})\\s*$", body)
+        match = re.search(r"(?im)^Version:\s*(v?\d+(?:\.\d+){1,3})\s*$", body)
         if match:
             value = match.group(1).removeprefix("v")
             return value, _version_tuple(value)
