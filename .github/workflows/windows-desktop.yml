@@ -7,7 +7,7 @@ on:
       - "desktop/windows/**"
       - ".github/workflows/windows-desktop.yml"
   push:
-    branches: [main, feat/offline-wake-word, feat/windows-desktop-app]
+    branches: [main, feat/offline-wake-word, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard]
     paths:
       - "desktop/windows/**"
       - ".github/workflows/windows-desktop.yml"
