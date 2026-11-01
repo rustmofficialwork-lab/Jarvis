@@ -49,6 +49,25 @@ class UpdaterTests(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertEqual(result["latest_version"], "1.2.0")
 
+    def test_rolling_latest_tag_uses_numeric_version_from_release_body(self):
+        payload = {
+            "tag_name": "jarvis-latest",
+            "body": "Latest successful Windows desktop build.\\nVersion: 1.1.345\\n",
+            "assets": [
+                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + INSTALLER_NAME},
+                {"name": CHECKSUM_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + CHECKSUM_NAME},
+            ],
+        }
+        result = check_for_update("1.1.344", FakeOpener([json.dumps(payload).encode()]))
+        self.assertTrue(result["available"])
+        self.assertEqual(result["latest_version"], "1.1.345")
+        self.assertEqual(result["tag"], "jarvis-latest")
+
+    def test_rolling_latest_tag_rejects_missing_version_metadata(self):
+        payload = {"tag_name": "jarvis-latest", "body": "Latest build", "assets": []}
+        with self.assertRaisesRegex(RuntimeError, "missing numeric version metadata"):
+            check_for_update("1.1.0", FakeOpener([json.dumps(payload).encode()]))
+
     def test_current_version_is_not_offered_again(self):
         payload = {"tag_name": "v1.1.0", "assets": []}
         result = check_for_update("1.1.0", FakeOpener([json.dumps(payload).encode()]))
