@@ -675,6 +675,12 @@ class JarvisDesktop:
                  font=("Segoe UI", 22, "bold")).pack(anchor="w")
         tk.Label(brand, text="PERSONAL AI DESKTOP ASSISTANT", bg="#0b1d2b", fg="#8aa9b8",
                  font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(2,0))
+        self.reactor_canvas = tk.Canvas(header, width=92, height=66, bg="#0b1d2b",
+                                        highlightthickness=0, bd=0)
+        self.reactor_canvas.pack(side="left", padx=(18, 0), pady=7)
+        self._reactor_angle = 0
+        self._draw_reactor()
+        self.root.after(90, self._animate_reactor)
         ttk.Button(header, text="MEMORY", style="Jarvis.TButton",
                    command=self.open_memory_manager).pack(side="right", padx=14, pady=18)
         ttk.Button(header, text="SETTINGS", style="Jarvis.TButton",
@@ -742,6 +748,46 @@ class JarvisDesktop:
         tk.Label(shell, text="Enter a message or try: system status  •  weather in Bhopal  •  find file",
                  bg="#07111b", fg="#66899a", font=("Segoe UI", 9)).pack(anchor="w", pady=(9,0))
         entry.focus_set()
+
+    def _draw_reactor(self):
+        """Draw a lightweight, image-free arc-reactor accent in the native header."""
+        canvas = self.reactor_canvas
+        canvas.delete("all")
+        cx, cy = 46, 33
+        for radius, color, width in ((27, "#16445b", 1), (22, "#087da5", 1),
+                                     (14, "#1a7895", 2), (6, "#42dfff", 1)):
+            canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
+                               outline=color, width=width)
+        import math
+        angle = self._reactor_angle
+        for index in range(8):
+            theta = math.radians(angle + index * 45)
+            x1, y1 = cx + math.cos(theta)*16, cy + math.sin(theta)*16
+            x2, y2 = cx + math.cos(theta)*25, cy + math.sin(theta)*25
+            canvas.create_line(x1, y1, x2, y2, fill="#42dfff", width=2,
+                               capstyle="round", tags="reactor-spokes")
+        canvas.create_oval(cx-3, cy-3, cx+3, cy+3, fill="#b8f8ff",
+                           outline="#42dfff", width=1)
+
+    def _animate_reactor(self):
+        """Animate only the small header accent; keep all UI drawing on Tk's thread."""
+        try:
+            if not self.root.winfo_exists():
+                return
+            self._reactor_angle = (self._reactor_angle + 6) % 360
+            canvas = self.reactor_canvas
+            canvas.delete("reactor-spokes")
+            import math
+            cx, cy, angle = 46, 33, self._reactor_angle
+            for index in range(8):
+                theta = math.radians(angle + index * 45)
+                canvas.create_line(cx + math.cos(theta)*16, cy + math.sin(theta)*16,
+                                   cx + math.cos(theta)*25, cy + math.sin(theta)*25,
+                                   fill="#42dfff", width=2, capstyle="round",
+                                   tags="reactor-spokes")
+            self.root.after(90, self._animate_reactor)
+        except tk.TclError:
+            return
 
     def _refresh_dashboard_metrics(self):
         """Refresh the native dashboard from local psutil readings without blocking Tk."""
