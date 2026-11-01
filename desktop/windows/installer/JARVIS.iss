@@ -1,6 +1,7 @@
 [Setup]
 AppId={{7C1D7B52-6C19-4D64-9B25-6F9A6F3E8A11}
 AppName=JARVIS Desktop
+AppMutex=JARVIS.Desktop.Singleton
 #ifndef MyAppVersion
   #define MyAppVersion "1.1.0"
 #endif
