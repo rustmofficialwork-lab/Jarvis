@@ -712,6 +712,75 @@ class JarvisDesktop:
                  bg="#07111b", fg="#66899a", font=("Segoe UI", 9)).pack(anchor="w", pady=(9,0))
         entry.focus_set()
 
+    def _get_service_statuses(self):
+        """Report readiness from actual configuration and installed capabilities."""
+        import importlib.util
+
+        ai_ready = bool(getattr(self, "ai_api_key", "").strip())
+        voice_key_ready = bool(getattr(self, "picovoice_access_key", "").strip())
+        voice_packages = all(
+            importlib.util.find_spec(module) is not None
+            for module in ("pvporcupine", "pvrecorder", "speech_recognition", "pyttsx3")
+        )
+        memory_store = getattr(self, "memory_store", None)
+        memory_detail = f"{len(memory_store.list())} SAVED LOCALLY" if memory_store else "LOCAL STORE"
+        return [
+            ("AI CHAT", ai_ready, "CONFIGURED" if ai_ready else "ADD API TOKEN"),
+            ("VOICE ENGINE", voice_key_ready and voice_packages,
+             "CONFIGURED" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
+            ("MEMORY", True, memory_detail),
+            ("SYSTEM CONTROL", os.name == "nt",
+             "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
+        ]
+
+    def _format_battery_status(battery) -> str:
+        """Delegate battery presentation to the shared system-monitor module."""
+        from system_monitor import format_battery_status
+        return format_battery_status(battery)
+
+    def _get_system_metrics(self):
+        """Format the shared system snapshot for the dashboard; cache it briefly for the HUD."""
+        import time
+        from system_monitor import collect_system_metrics
+
+        now = time.monotonic()
+        cached = getattr(self, "_metrics_cache", None)
+        if cached and now - cached[0] < 1.0:
+            return cached[1]
+
+        metrics = collect_system_metrics()
+        def percent(value):
+            try:
+                return f"{float(value):.0f}%"
+            except (TypeError, ValueError):
+                return "N/A"
+
+        temperature = metrics["cpu_temperature"]
+        try:
+            temperature = f"{float(temperature):.0f}°C" if temperature is not None else "N/A"
+        except (TypeError, ValueError):
+            temperature = "N/A"
+        online = metrics["network_online"]
+        network = "ONLINE" if online is True else "OFFLINE" if online is False else "N/A"
+        from system_monitor import _format_bytes, _format_battery_time
+        values = [
+            ("CPU LOAD", percent(metrics["cpu_percent"])),
+            ("MEMORY", percent(metrics["memory_percent"])),
+            ("DISK USED", percent(metrics["disk_percent"])),
+            ("BATTERY", self._format_battery_status(metrics["battery"])),
+            ("CPU TEMP", temperature),
+            ("NETWORK", network),
+            ("BATTERY TIME", _format_battery_time(metrics.get("battery_seconds"))),
+            ("STORAGE FREE", _format_bytes(metrics.get("disk_free"))),
+            ("STORAGE TOTAL", _format_bytes(metrics.get("disk_total"))),
+            ("RAM USED", _format_bytes(metrics.get("memory_used"))),
+            ("RAM TOTAL", _format_bytes(metrics.get("memory_total"))),
+        ]
+        self._metrics_cache = (now, values)
+        return values
+
+    @staticmethod
+
     def _handle_memory_command(
         self, prompt: str, *, from_voice: bool = False, display_user: bool = True,
     ) -> bool:
