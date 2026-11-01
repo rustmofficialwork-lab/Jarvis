@@ -688,8 +688,6 @@ class JarvisDesktop:
         self._reactor_angle = 0
         self._draw_reactor()
         self.root.after(90, self._animate_reactor)
-        ttk.Button(header, text="MEMORY", style="Jarvis.TButton",
-                   command=self.open_memory_manager).pack(side="right", padx=14, pady=18)
         ttk.Button(header, text="SETTINGS", style="Jarvis.TButton",
                    command=self.open_settings).pack(side="right", padx=4, pady=18)
 
