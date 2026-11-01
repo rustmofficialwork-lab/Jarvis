@@ -739,7 +739,7 @@ class JarvisDesktop:
         return format_battery_status(battery)
 
     def _get_system_metrics(self):
-        """Format the shared system snapshot for the dashboard; cache it briefly for the HUD."""
+        """Format the shared system snapshot for desktop status displays."""
         import time
         from system_monitor import collect_system_metrics
 
@@ -863,7 +863,7 @@ class JarvisDesktop:
             relief="flat", font=("Segoe UI", 10), height=12,
         )
         listing.pack(fill="both", expand=True, padx=16, pady=6)
-        entry = ttk.Entry(window, style="HUD.TEntry")
+        entry = ttk.Entry(window)
         entry.pack(fill="x", padx=16, pady=8)
         ids = []
 
@@ -928,7 +928,7 @@ class JarvisDesktop:
         listing.bind("<<ListboxSelect>>", load_selected)
         controls = tk.Frame(window, bg="#07111b")
         controls.pack(fill="x", padx=16, pady=(2, 14))
-        ttk.Button(controls, text="Add", style="HUD.TButton", command=add_memory).pack(side="left")
+        ttk.Button(controls, text="Add", command=add_memory).pack(side="left")
         ttk.Button(controls, text="Update selected", style="HUD.TButton", command=edit_memory).pack(side="left", padx=6)
         ttk.Button(controls, text="Delete selected", style="HUD.TButton", command=delete_memory).pack(side="left")
         ttk.Button(controls, text="Close", style="HUD.TButton", command=window.destroy).pack(side="right")
