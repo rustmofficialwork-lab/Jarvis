@@ -2087,6 +2087,46 @@ class JarvisDesktop:
         self.exit_app()
 
 
+def enable_windows_dpi_awareness():
+    """Ask Windows for native per-monitor DPI rendering before Tk creates a window.
+
+    Without this, Windows may bitmap-scale the whole Tk window on high-DPI
+    displays, making text and borders look soft or blurry.
+    """
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        set_context = getattr(user32, "SetProcessDpiAwarenessContext", None)
+        if set_context is not None:
+            set_context.argtypes = [ctypes.c_void_p]
+            set_context.restype = ctypes.c_bool
+            # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            if set_context(ctypes.c_void_p(-4)):
+                return
+
+        # Compatibility fallback for older Windows versions.
+        try:
+            shcore = ctypes.WinDLL("shcore", use_last_error=True)
+            set_awareness = shcore.SetProcessDpiAwareness
+            set_awareness.argtypes = [ctypes.c_int]
+            set_awareness.restype = ctypes.c_long
+            if set_awareness(2) == 0:  # PROCESS_PER_MONITOR_DPI_AWARE
+                return
+        except (AttributeError, OSError):
+            pass
+
+        try:
+            user32.SetProcessDPIAware()
+        except (AttributeError, OSError):
+            pass
+    except (AttributeError, OSError):
+        # Keep startup working on restricted or unusual Windows environments.
+        return
+
+
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     if args == ["--reminder-check"]:
@@ -2104,6 +2144,9 @@ def main(argv=None):
             return 1 if errors else 0
         except Exception:
             return 1
+    # Must run before Tk creates its first native window to avoid Windows
+    # bitmap-scaling the interface and making the UI appear blurry.
+    enable_windows_dpi_awareness()
     if not acquire_single_instance():
         return 0
     root = tk.Tk()
