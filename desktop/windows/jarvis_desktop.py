@@ -284,6 +284,37 @@ def press_windows_media_key(key_name: str, keybd_event=None, platform_name=None)
     return True
 
 
+# Keep one desktop UI process per Windows user session. The installer uses the
+# same mutex (AppMutex) so Inno Setup can detect and close JARVIS before replacing it.
+_INSTANCE_MUTEX_HANDLE = None
+_INSTANCE_MUTEX_NAME = "JARVIS.Desktop.Singleton"
+ERROR_ALREADY_EXISTS = 183
+
+
+def acquire_single_instance() -> bool:
+    """Return True for the first UI process; prevent duplicate windows/tray processes."""
+    global _INSTANCE_MUTEX_HANDLE
+    if os.name != "nt":
+        return True
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_bool
+    handle = kernel32.CreateMutexW(None, True, _INSTANCE_MUTEX_NAME)
+    if not handle:
+        error = ctypes.get_last_error()
+        raise OSError(error, "Could not create the JARVIS single-instance mutex.")
+    if ctypes.get_last_error() == ERROR_ALREADY_EXISTS:
+        kernel32.CloseHandle(handle)
+        return False
+    # Keep the handle alive for the entire process lifetime; Windows releases it on exit.
+    _INSTANCE_MUTEX_HANDLE = handle
+    return True
+
+
 STARTUP_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 
@@ -2042,6 +2073,8 @@ def main(argv=None):
             return 1 if errors else 0
         except Exception:
             return 1
+    if not acquire_single_instance():
+        return 0
     root = tk.Tk()
     JarvisDesktop(root)
     root.mainloop()
