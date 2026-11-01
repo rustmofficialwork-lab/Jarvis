@@ -793,6 +793,7 @@ class JarvisDesktop:
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
         ]
 
+    @staticmethod
     def _format_battery_status(battery) -> str:
         """Delegate battery presentation to the shared system-monitor module."""
         from system_monitor import format_battery_status
@@ -838,8 +839,6 @@ class JarvisDesktop:
         ]
         self._metrics_cache = (now, values)
         return values
-
-    @staticmethod
 
     def _handle_memory_command(
         self, prompt: str, *, from_voice: bool = False, display_user: bool = True,
