@@ -45,6 +45,91 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - name: Set build version
+        shell: pwsh
+        run: |
+          $version = "1.1.$env:GITHUB_RUN_NUMBER"
+          $desktopFile = "desktop/windows/jarvis_desktop.py"
+          $source = Get-Content $desktopFile -Raw
+          $source = $source -replace '(?m)^APP_VERSION = "[^"]+"        run: python -m pip install -r desktop/windows/requirements.txt
+      - name: Build standalone Windows executable
+        working-directory: desktop/windows
+        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all pystray --collect-all PIL --collect-all vosk --collect-all pypdf --add-data "jarvis_hud.webp;." --name JARVIS jarvis_desktop.py
+      - name: Upload JARVIS Windows executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: JARVIS-Windows-Portable-x64
+          path: desktop/windows/dist/JARVIS.exe
+          if-no-files-found: error
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          )
+          $compiler = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $compiler) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+            $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $compiler)) { throw "ISCC.exe was not found after installation." }
+          & $compiler /O+ "/DMyAppVersion=$env:JARVIS_VERSION" desktop/windows/installer/JARVIS.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload JARVIS Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: JARVIS-Windows-Installer-x64
+          path: desktop/windows/dist-installer/JARVIS-Setup-x64.exe
+          if-no-files-found: error
+
+      - name: Create SHA-256 checksums
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          $files = @(
+            "desktop/windows/dist/JARVIS.exe",
+            "desktop/windows/dist-installer/JARVIS-Setup-x64.exe"
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+            "$hash  $([System.IO.Path]::GetFileName($file))"
+          }
+          $lines | Out-File -FilePath SHA256SUMS.txt -Encoding ascii
+
+      # Publish stable, direct download links for Windows users. GitHub's
+      # Actions artifact table UI varies by viewport; release assets are easier
+      # to find and can be downloaded without opening the artifact details.
+      - name: Publish latest Windows downloads
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: jarvis-latest
+          target_commitish: main
+          name: JARVIS Latest Windows Build
+          body: |
+            Latest successful Windows desktop build from the main branch.
+
+            - Installer: JARVIS-Setup-x64.exe
+            - Portable executable: JARVIS.exe
+            - Version: ${{ env.JARVIS_VERSION }}
+
+            These links are updated by the Windows Desktop workflow.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: |
+            desktop/windows/dist-installer/JARVIS-Setup-x64.exe
+            desktop/windows/dist/JARVIS.exe
+            SHA256SUMS.txt
+, ('APP_VERSION = "' + $version + '"')
+          if ($source -notmatch [regex]::Escape('APP_VERSION = "' + $version + '"')) { throw "Could not set desktop app version." }
+          Set-Content -Path $desktopFile -Value $source -NoNewline
+          "JARVIS_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install desktop dependencies
         run: python -m pip install -r desktop/windows/requirements.txt
       - name: Build standalone Windows executable
