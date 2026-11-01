@@ -6,6 +6,9 @@ import {
   FastForward, Rewind, Settings, Wifi, Lock, ChevronRight, ArrowRight, HardDrive, Video, Folder,
 } from "lucide-react";
 import helmet from "@/assets/helmet.jpg";
+import { Button } from "@/components/ui/button";
+import { useTelemetry } from "@/hooks/use-telemetry";
+import { formatGB, formatPercent, formatTemperature, formatUptime, usedPercent } from "@/lib/telemetry";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -67,12 +70,6 @@ const socials = [
   { icon: Youtube, label: "youtube" }, { icon: Joystick, label: "steam" }, { icon: BookOpen, label: "notion" },
   { icon: Radio, label: "spotify" }, { icon: Bot, label: "chatgpt" },
 ];
-const quotes = [
-  ["The future is not a gift, it is an achievement."],
-  ["Sometimes you gotta run before you can walk."],
-  ["I'm not a hero. I'm just a guy who runs a company."],
-  ["Genius, billionaire, playboy, philanthropist."],
-];
 
 function useClock() {
   const [d, setD] = useState<Date | null>(null);
@@ -82,6 +79,10 @@ function useClock() {
 
 function Index() {
   const d = useClock();
+  const sensors = useTelemetry();
+  const metrics = sensors.data;
+  const diskPct = usedPercent(metrics?.diskTotal, metrics?.diskFree);
+  const ramUsed = metrics?.ramTotal != null && metrics.ramFree != null ? metrics.ramTotal - metrics.ramFree : null;
   const time = d ? d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "--:-- --";
   const [hm, ampm] = time.split(" ");
   const day = d ? d.toLocaleDateString("en-US", { weekday: "long" }) : "";
@@ -105,15 +106,16 @@ function Index() {
               <div className="font-hud text-sm">{day}</div>
             </div>
           </div>
-          <div className="space-y-2 text-lg font-semibold">
-            <div className="flex items-center gap-2"><HardDrive className="h-5 w-5" /> Full Capacity: 457 GB</div>
-            <div className="flex items-center gap-2"><Database className="h-5 w-5" /> Free Capacity: 143 GB</div>
-            <div className="h-1.5 w-full bg-hud-dim/30"><div className="h-full w-[70%] bg-hud glow-box" /></div>
+           <div className="space-y-2 text-lg font-semibold">
+             <div className="flex items-center gap-2"><HardDrive className="h-5 w-5 shrink-0" /> C: Capacity: {formatGB(metrics?.diskTotal)}</div>
+             <div className="flex items-center gap-2"><Database className="h-5 w-5 shrink-0" /> C: Free: {formatGB(metrics?.diskFree)}</div>
+             <div className="h-1.5 w-full bg-hud-dim/30"><div className="h-full bg-hud glow-box" style={{ width: `${diskPct ?? 0}%` }} /></div>
           </div>
           <div className="flex items-center gap-4">
-            <Ring size={140} pct={98} stroke={8}>
-              <div className="font-hud text-xl font-bold glow-text">98%</div>
+             <Ring size={140} pct={sensors.batteryPercent ?? 0} stroke={8}>
+               <div className="font-hud text-xl font-bold glow-text">{formatPercent(sensors.batteryPercent)}</div>
               <div className="text-sm">Battery</div>
+               <div className="text-xs">{sensors.charging === null ? "Unavailable" : sensors.charging ? "Plugged in" : "On battery"}</div>
             </Ring>
             <div className="flex-1 space-y-2">
               <div className="font-hud text-sm">Power</div>
@@ -128,8 +130,8 @@ function Index() {
           </div>
           <div className="space-y-1">
             <div className="font-hud text-sm">Wireless Status</div>
-            <div className="flex items-center gap-2 text-sm"><Wifi className="h-4 w-4" /> Wi-Fi: Connected</div>
-            <div className="text-sm">System: 64 Bit Windows</div>
+             <div className="flex items-center gap-2 text-sm"><Wifi className="h-4 w-4" /> Wi-Fi: Unavailable</div>
+             <div className="text-sm">System: {metrics?.osName ?? "Unavailable"}</div>
           </div>
           <ul className="space-y-2 text-lg font-semibold">
             {[[FileText, "Documents"], [Image, "Pictures"], [Music, "Music"], [Video, "Videos"]].map(([I, l]) => {
@@ -139,18 +141,31 @@ function Index() {
           </ul>
           <div className="flex items-end justify-between gap-4">
             <div className="hud-panel flex flex-1 items-center justify-between p-3">
-              <div><div className="text-lg">Encryption</div><div className="font-semibold text-success">Active</div></div>
+               <div><div className="text-lg">Encryption</div><div className="font-semibold">Unavailable</div></div>
               <Lock className="h-6 w-6" />
             </div>
-            <Ring size={130} pct={16} stroke={10}>
-              <div className="font-hud text-lg font-bold glow-text">16%</div>
+             <Ring size={130} pct={metrics?.cpuPercent ?? 0} stroke={10}>
+               <div className="font-hud text-lg font-bold glow-text">{formatPercent(metrics?.cpuPercent)}</div>
               <div className="font-hud text-sm">CPU</div>
             </Ring>
           </div>
         </section>
 
         {/* CENTER */}
-        <section className="space-y-6">
+         <section className="min-w-0 space-y-6">
+           <div className="flex flex-wrap items-center gap-3 border-b border-hud/40 pb-3">
+             <div className="mr-auto text-sm" role="status">
+               <span className={sensors.status === "live" ? "text-success" : "text-hud"}>
+                 {sensors.status === "live" ? "Laptop connected" : sensors.status === "connecting" ? "Connecting…" : sensors.status === "unavailable" ? "Laptop helper unavailable" : "Laptop disconnected"}
+               </span>
+               {sensors.updatedAt && <span className="ml-2">{sensors.updatedAt.toLocaleTimeString()}</span>}
+             </div>
+             <Button variant="outline" size="sm" onClick={() => sensors.setEnabled(!sensors.enabled)}>
+               <Monitor />{sensors.enabled ? "Disconnect laptop" : "Connect laptop"}
+             </Button>
+             <Button asChild variant="outline" size="sm"><a href="/windows/jarvis-sensors.py" download><Download />Windows helper</a></Button>
+             <Button asChild variant="ghost" size="sm"><a href="/windows/README.txt" target="_blank" rel="noreferrer"><BookOpen />Setup</a></Button>
+           </div>
           <div className="grid items-center gap-6 md:grid-cols-[160px_1fr_200px]">
             <ul className="space-y-6">
               {leftLinks.map(({ icon: Icon, label }) => (
@@ -182,15 +197,15 @@ function Index() {
               <div className="hud-panel p-4">
                 <div className="mb-2 text-sm font-bold glow-text">System Information</div>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div><p className="text-foreground">CPU</p><p>Intel Core i5 3.20 GHz</p><p className="mt-2 text-foreground">RAM</p><p>8.00 GB</p><p className="mt-2 text-foreground">GPU</p><p>NVIDIA GeForce GTX 1650</p></div>
-                  <div><p className="text-foreground">Operating System</p><p>Windows 11 Professional</p><p className="mt-2 text-foreground">Architecture</p><p>64-bit</p></div>
-                  <div><p className="text-foreground">Uptime</p><p>2:15:32</p><p className="mt-2 text-foreground">Temperature</p><p>CPU 46°C</p><p>GPU 52°C</p></div>
+                   <div className="min-w-0 break-words"><p className="text-foreground">CPU</p><p>{metrics?.cpuName ?? "Unavailable"}</p><p className="mt-2 text-foreground">RAM</p><p>{formatGB(metrics?.ramTotal)}</p><p className="mt-2 text-foreground">GPU</p><p>{metrics?.gpuName ?? "Unavailable"}</p></div>
+                   <div className="min-w-0 break-words"><p className="text-foreground">Operating System</p><p>{metrics?.osName ?? "Unavailable"}</p><p className="mt-2 text-foreground">Architecture</p><p>{metrics?.architecture ?? "Unavailable"}</p></div>
+                   <div><p className="text-foreground">Uptime</p><p>{formatUptime(metrics?.uptimeSeconds)}</p><p className="mt-2 text-foreground">Temperature</p><p>CPU {formatTemperature(metrics?.cpuTemperature)}</p><p>GPU {formatTemperature(metrics?.gpuTemperature)}</p></div>
                 </div>
               </div>
               <div className="hud-panel grid gap-4 p-4 sm:grid-cols-3">
                 <div><p className="mb-1 text-sm text-foreground">Quick Access</p>{["Control Panel", "Device Manager", "Task Manager", "Run", "Settings"].map((x) => <p key={x}>- {x}</p>)}</div>
-                <div><p className="mb-1 text-sm text-foreground">Network Details</p>{["ISP : JioFiber", "IP : 192.168.1.100", "Download : 120 Mbps", "Upload : 80 Mbps"].map((x) => <p key={x}>- {x}</p>)}</div>
-                <div><p className="mb-1 text-sm text-foreground">System Status</p>{["Battery : 98%", "CPU : 16%", "RAM : 3.4/8.0 GB", "Disk : 68%"].map((x) => <p key={x}>- {x}</p>)}</div>
+                 <div><p className="mb-1 text-sm text-foreground">Network Details</p>{["ISP : Unavailable", "IP : Unavailable", "Download : Unavailable", "Upload : Unavailable"].map((x) => <p key={x}>- {x}</p>)}</div>
+                 <div><p className="mb-1 text-sm text-foreground">System Status</p>{[`Battery : ${formatPercent(sensors.batteryPercent)}`, `CPU : ${formatPercent(metrics?.cpuPercent)}`, `RAM : ${formatGB(ramUsed)} / ${formatGB(metrics?.ramTotal)}`, `C: Used : ${formatPercent(diskPct)}`].map((x) => <p key={x}>- {x}</p>)}</div>
               </div>
             </div>
           </div>
@@ -201,21 +216,14 @@ function Index() {
           <div className="flex justify-end"><span className="grid h-11 w-11 place-items-center rounded-full border-2 border-hud glow-box"><ArrowRight className="h-5 w-5" /></span></div>
           <div className="flex items-center justify-end gap-3">
             <div className="text-center text-sm">
-              <div className="font-hud">CPU Temp</div><div>16°C</div>
-              <div className="mt-2">Atmospheric<br />Roughly<br />Clear</div>
+               <div className="font-hud">CPU Temp</div><div>{formatTemperature(metrics?.cpuTemperature)}</div>
+               <div className="mt-2">GPU Temp<br />{formatTemperature(metrics?.gpuTemperature)}</div>
             </div>
-            <Ring size={150} pct={75} stroke={10}><div className="font-hud text-4xl font-black glow-text">16°</div></Ring>
+             <Ring size={150} pct={Math.min(100, Math.max(0, metrics?.cpuTemperature ?? 0))} stroke={10}><div className="font-hud text-2xl font-black glow-text">{metrics?.cpuTemperature == null ? "—" : `${Math.round(metrics.cpuTemperature)}°`}</div></Ring>
           </div>
           <div className="border-b border-hud text-right font-hud text-xl glow-text">Jarvis</div>
           <div className="flex h-6 items-center justify-end gap-0.5">
             {Array.from({ length: 30 }).map((_, i) => <span key={i} className="w-0.5 bg-hud animate-bar" style={{ height: "100%", animationDelay: `${(i % 7) * 0.13}s` }} />)}
-          </div>
-          <div className="space-y-4 border-r-4 border-hud pr-3">
-            {quotes.map(([q]) => (
-              <blockquote key={q} className="text-sm font-semibold text-foreground">
-                “{q}”<div className="text-right text-hud">— Tony Stark</div>
-              </blockquote>
-            ))}
           </div>
           <div className="flex justify-between">{[0, 1, 2, 3].map((i) => <span key={i} className="h-4 w-4 bg-hud glow-box" />)}</div>
           <div className="flex flex-col items-end gap-4 pt-4 text-center text-sm font-semibold text-foreground">
