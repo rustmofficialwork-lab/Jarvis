@@ -645,19 +645,72 @@ class JarvisDesktop:
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
-        """Build the image-only JARVIS HUD; legacy drawn dashboard widgets are removed."""
-        self.root.title("J.A.R.V.I.S. | Desktop Command Center")
-        self.root.geometry("1600x900")
-        self.root.minsize(1100, 619)
-        self.root.configure(bg="#02070d")
+        """Build the native JARVIS command center without any wallpaper artwork."""
+        self.root.title("J.A.R.V.I.S. | Desktop Assistant")
+        self.root.geometry("1180x760")
+        self.root.minsize(820,600)
+        self.root.configure(bg="#07111b")
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.chat = None
         self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
         self.prompt_var = tk.StringVar()
-        self.hud = tk.Canvas(self.root, bg="#02070d", highlightthickness=0)
-        self.hud.pack(fill="both", expand=True)
-        self.hud.bind("<Configure>", lambda _event: self._render_hud_background())
-        self._render_hud_background()
+
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure("Jarvis.TButton", background="#123247", foreground="#8deeff",
+                        bordercolor="#087da5", padding=(12, 8), font=("Segoe UI", 10, "bold"))
+        style.map("Jarvis.TButton", background=[("active", "#18516b")])
+
+        shell = tk.Frame(self.root, bg="#07111b")
+        shell.pack(fill="both", expand=True, padx=22, pady=18)
+        header = tk.Frame(shell, bg="#0b1d2b", highlightbackground="#087da5", highlightthickness=1)
+        header.pack(fill="x")
+        brand = tk.Frame(header, bg="#0b1d2b")
+        brand.pack(side="left", padx=18, pady=14)
+        tk.Label(brand, text="J.A.R.V.I.S.", bg="#0b1d2b", fg="#42dfff",
+                 font=("Segoe UI", 22, "bold")).pack(anchor="w")
+        tk.Label(brand, text="PERSONAL AI DESKTOP ASSISTANT", bg="#0b1d2b", fg="#8aa9b8",
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(2,0))
+        ttk.Button(header, text="MEMORY", style="Jarvis.TButton",
+                   command=self.open_memory_manager).pack(side="right", padx=14, pady=18)
+        ttk.Button(header, text="SETTINGS", style="Jarvis.TButton",
+                   command=self.open_settings).pack(side="right", padx=4, pady=18)
+
+        status = tk.Frame(shell, bg="#0b1d2b")
+        status.pack(fill="x", pady=(12,10))
+        tk.Label(status, textvariable=self.status_var, bg="#0b1d2b", fg="#45d7b5",
+                 font=("Segoe UI", 9, "bold"), anchor="w", padx=12, pady=9).pack(fill="x")
+
+        panel = tk.Frame(shell, bg="#0b1722", highlightbackground="#16445b", highlightthickness=1)
+        panel.pack(fill="both", expand=True)
+        tk.Label(panel, text="CONVERSATION", bg="#0b1722", fg="#42dfff",
+                 font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x", padx=14, pady=(12,6))
+        self.chat = tk.Text(panel, wrap="word", bg="#06101a", fg="#d8edf5",
+                            insertbackground="#42dfff", relief="flat", padx=16, pady=14,
+                            font=("Segoe UI", 11), state="disabled")
+        self.chat.pack(fill="both", expand=True, padx=12, pady=(0,12))
+        self.chat.tag_configure("speaker", foreground="#42dfff", font=("Segoe UI", 9, "bold"))
+        self.chat.tag_configure("error", foreground="#ff8c8c")
+        for who, message, tag in self.transcript:
+            self.chat.configure(state="normal")
+            self.chat.insert("end", f"{who}\\n", "speaker")
+            self.chat.insert("end", f"{message}\\n\\n", tag or "")
+            self.chat.configure(state="disabled")
+        self.chat.see("end")
+
+        composer = tk.Frame(shell, bg="#07111b")
+        composer.pack(fill="x", pady=(12,0))
+        entry = tk.Entry(composer, textvariable=self.prompt_var, bg="#0b1d2b", fg="#e5f8ff",
+                         insertbackground="#42dfff", relief="flat", font=("Segoe UI", 12))
+        entry.pack(side="left", fill="x", expand=True, ipady=13, padx=(0,10))
+        entry.bind("<Return>", lambda _event: self.send_text())
+        ttk.Button(composer, text="SEND", style="Jarvis.TButton", command=self.send_text).pack(side="right")
+        tk.Label(shell, text="Enter a message or try: system status  •  weather in Bhopal  •  find file",
+                 bg="#07111b", fg="#66899a", font=("Segoe UI", 9)).pack(anchor="w", pady=(9,0))
+        entry.focus_set()
 
     def _get_service_statuses(self):
         """Report readiness from actual configuration and installed capabilities."""
