@@ -1212,3 +1212,18 @@ class HudAssetIntegrityTests(unittest.TestCase):
             self.assertGreater(image.width, 300)
             self.assertGreater(image.height, 150)
             image.verify()
+
+
+
+class SingleInstanceTests(unittest.TestCase):
+    def test_non_windows_runs_without_mutex(self):
+        with patch.object(jarvis_desktop.os, "name", "posix"):
+            self.assertTrue(jarvis_desktop.acquire_single_instance())
+
+    def test_main_exits_when_another_instance_is_running(self):
+        with (
+            patch.object(jarvis_desktop, "acquire_single_instance", return_value=False),
+            patch.object(jarvis_desktop.tk, "Tk") as tk_root,
+        ):
+            self.assertEqual(jarvis_desktop.main([]), 0)
+        tk_root.assert_not_called()
