@@ -645,7 +645,7 @@ class JarvisDesktop:
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     def _build_ui(self):
-        """Build the native JARVIS command center without any wallpaper artwork."""
+        """Build the native JARVIS command center using native desktop widgets."""
         self.root.title("J.A.R.V.I.S. | Desktop Assistant")
         self.root.geometry("1180x760")
         self.root.minsize(820,600)
