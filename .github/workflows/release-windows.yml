@@ -32,7 +32,7 @@ jobs:
 
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all pystray --collect-all PIL --collect-all vosk --collect-all pypdf --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all pystray --collect-all PIL --collect-all vosk --collect-all pypdf --add-data "jarvis_hud.webp;." --name JARVIS jarvis_desktop.py
 
       - name: Create Windows installer
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
