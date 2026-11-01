@@ -929,9 +929,9 @@ class JarvisDesktop:
         controls = tk.Frame(window, bg="#07111b")
         controls.pack(fill="x", padx=16, pady=(2, 14))
         ttk.Button(controls, text="Add", command=add_memory).pack(side="left")
-        ttk.Button(controls, text="Update selected", style="HUD.TButton", command=edit_memory).pack(side="left", padx=6)
-        ttk.Button(controls, text="Delete selected", style="HUD.TButton", command=delete_memory).pack(side="left")
-        ttk.Button(controls, text="Close", style="HUD.TButton", command=window.destroy).pack(side="right")
+        ttk.Button(controls, text="Update selected", command=edit_memory).pack(side="left", padx=6)
+        ttk.Button(controls, text="Delete selected", command=delete_memory).pack(side="left")
+        ttk.Button(controls, text="Close", command=window.destroy).pack(side="right")
         refresh()
 
     def _load_secrets(self):
