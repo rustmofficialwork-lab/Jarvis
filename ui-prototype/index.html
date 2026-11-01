@@ -38,7 +38,11 @@ tick();setInterval(tick,1000);document.getElementById('sessionStart').textConten
 document.getElementById('platform').textContent=(navigator.userAgentData?.platform||navigator.platform||'Browser').toUpperCase();
 document.getElementById('browser').textContent=(navigator.userAgent.match(/(Edg|Chrome|Firefox|Safari)\/?([\d.]*)/i)?.[1]||'WEB').toUpperCase();
 function screenInfo(){document.getElementById('screenSize').textContent=screen.width+' × '+screen.height;}
-screenInfo();addEventListener('resize',screenInfo);\ndocument.getElementById('cpuCores').textContent=navigator.hardwareConcurrency?String(navigator.hardwareConcurrency):'NOT EXPOSED';\ndocument.getElementById('deviceMemory').textContent=navigator.deviceMemory?navigator.deviceMemory+' GB (EST.)':'NOT EXPOSED';\nfunction updateBrowserHeap(){const m=performance.memory;document.getElementById('memoryUsage').textContent=m?Math.round(m.usedJSHeapSize/1048576)+' / '+Math.round(m.jsHeapSizeLimit/1048576)+' MB':'NOT EXPOSED';}\nupdateBrowserHeap();setInterval(updateBrowserHeap,5000);
+screenInfo();addEventListener('resize',screenInfo);
+document.getElementById('cpuCores').textContent=navigator.hardwareConcurrency?String(navigator.hardwareConcurrency):'NOT EXPOSED';
+document.getElementById('deviceMemory').textContent=navigator.deviceMemory?navigator.deviceMemory+' GB (EST.)':'NOT EXPOSED';
+function updateBrowserHeap(){const m=performance.memory;document.getElementById('memoryUsage').textContent=m?Math.round(m.usedJSHeapSize/1048576)+' / '+Math.round(m.jsHeapSizeLimit/1048576)+' MB':'NOT EXPOSED';}
+updateBrowserHeap();setInterval(updateBrowserHeap,5000);
 function updateOnline(){const el=document.getElementById('onlineStatus');el.textContent=navigator.onLine?'ONLINE':'OFFLINE';el.style.color=navigator.onLine?'var(--green)':'var(--amber)';}
 updateOnline();addEventListener('online',updateOnline);addEventListener('offline',updateOnline);
 const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
