@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-API_URL = "https://api.github.com/repos/rustmofficialwork-lab/Jarvis/releases/latest"
+API_URL = "https://api.github.com/repos/rustmofficialwork-lab/Jarvis/releases/tags/jarvis-latest"
 INSTALLER_NAME = "JARVIS-Setup-x64.exe"
 CHECKSUM_NAME = "SHA256SUMS.txt"
 MAX_API_BYTES = 1024 * 1024
