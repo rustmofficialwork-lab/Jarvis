@@ -52,7 +52,7 @@ class UpdaterTests(unittest.TestCase):
     def test_rolling_latest_tag_uses_numeric_version_from_release_body(self):
         payload = {
             "tag_name": "jarvis-latest",
-            "body": "Latest successful Windows desktop build.\\nVersion: 1.1.345\\n",
+            "body": "Latest successful Windows desktop build.\nVersion: 1.1.345\n",
             "assets": [
                 {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + INSTALLER_NAME},
                 {"name": CHECKSUM_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + CHECKSUM_NAME},
