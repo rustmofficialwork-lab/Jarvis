@@ -657,7 +657,11 @@ class JarvisDesktop:
             screen_w = self.root.winfo_screenwidth()
             screen_h = self.root.winfo_screenheight()
             self.root.geometry(f"{min(1180, screen_w - 80)}x{min(760, screen_h - 100)}")
-        self.root.configure(bg="#07111b")
+        self.root.configure(bg="#060d16")
+        # Use a consistent native Windows UI font across every Tk widget.
+        self.root.option_add("*Font", ("Segoe UI", 10))
+        self.root.option_add("*Background", "#060d16")
+        self.root.option_add("*Foreground", "#e7f7ff")
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.chat = None
         self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
@@ -668,20 +672,24 @@ class JarvisDesktop:
             style.theme_use("clam")
         except tk.TclError:
             pass
-        style.configure("Jarvis.TButton", background="#123247", foreground="#8deeff",
-                        bordercolor="#087da5", padding=(12, 8), font=("Segoe UI", 10, "bold"))
-        style.map("Jarvis.TButton", background=[("active", "#18516b")])
+        style.configure("Jarvis.TButton", background="#103449", foreground="#a5f2ff",
+                        bordercolor="#1685a6", lightcolor="#1685a6", darkcolor="#0a2638",
+                        borderwidth=1, relief="flat", padding=(18, 11),
+                        font=("Segoe UI", 10, "bold"), focuscolor="#42dfff")
+        style.map("Jarvis.TButton",
+                  background=[("pressed", "#0b2638"), ("active", "#18516b")],
+                  foreground=[("disabled", "#66899a")])
 
-        shell = tk.Frame(self.root, bg="#07111b")
-        shell.pack(fill="both", expand=True, padx=22, pady=18)
-        header = tk.Frame(shell, bg="#0b1d2b", highlightbackground="#087da5", highlightthickness=1)
+        shell = tk.Frame(self.root, bg="#060d16")
+        shell.pack(fill="both", expand=True, padx=24, pady=20)
+        header = tk.Frame(shell, bg="#0b1d2b", highlightbackground="#147b9b", highlightthickness=1)
         header.pack(fill="x")
         brand = tk.Frame(header, bg="#0b1d2b")
-        brand.pack(side="left", padx=18, pady=14)
-        tk.Label(brand, text="J.A.R.V.I.S.", bg="#0b1d2b", fg="#42dfff",
-                 font=("Segoe UI", 22, "bold")).pack(anchor="w")
-        tk.Label(brand, text="PERSONAL AI DESKTOP ASSISTANT", bg="#0b1d2b", fg="#8aa9b8",
-                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(2,0))
+        brand.pack(side="left", padx=22, pady=17)
+        tk.Label(brand, text="J.A.R.V.I.S.", bg="#0b1d2b", fg="#55e4ff",
+                 font=("Segoe UI", 25, "bold")).pack(anchor="w")
+        tk.Label(brand, text="PERSONAL AI DESKTOP ASSISTANT", bg="#0b1d2b", fg="#9ab9c8",
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(3, 0))
         self.reactor_canvas = tk.Canvas(header, width=92, height=66, bg="#0b1d2b",
                                         highlightthickness=0, bd=0)
         self.reactor_canvas.pack(side="left", padx=(18, 0), pady=7)
@@ -691,50 +699,51 @@ class JarvisDesktop:
         ttk.Button(header, text="SETTINGS", style="Jarvis.TButton",
                    command=self.open_settings).pack(side="right", padx=4, pady=18)
 
-        status = tk.Frame(shell, bg="#0b1d2b")
-        status.pack(fill="x", pady=(12,10))
-        tk.Label(status, textvariable=self.status_var, bg="#0b1d2b", fg="#45d7b5",
-                 font=("Segoe UI", 9, "bold"), anchor="w", padx=12, pady=9).pack(fill="x")
+        status = tk.Frame(shell, bg="#0d2231", highlightbackground="#153c50", highlightthickness=1)
+        status.pack(fill="x", pady=(14, 12))
+        tk.Label(status, textvariable=self.status_var, bg="#0d2231", fg="#58e0bd",
+                 font=("Segoe UI", 9, "bold"), anchor="w", padx=15, pady=11).pack(fill="x")
 
         # Native live telemetry dashboard: real OS readings, never browser estimates.
-        telemetry = tk.Frame(shell, bg="#07111b")
-        telemetry.pack(fill="x", pady=(0, 12))
-        telemetry_header = tk.Frame(telemetry, bg="#07111b")
+        telemetry = tk.Frame(shell, bg="#060d16")
+        telemetry.pack(fill="x", pady=(0, 14))
+        telemetry_header = tk.Frame(telemetry, bg="#060d16")
         telemetry_header.pack(fill="x", pady=(0, 7))
-        tk.Label(telemetry_header, text="LIVE SYSTEM TELEMETRY", bg="#07111b", fg="#42dfff",
-                 font=("Segoe UI", 9, "bold")).pack(side="left")
+        tk.Label(telemetry_header, text="LIVE SYSTEM TELEMETRY", bg="#060d16", fg="#55e4ff",
+                 font=("Segoe UI", 10, "bold")).pack(side="left")
         tk.Label(telemetry_header, text="LOCAL WINDOWS SENSOR SNAPSHOT  •  AUTO REFRESH",
-                 bg="#07111b", fg="#66899a", font=("Segoe UI", 8)).pack(side="right")
+                 bg="#060d16", fg="#7898a9", font=("Segoe UI", 8)).pack(side="right")
         self.metric_value_labels = {}
         self.metric_detail_var = tk.StringVar(value="Collecting hardware readings…")
-        telemetry_grid = tk.Frame(telemetry, bg="#07111b")
+        telemetry_grid = tk.Frame(telemetry, bg="#060d16")
         telemetry_grid.pack(fill="x")
         metric_names = ("CPU LOAD", "MEMORY", "DISK USED", "BATTERY",
                         "CPU TEMP", "NETWORK", "STORAGE FREE", "STORAGE TOTAL")
         for index, metric_name in enumerate(metric_names):
-            card = tk.Frame(telemetry_grid, bg="#0b1d2b", highlightbackground="#16445b", highlightthickness=1)
+            card = tk.Frame(telemetry_grid, bg="#0d2231", highlightbackground="#1a5269", highlightthickness=1)
             card.grid(row=index // 4, column=index % 4, sticky="nsew", padx=(0 if index % 4 == 0 else 5, 0),
                       pady=(0, 5 if index < 4 else 0))
-            tk.Label(card, text=metric_name, bg="#0b1d2b", fg="#789eaf",
-                     font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
-            value = tk.Label(card, text="—", bg="#0b1d2b", fg="#dffaff",
-                             font=("Segoe UI", 14, "bold"))
-            value.pack(anchor="w", padx=10, pady=(0, 8))
+            tk.Label(card, text=metric_name, bg="#0d2231", fg="#91b5c5",
+                     font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=12, pady=(10, 3))
+            value = tk.Label(card, text="—", bg="#0d2231", fg="#effcff",
+                             font=("Segoe UI", 16, "bold"))
+            value.pack(anchor="w", padx=12, pady=(0, 10))
             self.metric_value_labels[metric_name] = value
         for column in range(4):
             telemetry_grid.grid_columnconfigure(column, weight=1, uniform="telemetry")
-        tk.Label(telemetry, textvariable=self.metric_detail_var, bg="#07111b", fg="#66899a",
-                 font=("Segoe UI", 8), anchor="w").pack(fill="x", pady=(5, 0))
+        tk.Label(telemetry, textvariable=self.metric_detail_var, bg="#060d16", fg="#7898a9",
+                 font=("Segoe UI", 8), anchor="w").pack(fill="x", pady=(7, 0))
 
-        panel = tk.Frame(shell, bg="#0b1722", highlightbackground="#16445b", highlightthickness=1)
+        panel = tk.Frame(shell, bg="#0d1c2a", highlightbackground="#1a5269", highlightthickness=1)
         panel.pack(fill="both", expand=True)
-        tk.Label(panel, text="CONVERSATION", bg="#0b1722", fg="#42dfff",
-                 font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x", padx=14, pady=(12,6))
-        self.chat = tk.Text(panel, height=8, wrap="word", bg="#06101a", fg="#d8edf5",
-                            insertbackground="#42dfff", relief="flat", padx=16, pady=14,
-                            font=("Segoe UI", 11), state="disabled")
-        self.chat.pack(fill="both", expand=True, padx=12, pady=(0,12))
-        self.chat.tag_configure("speaker", foreground="#42dfff", font=("Segoe UI", 9, "bold"))
+        tk.Label(panel, text="CONVERSATION", bg="#0d1c2a", fg="#55e4ff",
+                 font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x", padx=17, pady=(14, 8))
+        self.chat = tk.Text(panel, height=8, wrap="word", bg="#071522", fg="#e5f4fa",
+                            insertbackground="#55e4ff", selectbackground="#15516a",
+                            selectforeground="#ffffff", relief="flat", padx=20, pady=17,
+                            font=("Segoe UI", 11), spacing1=3, spacing3=7, state="disabled")
+        self.chat.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+        self.chat.tag_configure("speaker", foreground="#55e4ff", font=("Segoe UI", 9, "bold"))
         self.chat.tag_configure("error", foreground="#ff8c8c")
         for who, message, tag in self.transcript:
             self.chat.configure(state="normal")
@@ -743,15 +752,18 @@ class JarvisDesktop:
             self.chat.configure(state="disabled")
         self.chat.see("end")
 
-        composer = tk.Frame(shell, bg="#07111b")
-        composer.pack(fill="x", pady=(12,0))
-        entry = tk.Entry(composer, textvariable=self.prompt_var, bg="#0b1d2b", fg="#e5f8ff",
-                         insertbackground="#42dfff", relief="flat", font=("Segoe UI", 12))
-        entry.pack(side="left", fill="x", expand=True, ipady=13, padx=(0,10))
+        composer = tk.Frame(shell, bg="#060d16")
+        composer.pack(fill="x", pady=(14, 0))
+        entry = tk.Entry(composer, textvariable=self.prompt_var, bg="#0d2231", fg="#f0fbff",
+                         insertbackground="#55e4ff", selectbackground="#15516a",
+                         selectforeground="#ffffff", relief="flat", highlightthickness=1,
+                         highlightbackground="#1a5269", highlightcolor="#35cce9",
+                         font=("Segoe UI", 12))
+        entry.pack(side="left", fill="x", expand=True, ipady=15, padx=(0, 12))
         entry.bind("<Return>", lambda _event: self.send_text())
         ttk.Button(composer, text="SEND", style="Jarvis.TButton", command=self.send_text).pack(side="right")
-        tk.Label(shell, text="Enter a message or try: system status  •  weather in Bhopal  •  find file",
-                 bg="#07111b", fg="#66899a", font=("Segoe UI", 9)).pack(anchor="w", pady=(9,0))
+        tk.Label(shell, text="ENTER A MESSAGE  •  TRY: SYSTEM STATUS  /  WEATHER  /  FIND FILE",
+                 bg="#060d16", fg="#7898a9", font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(9, 0))
         entry.focus_set()
 
     def _draw_reactor(self):
