@@ -28,6 +28,25 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     return parts + (0,) * (4 - len(parts))
 
 
+def _release_version(payload: dict) -> tuple[str, tuple[int, ...]]:
+    """Read the numeric build version from a rolling release or a versioned tag."""
+    body = payload.get("body", "")
+    if isinstance(body, str):
+        match = re.search(r"(?im)^Version:\\s*(v?\\d+(?:\\.\\d+){1,3})\\s*$", body)
+        if match:
+            value = match.group(1).removeprefix("v")
+            return value, _version_tuple(value)
+    tag = str(payload.get("tag_name", ""))
+    try:
+        version = _version_tuple(tag)
+    except ValueError as exc:
+        raise RuntimeError(
+            "The GitHub release is missing numeric version metadata. "
+            "Publish a build with a 'Version: x.y.z' release-body line."
+        ) from exc
+    return tag.removeprefix("v"), version
+
+
 def _safe_github_url(value: str) -> str:
     parsed = urlparse(value)
     try:
@@ -81,7 +100,7 @@ def check_for_update(current_version: str, opener=None) -> dict:
         raise RuntimeError("GitHub returned an invalid update description.") from exc
 
     tag = payload.get("tag_name", "")
-    latest = _version_tuple(tag)
+    latest_version, latest = _release_version(payload)
     assets = payload.get("assets", [])
     if not isinstance(assets, list):
         raise RuntimeError("The GitHub release has an invalid asset list.")
@@ -98,7 +117,7 @@ def check_for_update(current_version: str, opener=None) -> dict:
         "available": latest > current,
         "release_exists": True,
         "current_version": current_version,
-        "latest_version": str(tag).strip().removeprefix("v"),
+        "latest_version": latest_version,
         "tag": tag,
         "release_url": payload.get("html_url", "https://github.com/rustmofficialwork-lab/Jarvis/releases"),
         "installer_url": _safe_github_url(installer.get("browser_download_url")) if installer else None,
