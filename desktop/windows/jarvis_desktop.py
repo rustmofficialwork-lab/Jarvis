@@ -27,7 +27,7 @@ from updater import check_for_update, download_verified_installer
 from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
 
 APP_NAME = "JARVIS"
-APP_VERSION = "1.1.0"
+APP_VERSION = os.environ.get("JARVIS_BUILD_VERSION", "1.1.0")
 MAX_CHAT_RESPONSE_BYTES = 2_000_000
 KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
