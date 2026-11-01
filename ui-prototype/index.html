@@ -17,26 +17,38 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 <section class="layout">
 <aside class="column left">
 <div class="panel"><div class="label">LOCAL TIME / DATE</div><div class="clock" id="clock">--:--:--</div><div class="date" id="date">Loading date...</div></div>
-<div class="panel"><div class="label">SYSTEM OVERVIEW <span style="color:#ffc66d">/ DEMO</span></div><div class="row"><span>Processor</span><strong>INTEL CORE</strong></div><div class="meter"><i style="--w:42%"></i></div><div class="row"><span>Memory usage</span><strong>6.4 / 16 GB</strong></div><div class="meter"><i style="--w:40%"></i></div><div class="row"><span>Storage</span><strong>58%</strong></div><div class="meter"><i style="--w:58%"></i></div></div>
-<div class="panel"><div class="label">CONNECTIVITY</div><div class="row"><span>Wi-Fi</span><strong style="color:var(--green)">CONNECTED</strong></div><div class="row"><span>Bluetooth</span><strong style="color:var(--green)">READY</strong></div><div class="row"><span>Cloud link</span><strong style="color:var(--green)">ACTIVE</strong></div></div>
+<div class="panel"><div class="label">DEVICE INFORMATION</div><div class="row"><span>Platform</span><strong id="platform">DETECTING</strong></div><div class="row"><span>Browser</span><strong id="browser">DETECTING</strong></div><div class="row"><span>Screen</span><strong id="screenSize">--</strong></div><div class="row"><span>Battery</span><strong id="battery">NOT AVAILABLE</strong></div><div class="meter"><i id="batteryMeter" style="--w:0%"></i></div></div>
+<div class="panel"><div class="label">LIVE CONNECTIVITY</div><div class="row"><span>Internet</span><strong id="onlineStatus">CHECKING</strong></div><div class="row"><span>Connection</span><strong id="connectionType">UNKNOWN</strong></div><div class="row"><span>Last update</span><strong id="updateTime">--:--:--</strong></div></div>
 </aside>
 <section class="center"><div class="core-wrap"><div class="orbit"></div><div class="orbit two"></div><div class="orbit three"></div><div class="reactor"></div></div><div class="core-caption">J.A.R.V.I.S. CORE</div><div class="subcaption">ALL SYSTEMS NOMINAL</div>
 <div class="quick"><button data-action="Run diagnostics">⌁ DIAGNOSTICS</button><button data-action="Open system status">◈ SYSTEM STATUS</button><button data-action="Show recent activity">⌘ ACTIVITY LOG</button></div>
 <div class="chat" style="width:100%"><div class="chat-head">◉ &nbsp; TALK TO YOUR ASSISTANT</div><div class="messages" id="messages"><div class="msg">JARVIS: Good day. Interface prototype is ready. How may I assist?</div></div><form class="composer" id="chatForm"><input id="chatInput" autocomplete="off" placeholder="Enter a command..." aria-label="Message JARVIS"><button type="submit">SEND ↗</button></form></div></section>
 <aside class="column right">
-<div class="panel"><div class="label">PERFORMANCE <span style="color:#ffc66d">/ DEMO</span></div><div class="row"><span>CPU load</span><span class="metric">42<span class="unit">%</span></span></div><div class="meter"><i style="--w:42%"></i></div><div class="row"><span>GPU load</span><span class="metric">28<span class="unit">%</span></span></div><div class="meter"><i style="--w:28%"></i></div><div class="row"><span>Temperature</span><strong>48°C</strong></div></div>
+<div class="panel"><div class="label">HARDWARE TELEMETRY</div><div class="row"><span>CPU load</span><strong id="cpuLoad">NOT EXPOSED</strong></div><div class="row"><span>GPU load</span><strong id="gpuLoad">NOT EXPOSED</strong></div><div class="row"><span>Memory usage</span><strong id="memoryUsage">NOT EXPOSED</strong></div><div class="row"><span>Device temperature</span><strong id="deviceTemp">NOT EXPOSED</strong></div><div class="unit">Requires the native JARVIS desktop companion for real sensor readings.</div></div>
 <div class="panel"><div class="label">ASSISTANT MODULES</div><div class="row"><span>Voice interface</span><strong style="color:var(--green)">READY</strong></div><div class="row"><span>Memory engine</span><strong style="color:var(--green)">READY</strong></div><div class="row"><span>AI reasoning</span><strong style="color:var(--green)">READY</strong></div><div class="row"><span>Automation</span><strong style="color:var(--amber)">STANDBY</strong></div></div>
 <div class="panel"><div class="label">RECENT ACTIVITY</div><div class="activity"><b>ONLINE</b><span>Core interface initialized</span></div><div class="activity"><b>READY</b><span>Assistant modules loaded</span></div><div class="activity"><b>SECURE</b><span>Local session established</span></div></div>
 </aside></section>
-<footer class="foot"><span>J.A.R.V.I.S. UI CONCEPT</span><span>LOCAL DEMO DATA — NOT LIVE HARDWARE TELEMETRY</span><span>DESIGNED FOR REVIEW</span></footer></main><div class="toast" id="toast"></div>
+<footer class="foot"><span>J.A.R.V.I.S. UI CONCEPT</span><span>LIVE BROWSER DATA WHERE SUPPORTED · HARDWARE METRICS REQUIRE DESKTOP BRIDGE</span><span>DESIGNED FOR REVIEW</span></footer></main><div class="toast" id="toast"></div>
 <script>
 const clock=document.getElementById('clock'),date=document.getElementById('date');
-function tick(){const d=new Date();clock.textContent=d.toLocaleTimeString('en-IN',{hour12:false});date.textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}
+const updateTime=document.getElementById('updateTime');
+function tick(){const d=new Date();clock.textContent=d.toLocaleTimeString('en-IN',{hour12:false});date.textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});if(updateTime)updateTime.textContent=d.toLocaleTimeString('en-IN',{hour12:false});}
 tick();setInterval(tick,1000);
+document.getElementById('platform').textContent=(navigator.userAgentData?.platform||navigator.platform||'Browser').toUpperCase();
+document.getElementById('browser').textContent=(navigator.userAgent.match(/(Edg|Chrome|Firefox|Safari)\/?([\d.]*)/i)?.[1]||'WEB').toUpperCase();
+function screenInfo(){document.getElementById('screenSize').textContent=screen.width+' × '+screen.height;}
+screenInfo();addEventListener('resize',screenInfo);
+function updateOnline(){const el=document.getElementById('onlineStatus');el.textContent=navigator.onLine?'ONLINE':'OFFLINE';el.style.color=navigator.onLine?'var(--green)':'var(--amber)';}
+updateOnline();addEventListener('online',updateOnline);addEventListener('offline',updateOnline);
+const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+function updateConnection(){document.getElementById('connectionType').textContent=connection?(connection.effectiveType||connection.type||'AVAILABLE').toUpperCase():'NOT EXPOSED';}
+updateConnection();connection?.addEventListener?.('change',updateConnection);
+async function updateBattery(){const el=document.getElementById('battery'),meter=document.getElementById('batteryMeter');if(!navigator.getBattery){el.textContent='NOT SUPPORTED';meter.style.setProperty('--w','0%');return;}try{const b=await navigator.getBattery();function paint(){el.textContent=Math.round(b.level*100)+'%'+(b.charging?' · CHARGING':'');meter.style.setProperty('--w',(b.level*100)+'%');}paint();b.addEventListener('levelchange',paint);b.addEventListener('chargingchange',paint);}catch{el.textContent='PERMISSION UNAVAILABLE';}}
+updateBattery();
 const toast=document.getElementById('toast');let toastTimer;
 function notify(t){toast.textContent=t;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),2200);}
-document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>{notify(b.dataset.action+' — demo action');addMessage('JARVIS',b.dataset.action+' module selected. This is a UI demonstration.');}));
+document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>{notify(b.dataset.action+' — prototype action');addMessage('JARVIS',b.dataset.action+' selected. Desktop integration is not connected yet.');}));
 const messages=document.getElementById('messages');
 function addMessage(who,txt,cls=''){const el=document.createElement('div');el.className='msg '+cls;el.textContent=who+': '+txt;messages.appendChild(el);messages.scrollTop=messages.scrollHeight;}
-document.getElementById('chatForm').addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('chatInput'),value=input.value.trim();if(!value)return;addMessage('YOU',value,'user');input.value='';setTimeout(()=>addMessage('JARVIS','Acknowledged. Chat interaction is running in prototype mode; connect an AI service to enable real assistant responses.'),350);});
+document.getElementById('chatForm').addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('chatInput'),value=input.value.trim();if(!value)return;addMessage('YOU',value,'user');input.value='';setTimeout(()=>addMessage('JARVIS','Message received. Connect the JARVIS AI backend to enable real assistant responses.'),350);});
 </script></body></html>
