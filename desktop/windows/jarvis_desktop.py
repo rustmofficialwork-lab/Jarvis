@@ -759,9 +759,8 @@ class JarvisDesktop:
                     "Live local readings • Temperature from the Windows-exposed CPU sensor."
                 )
             network = metrics.get("NETWORK", "N/A")
-            self.status_var.set(
-                "SYSTEM ONLINE  •  JARVIS READY" if network == "ONLINE"
-                else "JARVIS READY  •  NETWORK " + str(network)
+            self.metric_detail_var.set(
+                f"Live local readings • Network {network} • CPU/GPU temperature depends on sensor support."
             )
         except Exception as exc:
             if hasattr(self, "metric_detail_var"):
