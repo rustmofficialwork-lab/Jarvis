@@ -786,8 +786,8 @@ class JarvisDesktop:
         self.chat.tag_configure("error", foreground="#ff8c8c")
         for who, message, tag in self.transcript:
             self.chat.configure(state="normal")
-            self.chat.insert("end", f"{who}\\n", "speaker")
-            self.chat.insert("end", f"{message}\\n\\n", tag or "")
+            self.chat.insert("end", f"{who}\n", "speaker")
+            self.chat.insert("end", f"{message}\n\n", tag or "")
             self.chat.configure(state="disabled")
         self.chat.see("end")
 
@@ -822,8 +822,8 @@ class JarvisDesktop:
                    command=lambda: self._send_hud_command("open task manager")).pack(fill="x", padx=8, pady=3)
         quotes_box = section(right, "J.A.R.V.I.S.  /  SYSTEM NOTES")
         quote_text = (
-            "THE FUTURE IS BUILT, NOT GIVEN.\\n\\n"
-            "SYSTEMS READY. THINK CLEARLY. ACT PRECISELY.\\n\\n"
+            "THE FUTURE IS BUILT, NOT GIVEN.\n\n"
+            "SYSTEMS READY. THINK CLEARLY. ACT PRECISELY.\n\n"
             "YOUR DESKTOP. YOUR COMMANDS. YOUR JARVIS."
         )
         tk.Label(quotes_box, text=quote_text, bg=panel, fg="#8fcde2",
@@ -967,9 +967,9 @@ class JarvisDesktop:
                 import psutil
                 memory = psutil.virtual_memory()
                 self.system_info_var.set(
-                    f"OS  {platform.system()} {platform.release()}   |   ARCH  {platform.machine()}\\n"
+                    f"OS  {platform.system()} {platform.release()}   |   ARCH  {platform.machine()}\n"
                     f"CPU  {platform.processor() or (str(os.cpu_count()) + ' logical cores')}   |   "
-                    f"RAM  {memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB\\n"
+                    f"RAM  {memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB\n"
                     f"QUICK ACCESS  Control Panel  •  Device Manager  •  Task Manager  •  Settings"
                 )
             except Exception:
