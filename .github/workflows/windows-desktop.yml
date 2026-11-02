@@ -2,12 +2,12 @@ name: Windows Desktop Checks
 
 on:
   pull_request:
-    branches: [main, feat/offline-wake-word]
+    branches: [main, feat/offline-wake-word, feature/complete-realtime-dashboard]
     paths:
       - "desktop/windows/**"
       - ".github/workflows/windows-desktop.yml"
   push:
-    branches: [main, feat/offline-wake-word, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard]
+    branches: [main, feat/offline-wake-word, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard, feature/complete-realtime-dashboard]
     paths:
       - "desktop/windows/**"
       - ".github/workflows/windows-desktop.yml"
