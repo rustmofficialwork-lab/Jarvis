@@ -901,7 +901,10 @@ class JarvisDesktop:
             if not self.root.winfo_exists():
                 return
             from datetime import datetime
-            self.clock_var.set(datetime.now().strftime("%I:%M %p  •  %A, %d %B %Y"))
+            now = datetime.now()
+            self.clock_var.set(now.strftime("%I:%M %p  •  %A"))
+            if hasattr(self, "hud_date_var"):
+                self.hud_date_var.set(now.strftime("%B %d"))
             self.root.after(1000, self._refresh_dashboard_clock)
         except tk.TclError:
             return
