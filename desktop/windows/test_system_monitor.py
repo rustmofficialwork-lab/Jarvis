@@ -82,6 +82,8 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertEqual(metrics["disk_percent"], 72.8)
         self.assertEqual(metrics["network_online"], True)
         self.assertIsNone(metrics["cpu_temperature"])
+        self.assertIsNone(metrics["gpu"])
+        self.assertIsNone(metrics["network_counters"])
         self.assertEqual(calls, {
             "cpu": 1, "memory": 1, "disk": 1, "battery": 1, "network": 1,
         })
