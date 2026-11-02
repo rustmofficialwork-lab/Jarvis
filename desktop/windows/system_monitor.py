@@ -26,6 +26,33 @@ def _read_cpu_temperature(psutil_module):
     return None
 
 
+def _read_nvidia_gpu():
+    """Read NVIDIA telemetry when nvidia-smi is installed; never guess other GPUs."""
+    import shutil
+    import subprocess
+
+    executable = shutil.which("nvidia-smi")
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [executable, "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=1.5, check=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        fields = [part.strip() for part in result.stdout.splitlines()[0].split(",")]
+        if len(fields) != 4:
+            return None
+        load, memory_used, memory_total, temperature = (float(value) for value in fields)
+        if not (0 <= load <= 100 and memory_used >= 0 and memory_total >= 0 and 0 <= temperature <= 150):
+            return None
+        return {"load": load, "memory_used": memory_used, "memory_total": memory_total,
+                "temperature": temperature}
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return None
+
+
 def collect_system_metrics(psutil_module=None) -> dict:
     """Read each hardware metric once; shared by the HUD and spoken PC-status command."""
     if psutil_module is None:
@@ -43,6 +70,12 @@ def collect_system_metrics(psutil_module=None) -> dict:
             if name.casefold() not in {"lo", "loopback"}
         )
     )
+    network_counters = _safe_read(
+        lambda: (lambda counters: (counters.bytes_recv, counters.bytes_sent))(
+            psutil_module.net_io_counters()
+        )
+    )
+    gpu = _safe_read(_read_nvidia_gpu)
     return {
         "cpu_percent": _safe_read(lambda: psutil_module.cpu_percent(interval=None)),
         "memory_percent": _safe_read(lambda: memory.percent) if memory is not None else None,
@@ -57,6 +90,8 @@ def collect_system_metrics(psutil_module=None) -> dict:
         "uptime_seconds": _safe_read(lambda: __import__("time").time() - psutil_module.boot_time()),
         "cpu_temperature": temperature,
         "network_online": network_online,
+        "network_counters": network_counters,
+        "gpu": gpu,
     }
 
 
