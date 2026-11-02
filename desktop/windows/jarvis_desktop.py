@@ -703,37 +703,41 @@ class JarvisDesktop:
         tk.Label(status, textvariable=self.status_var, bg="#0b1d2b", fg="#45d7b5",
                  font=("Segoe UI", 9, "bold"), anchor="w", padx=12, pady=9).pack(fill="x")
 
-        # Native live telemetry dashboard: real OS readings, never browser estimates.
-        telemetry = tk.Frame(shell, bg="#07111b")
+        # Native live telemetry dashboard: retain the existing JARVIS layout,
+        # with a clearer date/time strip and the reference's midnight/cyan palette.
+        telemetry = tk.Frame(shell, bg="#050b12")
         telemetry.pack(fill="x", pady=(0, 12))
-        telemetry_header = tk.Frame(telemetry, bg="#07111b")
+        telemetry_header = tk.Frame(telemetry, bg="#071522",
+                                    highlightbackground="#00bfff", highlightthickness=1)
         telemetry_header.pack(fill="x", pady=(0, 7))
-        tk.Label(telemetry_header, text="LIVE SYSTEM TELEMETRY", bg="#07111b", fg="#42dfff",
-                 font=("Segoe UI", 9, "bold")).pack(side="left")
-        self.clock_var = tk.StringVar(value="--:--:--  •  --")
-        tk.Label(telemetry_header, textvariable=self.clock_var, bg="#07111b", fg="#dffaff",
-                 font=("Segoe UI", 10, "bold")).pack(side="right")
+        tk.Label(telemetry_header, text="LIVE SYSTEM TELEMETRY", bg="#071522", fg="#20dcff",
+                 font=("Segoe UI", 9, "bold")).pack(side="left", padx=12, pady=9)
+        self.clock_var = tk.StringVar(value="--:-- --  •  --")
+        tk.Label(telemetry_header, textvariable=self.clock_var, bg="#071522", fg="#e5fbff",
+                 font=("Segoe UI", 10, "bold")).pack(side="right", padx=12, pady=9)
         self.metric_value_labels = {}
         self.metric_detail_var = tk.StringVar(value="Collecting hardware readings…")
-        telemetry_grid = tk.Frame(telemetry, bg="#07111b")
+        telemetry_grid = tk.Frame(telemetry, bg="#050b12")
         telemetry_grid.pack(fill="x")
-        metric_names = ("CPU LOAD", "MEMORY", "DISK USED", "BATTERY",
+        # Put the most glanceable status first, then keep every existing metric.
+        metric_names = ("BATTERY", "CPU LOAD", "MEMORY", "DISK USED",
                         "CPU TEMP", "GPU LOAD", "GPU TEMP", "GPU VRAM",
                         "NETWORK", "NETWORK DOWN", "NETWORK UP", "UPTIME",
                         "STORAGE FREE", "STORAGE TOTAL")
         for index, metric_name in enumerate(metric_names):
-            card = tk.Frame(telemetry_grid, bg="#0b1d2b", highlightbackground="#16445b", highlightthickness=1)
-            card.grid(row=index // 4, column=index % 4, sticky="nsew", padx=(0 if index % 4 == 0 else 5, 0),
-                      pady=(0, 5 if index < 8 else 0))
-            tk.Label(card, text=metric_name, bg="#0b1d2b", fg="#789eaf",
+            card = tk.Frame(telemetry_grid, bg="#071522",
+                            highlightbackground="#087fa8", highlightthickness=1)
+            card.grid(row=index // 4, column=index % 4, sticky="nsew",
+                      padx=(0 if index % 4 == 0 else 5, 0), pady=(0, 5 if index < 8 else 0))
+            tk.Label(card, text=metric_name, bg="#071522", fg="#54bfe0",
                      font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
-            value = tk.Label(card, text="—", bg="#0b1d2b", fg="#dffaff",
+            value = tk.Label(card, text="—", bg="#071522", fg="#e5fbff",
                              font=("Segoe UI", 14, "bold"))
             value.pack(anchor="w", padx=10, pady=(0, 8))
             self.metric_value_labels[metric_name] = value
         for column in range(4):
             telemetry_grid.grid_columnconfigure(column, weight=1, uniform="telemetry")
-        tk.Label(telemetry, textvariable=self.metric_detail_var, bg="#07111b", fg="#66899a",
+        tk.Label(telemetry, textvariable=self.metric_detail_var, bg="#050b12", fg="#63a9bf",
                  font=("Segoe UI", 8), anchor="w").pack(fill="x", pady=(5, 0))
 
         panel = tk.Frame(shell, bg="#0b1722", highlightbackground="#16445b", highlightthickness=1)
@@ -810,7 +814,7 @@ class JarvisDesktop:
             if not self.root.winfo_exists():
                 return
             from datetime import datetime
-            self.clock_var.set(datetime.now().strftime("%H:%M:%S  •  %A, %d %b %Y"))
+            self.clock_var.set(datetime.now().strftime("%I:%M %p  •  %A, %d %B %Y"))
             self.root.after(1000, self._refresh_dashboard_clock)
         except tk.TclError:
             return
