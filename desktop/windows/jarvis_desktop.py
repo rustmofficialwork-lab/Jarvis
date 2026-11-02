@@ -2237,10 +2237,31 @@ def main(argv=None):
     enable_windows_dpi_awareness()
     if not acquire_single_instance():
         return 0
-    root = tk.Tk()
-    JarvisDesktop(root)
-    root.mainloop()
-    return 0
+    try:
+        root = tk.Tk()
+        JarvisDesktop(root)
+        root.mainloop()
+        return 0
+    except Exception as exc:
+        # PyInstaller --windowed builds have no console; persist startup errors.
+        try:
+            SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+            from datetime import datetime
+            import traceback
+            with (SETTINGS_DIR / "startup.log").open("a", encoding="utf-8") as log_file:
+                log_file.write(f"\n[{datetime.now().isoformat(timespec='seconds')}] JARVIS startup failed\n")
+                traceback.print_exc(file=log_file)
+        except Exception:
+            pass
+        try:
+            messagebox.showerror(
+                "JARVIS could not start",
+                "Startup details saved to: " + str(SETTINGS_DIR / "startup.log")
+                + f"\n\n{type(exc).__name__}: {exc}",
+            )
+        except Exception:
+            pass
+        return 1
 
 
 if __name__ == "__main__":
