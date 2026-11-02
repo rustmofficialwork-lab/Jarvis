@@ -709,18 +709,20 @@ class JarvisDesktop:
         telemetry_header.pack(fill="x", pady=(0, 7))
         tk.Label(telemetry_header, text="LIVE SYSTEM TELEMETRY", bg="#07111b", fg="#42dfff",
                  font=("Segoe UI", 9, "bold")).pack(side="left")
-        tk.Label(telemetry_header, text="LOCAL WINDOWS SENSOR SNAPSHOT  •  AUTO REFRESH",
-                 bg="#07111b", fg="#66899a", font=("Segoe UI", 8)).pack(side="right")
+        self.clock_var = tk.StringVar(value="--:--:--  •  --")
+        tk.Label(telemetry_header, textvariable=self.clock_var, bg="#07111b", fg="#dffaff",
+                 font=("Segoe UI", 10, "bold")).pack(side="right")
         self.metric_value_labels = {}
         self.metric_detail_var = tk.StringVar(value="Collecting hardware readings…")
         telemetry_grid = tk.Frame(telemetry, bg="#07111b")
         telemetry_grid.pack(fill="x")
         metric_names = ("CPU LOAD", "MEMORY", "DISK USED", "BATTERY",
-                        "CPU TEMP", "NETWORK", "STORAGE FREE", "STORAGE TOTAL")
+                        "CPU TEMP", "GPU LOAD", "NETWORK", "NETWORK DOWN",
+                        "NETWORK UP", "UPTIME", "STORAGE FREE", "STORAGE TOTAL")
         for index, metric_name in enumerate(metric_names):
             card = tk.Frame(telemetry_grid, bg="#0b1d2b", highlightbackground="#16445b", highlightthickness=1)
             card.grid(row=index // 4, column=index % 4, sticky="nsew", padx=(0 if index % 4 == 0 else 5, 0),
-                      pady=(0, 5 if index < 4 else 0))
+                      pady=(0, 5 if index < 8 else 0))
             tk.Label(card, text=metric_name, bg="#0b1d2b", fg="#789eaf",
                      font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
             value = tk.Label(card, text="—", bg="#0b1d2b", fg="#dffaff",
@@ -803,21 +805,14 @@ class JarvisDesktop:
     def _refresh_dashboard_metrics(self):
         """Refresh the native dashboard from local psutil readings without blocking Tk."""
         try:
+            from datetime import datetime
+            self.clock_var.set(datetime.now().strftime("%H:%M:%S  •  %A, %d %b %Y"))
             metrics = dict(self._get_system_metrics())
             for name, label in getattr(self, "metric_value_labels", {}).items():
                 label.configure(text=metrics.get(name, "N/A"))
-            cpu_temp = metrics.get("CPU TEMP", "N/A")
-            if cpu_temp == "N/A":
-                self.metric_detail_var.set(
-                    "Live local readings • CPU/GPU temperature depends on sensor support; unavailable sensors are shown as N/A."
-                )
-            else:
-                self.metric_detail_var.set(
-                    "Live local readings • Temperature from the Windows-exposed CPU sensor."
-                )
-            network = metrics.get("NETWORK", "N/A")
             self.metric_detail_var.set(
-                f"Live local readings • Network {network} • CPU/GPU temperature depends on sensor support."
+                "Live local Windows readings • GPU values require a supported NVIDIA driver; "
+                "unsupported sensors show N/A. Network rates use interface byte counters."
             )
         except Exception as exc:
             if hasattr(self, "metric_detail_var"):
@@ -878,21 +873,37 @@ class JarvisDesktop:
             temperature = f"{float(temperature):.0f}°C" if temperature is not None else "N/A"
         except (TypeError, ValueError):
             temperature = "N/A"
+        gpu = metrics.get("gpu")
+        gpu_load = percent(gpu.get("load")) if gpu else "N/A"
         online = metrics["network_online"]
         network = "ONLINE" if online is True else "OFFLINE" if online is False else "N/A"
-        from system_monitor import _format_bytes, _format_battery_time
+        from system_monitor import _format_bytes, _format_battery_time, _format_uptime
+        import time
+        counters = metrics.get("network_counters")
+        now = time.monotonic()
+        previous = getattr(self, "_network_sample", None)
+        down_rate = up_rate = "N/A"
+        if counters is not None:
+            received, sent = counters
+            if previous is not None:
+                elapsed = max(0.001, now - previous[0])
+                down_rate = _format_bytes(max(0, received - previous[1]) / elapsed) + "/s"
+                up_rate = _format_bytes(max(0, sent - previous[2]) / elapsed) + "/s"
+            self._network_sample = (now, received, sent)
+        uptime = _format_uptime(metrics.get("uptime_seconds") or 0)
         values = [
             ("CPU LOAD", percent(metrics["cpu_percent"])),
             ("MEMORY", percent(metrics["memory_percent"])),
             ("DISK USED", percent(metrics["disk_percent"])),
             ("BATTERY", self._format_battery_status(metrics["battery"])),
             ("CPU TEMP", temperature),
+            ("GPU LOAD", gpu_load),
             ("NETWORK", network),
-            ("BATTERY TIME", _format_battery_time(metrics.get("battery_seconds"))),
+            ("NETWORK DOWN", down_rate),
+            ("NETWORK UP", up_rate),
+            ("UPTIME", uptime),
             ("STORAGE FREE", _format_bytes(metrics.get("disk_free"))),
             ("STORAGE TOTAL", _format_bytes(metrics.get("disk_total"))),
-            ("RAM USED", _format_bytes(metrics.get("memory_used"))),
-            ("RAM TOTAL", _format_bytes(metrics.get("memory_total"))),
         ]
         self._metrics_cache = (now, values)
         return values
