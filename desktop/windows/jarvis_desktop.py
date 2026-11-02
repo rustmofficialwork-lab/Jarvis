@@ -718,8 +718,9 @@ class JarvisDesktop:
         telemetry_grid = tk.Frame(telemetry, bg="#07111b")
         telemetry_grid.pack(fill="x")
         metric_names = ("CPU LOAD", "MEMORY", "DISK USED", "BATTERY",
-                        "CPU TEMP", "GPU LOAD", "NETWORK", "NETWORK DOWN",
-                        "NETWORK UP", "UPTIME", "STORAGE FREE", "STORAGE TOTAL")
+                        "CPU TEMP", "GPU LOAD", "GPU TEMP", "GPU VRAM",
+                        "NETWORK", "NETWORK DOWN", "NETWORK UP", "UPTIME",
+                        "STORAGE FREE", "STORAGE TOTAL")
         for index, metric_name in enumerate(metric_names):
             card = tk.Frame(telemetry_grid, bg="#0b1d2b", highlightbackground="#16445b", highlightthickness=1)
             card.grid(row=index // 4, column=index % 4, sticky="nsew", padx=(0 if index % 4 == 0 else 5, 0),
@@ -820,10 +821,9 @@ class JarvisDesktop:
             metrics = dict(self._get_system_metrics())
             for name, label in getattr(self, "metric_value_labels", {}).items():
                 label.configure(text=metrics.get(name, "N/A"))
-            gpu_info = self._get_gpu_detail()
             process_text = self._get_dashboard_process_summary()
             self.metric_detail_var.set(
-                "Live local Windows readings • " + gpu_info + "\n" + process_text
+                "Live local Windows readings • " + process_text
             )
         except Exception as exc:
             if hasattr(self, "metric_detail_var"):
@@ -861,18 +861,6 @@ class JarvisDesktop:
         """Delegate battery presentation to the shared system-monitor module."""
         from system_monitor import format_battery_status
         return format_battery_status(battery)
-
-    def _get_gpu_detail(self):
-        """Read optional NVIDIA detail; unsupported GPU hardware stays explicit."""
-        try:
-            from system_monitor import _read_nvidia_gpu
-            gpu = _read_nvidia_gpu()
-            if not gpu:
-                return "GPU temperature/VRAM: N/A"
-            return (f"GPU {gpu['load']:.0f}% • {gpu['temperature']:.0f}°C • "
-                    f"VRAM {gpu['memory_used']:.0f}/{gpu['memory_total']:.0f} MB")
-        except Exception:
-            return "GPU temperature/VRAM: N/A"
 
     def _get_dashboard_process_summary(self):
         """Refresh the read-only top-process summary no more than every five seconds."""
@@ -915,6 +903,9 @@ class JarvisDesktop:
             temperature = "N/A"
         gpu = metrics.get("gpu")
         gpu_load = percent(gpu.get("load")) if gpu else "N/A"
+        gpu_temp = f"{gpu['temperature']:.0f}°C" if gpu else "N/A"
+        gpu_vram = (f"{gpu['memory_used']:.0f}/{gpu['memory_total']:.0f} MB"
+                    if gpu else "N/A")
         online = metrics["network_online"]
         network = "ONLINE" if online is True else "OFFLINE" if online is False else "N/A"
         from system_monitor import _format_bytes, _format_battery_time, _format_uptime
@@ -938,6 +929,8 @@ class JarvisDesktop:
             ("BATTERY", self._format_battery_status(metrics["battery"])),
             ("CPU TEMP", temperature),
             ("GPU LOAD", gpu_load),
+            ("GPU TEMP", gpu_temp),
+            ("GPU VRAM", gpu_vram),
             ("NETWORK", network),
             ("NETWORK DOWN", down_rate),
             ("NETWORK UP", up_rate),
