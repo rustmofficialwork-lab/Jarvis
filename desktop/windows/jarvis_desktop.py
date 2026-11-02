@@ -605,8 +605,10 @@ class JarvisDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("J.A.R.V.I.S. | Desktop Assistant")
-        self.root.geometry("900x700")
-        self.root.minsize(720, 560)
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        self.root.geometry(f"{min(1180, max(720, screen_w - 80))}x{min(820, max(560, screen_h - 100))}")
+        self.root.minsize(min(820, max(640, screen_w - 80)), min(600, max(460, screen_h - 100)))
         self.root.configure(bg="#07111b")
         self.settings = load_settings()
         self.events: queue.Queue = queue.Queue()
@@ -650,12 +652,16 @@ class JarvisDesktop:
         self.root.title("J.A.R.V.I.S. | Desktop Assistant")
         # Start at the usable desktop size so Windows DPI scaling cannot push
         # the composer below the visible client area.
-        self.root.minsize(820, 600)
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        # Keep minimum dimensions within the usable display area (including
+        # scaled/lower-resolution desktops) so header and composer controls
+        # cannot be pushed outside the visible window.
+        self.root.minsize(min(820, max(640, screen_w - 80)),
+                          min(600, max(460, screen_h - 100)))
         try:
             self.root.state("zoomed")
         except tk.TclError:
-            screen_w = self.root.winfo_screenwidth()
-            screen_h = self.root.winfo_screenheight()
             self.root.geometry(f"{min(1180, screen_w - 80)}x{min(760, screen_h - 100)}")
         self.root.configure(bg="#07111b")
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
@@ -1746,7 +1752,39 @@ class JarvisDesktop:
         window = tk.Toplevel(self.root)
         window.title("JARVIS Settings")
         window.configure(bg="#07111b")
-        window.resizable(False, False)
+        screen_w = window.winfo_screenwidth()
+        screen_h = window.winfo_screenheight()
+        dialog_w = min(900, max(620, screen_w - 100))
+        dialog_h = min(720, max(480, screen_h - 100))
+        window.geometry(f"{dialog_w}x{dialog_h}")
+        window.minsize(min(620, max(520, screen_w - 60)),
+                       min(480, max(420, screen_h - 60)))
+        window.resizable(True, True)
+
+        # Put settings in a scrollable content area so every option and the
+        # Save/Update buttons remain reachable on small or scaled displays.
+        body = tk.Frame(window, bg="#07111b")
+        body.pack(fill="both", expand=True)
+        canvas = tk.Canvas(body, bg="#07111b", highlightthickness=0, bd=0)
+        scrollbar = ttk.Scrollbar(body, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        content = tk.Frame(canvas, bg="#07111b")
+        content_id = canvas.create_window((0, 0), window=content, anchor="nw")
+
+        def update_scroll_region(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def fit_content_width(event):
+            canvas.itemconfigure(content_id, width=event.width)
+
+        content.bind("<Configure>", update_scroll_region)
+        canvas.bind("<Configure>", fit_content_width)
+        canvas.bind("<MouseWheel>", lambda event: canvas.yview_scroll(
+            int(-1 * (event.delta / 120)), "units"
+        ))
+
         fields = [
             ("AI endpoint (HTTPS)", "endpoint", self.settings.get("endpoint", DEFAULT_ENDPOINT)),
             ("Model", "model", self.settings.get("model", DEFAULT_MODEL)),
@@ -1755,32 +1793,33 @@ class JarvisDesktop:
         ]
         entries = {}
         for row, (label, name, value) in enumerate(fields):
-            tk.Label(window, text=label, bg="#07111b", fg="#d7f4ff",
+            tk.Label(content, text=label, bg="#07111b", fg="#d7f4ff",
                      font=("Segoe UI", 10)).grid(row=row, column=0, sticky="w", padx=14, pady=8)
-            entry = ttk.Entry(window, width=58, show="*" if name.endswith("key") else "")
+            entry = ttk.Entry(content, width=58, show="*" if name.endswith("key") else "")
             entry.insert(0, value)
-            entry.grid(row=row, column=1, padx=14, pady=8)
+            entry.grid(row=row, column=1, padx=14, pady=8, sticky="ew")
             entries[name] = entry
-        tk.Label(window, text="Speech recognition language", bg="#07111b", fg="#d7f4ff",
+        tk.Label(content, text="Speech recognition language", bg="#07111b", fg="#d7f4ff",
                  font=("Segoe UI", 10)).grid(row=4, column=0, sticky="w", padx=14, pady=8)
-        language = ttk.Combobox(window, values=["en-IN", "hi-IN", "en-US"], state="readonly", width=12)
+        language = ttk.Combobox(content, values=["en-IN", "hi-IN", "en-US"], state="readonly", width=12)
         language.set(self.settings.get("language", "en-IN"))
         language.grid(row=4, column=1, sticky="w", padx=14, pady=8)
         tk.Label(
-            window,
+            content,
             text="Offline voice model downloads automatically in the background for the selected language.",
             bg="#07111b", fg="#78c8df", font=("Segoe UI", 9),
+            wraplength=max(280, dialog_w - 100), justify="left",
         ).grid(row=5, column=1, sticky="w", padx=14, pady=8)
         share_memory_var = tk.BooleanVar(value=bool(self.settings.get("share_memory_with_ai", False)))
-        ttk.Checkbutton(window, text="Allow saved memories in online AI chats (optional)",
+        ttk.Checkbutton(content, text="Allow saved memories in online AI chats (optional)",
                         variable=share_memory_var).grid(row=6, column=1, sticky="w", padx=14, pady=8)
         startup_var = tk.BooleanVar(value=bool(self.settings.get("start_with_windows", False)))
-        ttk.Checkbutton(window, text="Start JARVIS when I sign in to Windows",
+        ttk.Checkbutton(content, text="Start JARVIS when I sign in to Windows",
                         variable=startup_var).grid(row=7, column=1, sticky="w", padx=14, pady=8)
-        tk.Label(window, text="Closing the window keeps JARVIS in the system tray. Use Exit from its tray menu.",
-                 bg="#07111b", fg="#7897aa", font=("Segoe UI", 9)).grid(
-                     row=8, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 4))
-        tk.Label(window, text="Secrets are stored in Windows Credential Manager when available.",
+        tk.Label(content, text="Closing the window keeps JARVIS in the system tray. Use Exit from its tray menu.",
+                 bg="#07111b", fg="#7897aa", font=("Segoe UI", 9), wraplength=max(280, dialog_w - 50),
+                 justify="left").grid(row=8, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 4))
+        tk.Label(content, text="Secrets are stored in Windows Credential Manager when available.",
                  bg="#07111b", fg="#7897aa", font=("Segoe UI", 9)).grid(
                      row=9, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 12))
 
@@ -1825,10 +1864,11 @@ class JarvisDesktop:
             self._ensure_offline_model(self.settings["language"])
             window.destroy()
 
-        ttk.Button(window, text="Check for updates", command=self._check_for_updates).grid(
-            row=10, column=0, sticky="w", padx=14, pady=(4, 16))
-        ttk.Button(window, text="Save settings", command=save).grid(
-            row=10, column=1, sticky="e", padx=14, pady=(4, 16))
+        actions = tk.Frame(content, bg="#07111b")
+        actions.grid(row=10, column=0, columnspan=2, sticky="ew", padx=14, pady=(4, 16))
+        ttk.Button(actions, text="Check for updates", command=self._check_for_updates).pack(side="left")
+        ttk.Button(actions, text="Save settings", command=save).pack(side="right")
+        content.grid_columnconfigure(1, weight=1)
 
     def _check_for_updates(self, silent: bool = False):
         """Check GitHub Releases off the UI thread; install only after user approval."""
