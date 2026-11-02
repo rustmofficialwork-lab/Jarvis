@@ -740,6 +740,15 @@ class JarvisDesktop:
         tk.Label(telemetry, textvariable=self.metric_detail_var, bg="#050b12", fg="#63a9bf",
                  font=("Segoe UI", 8), anchor="w").pack(fill="x", pady=(5, 0))
 
+        composer = tk.Frame(shell, bg="#07111b")
+        composer.pack(fill="x", pady=(12,0))
+        entry = tk.Entry(composer, textvariable=self.prompt_var, bg="#0b1d2b", fg="#e5f8ff",
+                         insertbackground="#42dfff", relief="flat", font=("Segoe UI", 12))
+        entry.pack(side="left", fill="x", expand=True, ipady=13, padx=(0,10))
+        entry.bind("<Return>", lambda _event: self.send_text())
+        ttk.Button(composer, text="SEND", style="Jarvis.TButton", command=self.send_text).pack(side="right")
+        tk.Label(shell, text="Enter a message or try: system status  •  weather in Bhopal  •  find file",
+                 bg="#07111b", fg="#66899a", font=("Segoe UI", 9)).pack(anchor="w", pady=(9,0))
         panel = tk.Frame(shell, bg="#0b1722", highlightbackground="#16445b", highlightthickness=1)
         panel.pack(fill="both", expand=True)
         tk.Label(panel, text="CONVERSATION", bg="#0b1722", fg="#42dfff",
@@ -757,15 +766,6 @@ class JarvisDesktop:
             self.chat.configure(state="disabled")
         self.chat.see("end")
 
-        composer = tk.Frame(shell, bg="#07111b")
-        composer.pack(fill="x", pady=(12,0))
-        entry = tk.Entry(composer, textvariable=self.prompt_var, bg="#0b1d2b", fg="#e5f8ff",
-                         insertbackground="#42dfff", relief="flat", font=("Segoe UI", 12))
-        entry.pack(side="left", fill="x", expand=True, ipady=13, padx=(0,10))
-        entry.bind("<Return>", lambda _event: self.send_text())
-        ttk.Button(composer, text="SEND", style="Jarvis.TButton", command=self.send_text).pack(side="right")
-        tk.Label(shell, text="Enter a message or try: system status  •  weather in Bhopal  •  find file",
-                 bg="#07111b", fg="#66899a", font=("Segoe UI", 9)).pack(anchor="w", pady=(9,0))
         entry.focus_set()
 
     def _draw_reactor(self):
