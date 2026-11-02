@@ -638,6 +638,7 @@ class JarvisDesktop:
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
+        self.root.after(1000, self._refresh_dashboard_clock)
         self.root.after(1500, self._refresh_dashboard_metrics)
         self.root.after(120, self._poll_events)
         self.root.after(700, self._ensure_offline_model)
@@ -802,17 +803,27 @@ class JarvisDesktop:
         except tk.TclError:
             return
 
+    def _refresh_dashboard_clock(self):
+        """Keep the local clock/date accurate independently of hardware polling."""
+        try:
+            if not self.root.winfo_exists():
+                return
+            from datetime import datetime
+            self.clock_var.set(datetime.now().strftime("%H:%M:%S  •  %A, %d %b %Y"))
+            self.root.after(1000, self._refresh_dashboard_clock)
+        except tk.TclError:
+            return
+
     def _refresh_dashboard_metrics(self):
         """Refresh the native dashboard from local psutil readings without blocking Tk."""
         try:
-            from datetime import datetime
-            self.clock_var.set(datetime.now().strftime("%H:%M:%S  •  %A, %d %b %Y"))
             metrics = dict(self._get_system_metrics())
             for name, label in getattr(self, "metric_value_labels", {}).items():
                 label.configure(text=metrics.get(name, "N/A"))
+            gpu_info = self._get_gpu_detail()
+            process_text = self._get_dashboard_process_summary()
             self.metric_detail_var.set(
-                "Live local Windows readings • GPU values require a supported NVIDIA driver; "
-                "unsupported sensors show N/A. Network rates use interface byte counters."
+                "Live local Windows readings • " + gpu_info + "\n" + process_text
             )
         except Exception as exc:
             if hasattr(self, "metric_detail_var"):
@@ -850,6 +861,35 @@ class JarvisDesktop:
         """Delegate battery presentation to the shared system-monitor module."""
         from system_monitor import format_battery_status
         return format_battery_status(battery)
+
+    def _get_gpu_detail(self):
+        """Read optional NVIDIA detail; unsupported GPU hardware stays explicit."""
+        try:
+            from system_monitor import _read_nvidia_gpu
+            gpu = _read_nvidia_gpu()
+            if not gpu:
+                return "GPU temperature/VRAM: N/A"
+            return (f"GPU {gpu['load']:.0f}% • {gpu['temperature']:.0f}°C • "
+                    f"VRAM {gpu['memory_used']:.0f}/{gpu['memory_total']:.0f} MB")
+        except Exception:
+            return "GPU temperature/VRAM: N/A"
+
+    def _get_dashboard_process_summary(self):
+        """Refresh the read-only top-process summary no more than every five seconds."""
+        import time
+        now = time.monotonic()
+        cached = getattr(self, "_process_summary_cache", None)
+        if cached and now - cached[0] < 5:
+            return cached[1]
+        try:
+            from system_monitor import get_top_processes
+            summary = get_top_processes(limit=3)
+            summary = summary.replace("Top 3 processes by memory usage (read-only):",
+                                      "TOP RUNNING APPS (by RAM)")
+        except Exception:
+            summary = "TOP RUNNING APPS • N/A"
+        self._process_summary_cache = (now, summary)
+        return summary
 
     def _get_system_metrics(self):
         """Format the shared system snapshot for desktop status displays."""
