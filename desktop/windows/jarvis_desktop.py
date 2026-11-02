@@ -765,6 +765,15 @@ class JarvisDesktop:
             ttk.Button(app_rail, text=label, style="Jarvis.TButton",
                        command=lambda u=url: self._open_hud_url(u)).pack(side="left", expand=True, fill="x", padx=2)
 
+        # Reference-style lower information strip: real machine details, not mock values.
+        info_box = tk.Frame(center, bg="#041526", highlightbackground="#087da5", highlightthickness=1)
+        info_box.pack(fill="x", pady=(0, 7))
+        tk.Label(info_box, text="SYSTEM INFORMATION  /  QUICK ACCESS  /  NETWORK",
+                 bg="#041526", fg=cyan, font=("Segoe UI", 8, "bold"), anchor="w").pack(fill="x", padx=9, pady=(6, 2))
+        self.system_info_var = tk.StringVar(value="Reading Windows system information…")
+        tk.Label(info_box, textvariable=self.system_info_var, bg="#041526", fg=bright,
+                 font=("Consolas", 8), justify="left", anchor="w", wraplength=620).pack(fill="x", padx=9, pady=(0, 7))
+
         conversation = tk.Frame(center, bg=panel, highlightbackground="#16445b", highlightthickness=1)
         conversation.pack(fill="both", expand=True, pady=(0, 6))
         tk.Label(conversation, text="CONVERSATION  /  JARVIS INTERFACE", bg=panel, fg=cyan,
@@ -797,6 +806,8 @@ class JarvisDesktop:
         for name in ("CPU LOAD", "MEMORY", "DISK USED", "CPU TEMP",
                      "GPU LOAD", "GPU TEMP", "GPU VRAM"):
             metric(system_box, name, 11)
+        self.gauge_canvas = tk.Canvas(system_box, height=104, bg=panel, highlightthickness=0)
+        self.gauge_canvas.pack(fill="x", padx=7, pady=(0, 7))
         network_box = section(right, "NETWORK / PERFORMANCE")
         for name in ("NETWORK DOWN", "NETWORK UP", "UPTIME"):
             metric(network_box, name, 10)
@@ -809,6 +820,15 @@ class JarvisDesktop:
                    command=lambda: self._send_hud_command("system status")).pack(fill="x", padx=8, pady=3)
         ttk.Button(tools_box, text="TASK MANAGER", style="Jarvis.TButton",
                    command=lambda: self._send_hud_command("open task manager")).pack(fill="x", padx=8, pady=3)
+        quotes_box = section(right, "J.A.R.V.I.S.  /  SYSTEM NOTES")
+        quote_text = (
+            "THE FUTURE IS BUILT, NOT GIVEN.\\n\\n"
+            "SYSTEMS READY. THINK CLEARLY. ACT PRECISELY.\\n\\n"
+            "YOUR DESKTOP. YOUR COMMANDS. YOUR JARVIS."
+        )
+        tk.Label(quotes_box, text=quote_text, bg=panel, fg="#8fcde2",
+                 font=("Segoe UI", 8, "italic"), justify="left",
+                 wraplength=245, anchor="w").pack(fill="x", padx=10, pady=(0, 9))
         tk.Label(right, textvariable=self.metric_detail_var, bg=bg, fg=muted,
                  font=("Segoe UI", 7), justify="left", wraplength=250, anchor="w").pack(fill="x", padx=4, pady=3)
 
@@ -839,6 +859,32 @@ class JarvisDesktop:
         canvas.create_oval(cx-8, cy-8, cx+8, cy+8, fill="#e6ffff", outline=cyan if False else "#12cfff", width=2)
         canvas.create_text(cx, cy+radius+4, text="SYSTEM CORE  •  ONLINE",
                            fill="#35dfff", font=("Segoe UI", 8, "bold"))
+
+    def _draw_hud_gauges(self, metrics):
+        """Render compact live usage bars using actual local telemetry."""
+        canvas = getattr(self, "gauge_canvas", None)
+        if canvas is None or not canvas.winfo_exists():
+            return
+        canvas.delete("all")
+        width = max(180, canvas.winfo_width())
+        rows = (("CPU", metrics.get("CPU LOAD", "N/A")),
+                ("RAM", metrics.get("MEMORY", "N/A")),
+                ("DISK", metrics.get("DISK USED", "N/A")))
+        for index, (name, raw) in enumerate(rows):
+            y = 15 + index * 31
+            try:
+                value = max(0.0, min(100.0, float(str(raw).replace("%", "").strip())))
+                shown = f"{value:.0f}%"
+            except (TypeError, ValueError):
+                value, shown = 0.0, "N/A"
+            canvas.create_text(4, y, text=name, anchor="w", fill="#12cfff",
+                               font=("Segoe UI", 8, "bold"))
+            x0, x1 = 48, width - 38
+            canvas.create_rectangle(x0, y-5, x1, y+5, fill="#09263b", outline="#16445b")
+            canvas.create_rectangle(x0, y-5, x0+(x1-x0)*value/100, y+5,
+                                     fill="#12cfff", outline="")
+            canvas.create_text(width-3, y, text=shown, anchor="e", fill="#d8f7ff",
+                               font=("Segoe UI", 8, "bold"))
 
     def _open_hud_url(self, url):
         import webbrowser
@@ -915,6 +961,19 @@ class JarvisDesktop:
             metrics = dict(self._get_system_metrics())
             for name, label in getattr(self, "metric_value_labels", {}).items():
                 label.configure(text=metrics.get(name, "N/A"))
+            self._draw_hud_gauges(metrics)
+            try:
+                import platform
+                import psutil
+                memory = psutil.virtual_memory()
+                self.system_info_var.set(
+                    f"OS  {platform.system()} {platform.release()}   |   ARCH  {platform.machine()}\\n"
+                    f"CPU  {platform.processor() or (str(os.cpu_count()) + ' logical cores')}   |   "
+                    f"RAM  {memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB\\n"
+                    f"QUICK ACCESS  Control Panel  •  Device Manager  •  Task Manager  •  Settings"
+                )
+            except Exception:
+                self.system_info_var.set("SYSTEM INFORMATION  •  Some hardware details are unavailable")
             process_text = self._get_dashboard_process_summary()
             self.metric_detail_var.set(
                 "Live local Windows readings • " + process_text
