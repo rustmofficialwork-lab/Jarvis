@@ -631,8 +631,6 @@ class JarvisDesktop:
         self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
         self.prompt_var = tk.StringVar()
         self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
-        self.chat = None  # Conversation rendering belongs exclusively to the HTML HUD.
-        self.listen_button = None
         self._load_secrets()
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
@@ -1381,7 +1379,6 @@ class JarvisDesktop:
     def toggle_listening(self):
         if self.wake_thread and self.wake_thread.is_alive():
             self.stop_event.set()
-            self.listen_button.configure(text="Stopping…", state="disabled")
             self._set_status("Stopping microphone listener…")
             return
         if not self.picovoice_access_key.strip():
@@ -1390,7 +1387,6 @@ class JarvisDesktop:
             return
         self._ensure_offline_model(self.settings.get("language", "en-IN"))
         self.stop_event.clear()
-        self.listen_button.configure(text="Stop wake listening")
         self._set_status("Starting local JARVIS wake-word detector…")
         self.wake_thread = threading.Thread(target=self._wake_loop, daemon=True)
         self.wake_thread.start()
