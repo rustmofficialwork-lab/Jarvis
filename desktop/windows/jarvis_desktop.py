@@ -2324,6 +2324,143 @@ class JarvisDesktop:
         self.exit_app()
 
 
+
+class JarvisWebBridge:
+    """Small, thread-safe API exposed to the HTML HUD through pywebview."""
+    def __init__(self, app_state):
+        self.app_state = app_state
+        self.window = None
+
+    def _dispatch(self, callback):
+        root, app = self.app_state.get("root"), self.app_state.get("app")
+        if root is None or app is None:
+            return False
+        try:
+            root.after(0, callback)
+            return True
+        except Exception:
+            return False
+
+    def send_command(self, prompt):
+        prompt = str(prompt or "").strip()[:4000]
+        if not prompt:
+            return False
+        return self._dispatch(lambda: (self.app_state["app"].prompt_var.set(prompt),
+                                       self.app_state["app"].send_text()))
+
+    def toggle_voice(self):
+        return self._dispatch(self.app_state["app"].toggle_listening)
+
+    def stop_speech(self):
+        app = self.app_state.get("app")
+        if app is not None:
+            app.speech_stop_event.set()
+            return True
+        return False
+
+    def open_folder(self, folder):
+        allowed = {"Documents", "Downloads", "Pictures", "Music", "This PC"}
+        folder = str(folder or "")
+        if folder not in allowed:
+            return False
+        return self._dispatch(lambda: self.app_state["app"]._open_hud_folder(folder))
+
+    def open_url(self, url):
+        import webbrowser
+        from urllib.parse import urlparse
+        url = str(url or "")
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or not parsed.netloc:
+            return False
+        webbrowser.open(url)
+        return True
+
+    def get_dashboard(self):
+        result = {"status": "J.A.R.V.I.S. ONLINE"}
+        try:
+            import platform
+            import psutil
+            cpu = psutil.cpu_percent(interval=None)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage(str(Path.home().anchor or "/"))
+            battery = psutil.sensors_battery()
+            result.update({
+                "cpu": f"{cpu:.0f}%",
+                "memory": f"{memory.percent:.0f}%",
+                "ram": f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB",
+                "disk": f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB",
+                "os": f"{platform.system()} {platform.release()}",
+                "cpuName": platform.processor() or f"{os.cpu_count()} logical cores",
+                "uptime": str(__import__("datetime").timedelta(seconds=int(__import__("time").time() - psutil.boot_time()))),
+                "battery": f"{battery.percent:.0f}%" if battery else "AC",
+                "network": "Connected" if psutil.net_if_stats() else "Unavailable",
+                "ip": "Local network",
+            })
+        except Exception:
+            result["status"] = "Some system readings unavailable"
+        return result
+
+    def close_window(self):
+        try:
+            if self.window is not None:
+                self.window.destroy()
+            return True
+        except Exception:
+            return False
+
+
+def run_web_hud():
+    """Run the supplied HTML HUD as the visible desktop window; keep the legacy
+    Tk host hidden as a compatibility layer for the existing JARVIS backend."""
+    import time
+    import webview
+
+    state = {"root": None, "app": None}
+    bridge = JarvisWebBridge(state)
+    errors = []
+
+    def start_backend():
+        try:
+            root = tk.Tk()
+            root.withdraw()
+            app = JarvisDesktop(root)
+            state["root"], state["app"] = root, app
+            root.withdraw()
+            root.mainloop()
+        except Exception as exc:
+            errors.append(exc)
+
+    backend = threading.Thread(target=start_backend, name="JARVIS-backend", daemon=True)
+    backend.start()
+    for _ in range(200):
+        if state["app"] is not None or errors:
+            break
+        time.sleep(0.05)
+    if errors:
+        raise RuntimeError(f"JARVIS backend failed to initialize: {errors[0]}")
+    if state["app"] is None:
+        raise RuntimeError("JARVIS backend did not initialize in time")
+
+    hud_path = Path(__file__).with_name("jarvis_hud.html")
+    if not hud_path.exists() and getattr(sys, "frozen", False):
+        hud_path = Path(sys._MEIPASS) / "jarvis_hud.html"
+    if not hud_path.exists():
+        raise FileNotFoundError(f"JARVIS HUD file not found: {hud_path}")
+    window = webview.create_window(
+        "J.A.R.V.I.S. | Circular HUD", hud_path.resolve().as_uri(),
+        js_api=bridge, width=1400, height=800, min_size=(900, 560),
+        background_color="#020b14", text_select=False,
+    )
+    bridge.window = window
+    webview.start(debug=False)
+    app = state.get("app")
+    if app is not None:
+        try:
+            app.root.after(0, app.exit_app)
+        except Exception:
+            pass
+
+
 def enable_windows_dpi_awareness():
     """Ask Windows for native per-monitor DPI rendering before Tk creates a window.
 
@@ -2387,9 +2524,7 @@ def main(argv=None):
     if not acquire_single_instance():
         return 0
     try:
-        root = tk.Tk()
-        JarvisDesktop(root)
-        root.mainloop()
+        run_web_hud()
         return 0
     except Exception as exc:
         # PyInstaller --windowed builds have no console; persist startup errors.
