@@ -635,12 +635,14 @@ class JarvisDesktop:
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
-        self.root.after(120, self._poll_events)
-        self.root.after(700, self._ensure_offline_model)
+        self.root.after(200, self._poll_events)
+        # Offline speech models can be large; prepare them only when voice is enabled.
+        # This keeps ordinary app startup fast and avoids an unexpected background download.
         self.root.after(1000, self._check_reminders)
-        self.root.after(5000, self._check_automations)
-        self.root.after(1500, self._sync_reminder_tasks)
-        self.root.after(5000, lambda: self._check_for_updates(silent=True))
+        self.root.after(10000, self._check_automations)
+        self.root.after(3000, self._sync_reminder_tasks)
+        # Defer network activity until the HUD has settled.
+        self.root.after(30000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
     # Legacy Tk dashboard widgets have been removed; the HTML HUD is the sole dashboard.
@@ -1123,7 +1125,7 @@ class JarvisDesktop:
                     ))
         except Exception as exc:
             self._set_status(f"Automation check failed: {exc}")
-        self.root.after(5000, self._check_automations)
+        self.root.after(15000, self._check_automations)
 
     def _check_reminders(self):
         try:
@@ -1921,7 +1923,7 @@ class JarvisDesktop:
                     self._set_status("Wake listener stopped.")
         except queue.Empty:
             pass
-        self.root.after(120, self._poll_events)
+        self.root.after(200, self._poll_events)
 
     def _show_window(self):
         """Bring the HTML HUD forward from the system tray."""
