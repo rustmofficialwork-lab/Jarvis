@@ -12,3 +12,4 @@ Pillow>=10,<13
 screen-brightness-control>=0.24,<1
 vosk>=0.3.45,<1
 pypdf>=5,<7
+pywebview>=5.4,<7
