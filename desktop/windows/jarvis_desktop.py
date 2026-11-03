@@ -604,12 +604,7 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
 class JarvisDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("J.A.R.V.I.S. | Desktop Assistant")
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-        self.root.geometry(f"{min(1180, max(720, screen_w - 80))}x{min(820, max(560, screen_h - 100))}")
-        self.root.minsize(min(820, max(640, screen_w - 80)), min(600, max(460, screen_h - 100)))
-        self.root.configure(bg="#07111b")
+        # Tk is retained only as a hidden event-loop/dialog host; the visible UI is the HTML HUD.
         self.settings = load_settings()
         self.events: queue.Queue = queue.Queue()
         self.history: list[dict] = load_chat_history()
@@ -633,13 +628,15 @@ class JarvisDesktop:
         except Exception:
             self.keyring = None
 
-        self._build_ui()
+        self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
+        self.prompt_var = tk.StringVar()
+        self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
+        self.chat = None  # Conversation rendering belongs exclusively to the HTML HUD.
+        self.listen_button = None
         self._load_secrets()
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
-        self.root.after(1000, self._refresh_dashboard_clock)
-        self.root.after(1500, self._refresh_dashboard_metrics)
         self.root.after(120, self._poll_events)
         self.root.after(700, self._ensure_offline_model)
         self.root.after(1000, self._check_reminders)
@@ -648,243 +645,7 @@ class JarvisDesktop:
         self.root.after(5000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
 
-    def _build_ui(self):
-        """Build the JARVIS command center inspired by the supplied HUD reference."""
-        self.root.title("J.A.R.V.I.S. | Desktop Assistant")
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-        self.root.minsize(min(980, max(760, screen_w - 40)),
-                          min(650, max(560, screen_h - 80)))
-        try:
-            self.root.state("zoomed")
-        except tk.TclError:
-            self.root.geometry(f"{min(1500, screen_w - 40)}x{min(820, screen_h - 80)}")
-        self.root.configure(bg="#020d1b")
-        self.status_var = tk.StringVar(value="SYSTEM ONLINE  •  JARVIS READY")
-        self.chat = None
-        self.transcript = [("YOU" if item["role"] == "user" else "JARVIS", item["content"], None) for item in self.history]
-        self.prompt_var = tk.StringVar()
-        self.metric_value_labels = {}
-        self.metric_detail_var = tk.StringVar(value="Collecting live local system readings…")
-        self.clock_var = tk.StringVar(value="--:-- --  •  --")
-        self._hud_value_labels = {}
-
-        style = ttk.Style(self.root)
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-        style.configure("Jarvis.TButton", background="#062b46", foreground="#8cecff",
-                        bordercolor="#087da5", padding=(9, 6), font=("Segoe UI", 9, "bold"))
-        style.map("Jarvis.TButton", background=[("active", "#075477")],
-                  foreground=[("active", "#ffffff")])
-
-        bg, panel, cyan, bright, muted = "#020d1b", "#061a2c", "#12cfff", "#d8f7ff", "#5b9db9"
-        shell = tk.Frame(self.root, bg=bg)
-        shell.pack(fill="both", expand=True, padx=10, pady=9)
-        shell.grid_columnconfigure(0, weight=24, minsize=230)
-        shell.grid_columnconfigure(1, weight=49, minsize=400)
-        shell.grid_columnconfigure(2, weight=27, minsize=260)
-        shell.grid_rowconfigure(1, weight=1)
-
-        # Top status rail
-        top = tk.Frame(shell, bg="#04172a", highlightbackground="#087da5", highlightthickness=1)
-        top.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
-        tk.Label(top, text="J.A.R.V.I.S.", bg="#04172a", fg=cyan,
-                 font=("Segoe UI", 19, "bold")).pack(side="left", padx=14, pady=8)
-        tk.Label(top, text="PERSONAL AI COMMAND CENTER", bg="#04172a", fg=muted,
-                 font=("Segoe UI", 9, "bold")).pack(side="left", padx=10)
-        tk.Label(top, textvariable=self.status_var, bg="#04172a", fg="#36e0b5",
-                 font=("Segoe UI", 9, "bold")).pack(side="left", padx=16)
-        ttk.Button(top, text="SETTINGS", style="Jarvis.TButton",
-                   command=self.open_settings).pack(side="right", padx=10, pady=7)
-
-        left = tk.Frame(shell, bg=bg)
-        left.grid(row=1, column=0, sticky="nsew", padx=(0, 7))
-        center = tk.Frame(shell, bg=bg)
-        center.grid(row=1, column=1, sticky="nsew", padx=4)
-        right = tk.Frame(shell, bg=bg)
-        right.grid(row=1, column=2, sticky="nsew", padx=(7, 0))
-
-        def section(parent, title):
-            box = tk.Frame(parent, bg=panel, highlightbackground="#087da5", highlightthickness=1)
-            box.pack(fill="x", pady=(0, 7))
-            tk.Label(box, text=title, bg=panel, fg=cyan,
-                     font=("Segoe UI", 9, "bold"), anchor="w").pack(fill="x", padx=10, pady=(8, 5))
-            return box
-
-        def metric(parent, name, value_size=13):
-            cell = tk.Frame(parent, bg="#041526", highlightbackground="#07577a", highlightthickness=1)
-            cell.pack(fill="x", padx=8, pady=3)
-            tk.Label(cell, text=name, bg="#041526", fg=cyan,
-                     font=("Segoe UI", 8, "bold"), anchor="w").pack(fill="x", padx=8, pady=(5, 0))
-            value = tk.Label(cell, text="—", bg="#041526", fg=bright,
-                             font=("Segoe UI", value_size, "bold"), anchor="w")
-            value.pack(fill="x", padx=8, pady=(0, 5))
-            self.metric_value_labels[name] = value
-            return value
-
-        # LEFT: clock, capacity, power and local navigation
-        clock_box = section(left, "LOCAL DATE / TIME")
-        self.hud_date_var = tk.StringVar(value="--")
-        tk.Label(clock_box, textvariable=self.hud_date_var, bg=panel, fg=bright,
-                 font=("Segoe UI", 20, "bold")).pack(anchor="w", padx=10)
-        tk.Label(clock_box, textvariable=self.clock_var, bg=panel, fg=cyan,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10, pady=(0, 8))
-        storage_box = section(left, "STORAGE CAPACITY")
-        metric(storage_box, "STORAGE TOTAL", 12)
-        metric(storage_box, "STORAGE FREE", 12)
-        power_box = section(left, "POWER / SYSTEM")
-        metric(power_box, "BATTERY", 13)
-        metric(power_box, "NETWORK", 12)
-        shortcuts = section(left, "QUICK FOLDERS")
-        for label, target in (("DOCUMENTS", "Documents"), ("PICTURES", "Pictures"),
-                              ("DOWNLOADS", "Downloads"), ("MUSIC", "Music"),
-                              ("THIS PC", "This PC")):
-            ttk.Button(shortcuts, text="›  " + label, style="Jarvis.TButton",
-                       command=lambda p=target: self._open_hud_folder(p)).pack(fill="x", padx=8, pady=2)
-        tk.Label(left, text="LOCAL WINDOWS STATUS  •  READ-ONLY TELEMETRY",
-                 bg=bg, fg=muted, font=("Segoe UI", 7)).pack(anchor="w", padx=4, pady=3)
-
-        # CENTER: reactor, connected app launchers, chat and always-visible composer
-        reactor_box = tk.Frame(center, bg="#03172a", highlightbackground="#087da5", highlightthickness=1)
-        reactor_box.pack(fill="both", expand=True, pady=(0, 7))
-        self.core_canvas = tk.Canvas(reactor_box, height=260, bg="#03172a",
-                                     highlightthickness=0, bd=0)
-        self.core_canvas.pack(fill="both", expand=True, padx=6, pady=(8, 0))
-        self.core_canvas.bind("<Configure>", self._draw_hud_reactor)
-        tk.Label(reactor_box, text="J.A.R.V.I.S.  /  CORE SYSTEM", bg="#03172a",
-                 fg=cyan, font=("Segoe UI", 10, "bold")).pack(pady=(0, 7))
-        app_rail = tk.Frame(reactor_box, bg="#03172a")
-        app_rail.pack(fill="x", padx=8, pady=(0, 8))
-        for label, url in (("GMAIL", "https://mail.google.com"),
-                           ("WHATSAPP", "https://web.whatsapp.com"),
-                           ("DISCORD", "https://discord.com/app"),
-                           ("YOUTUBE", "https://youtube.com"),
-                           ("CHATGPT", "https://chatgpt.com")):
-            ttk.Button(app_rail, text=label, style="Jarvis.TButton",
-                       command=lambda u=url: self._open_hud_url(u)).pack(side="left", expand=True, fill="x", padx=2)
-
-        # Reference-style lower information strip: real machine details, not mock values.
-        info_box = tk.Frame(center, bg="#041526", highlightbackground="#087da5", highlightthickness=1)
-        info_box.pack(fill="x", pady=(0, 7))
-        tk.Label(info_box, text="SYSTEM INFORMATION  /  QUICK ACCESS  /  NETWORK",
-                 bg="#041526", fg=cyan, font=("Segoe UI", 8, "bold"), anchor="w").pack(fill="x", padx=9, pady=(6, 2))
-        self.system_info_var = tk.StringVar(value="Reading Windows system information…")
-        tk.Label(info_box, textvariable=self.system_info_var, bg="#041526", fg=bright,
-                 font=("Consolas", 8), justify="left", anchor="w", wraplength=620).pack(fill="x", padx=9, pady=(0, 7))
-
-        conversation = tk.Frame(center, bg=panel, highlightbackground="#16445b", highlightthickness=1)
-        conversation.pack(fill="both", expand=True, pady=(0, 6))
-        tk.Label(conversation, text="CONVERSATION  /  JARVIS INTERFACE", bg=panel, fg=cyan,
-                 font=("Segoe UI", 9, "bold"), anchor="w").pack(fill="x", padx=10, pady=(7, 4))
-        self.chat = tk.Text(conversation, height=5, wrap="word", bg="#020e1b", fg=bright,
-                            insertbackground=cyan, relief="flat", padx=10, pady=7,
-                            font=("Segoe UI", 9), state="disabled")
-        self.chat.pack(fill="both", expand=True, padx=8, pady=(0, 7))
-        self.chat.tag_configure("speaker", foreground=cyan, font=("Segoe UI", 8, "bold"))
-        self.chat.tag_configure("error", foreground="#ff8c8c")
-        for who, message, tag in self.transcript:
-            self.chat.configure(state="normal")
-            self.chat.insert("end", f"{who}\n", "speaker")
-            self.chat.insert("end", f"{message}\n\n", tag or "")
-            self.chat.configure(state="disabled")
-        self.chat.see("end")
-
-        composer = tk.Frame(center, bg="#041526", highlightbackground="#087da5", highlightthickness=1)
-        composer.pack(fill="x", pady=(0, 2))
-        entry = tk.Entry(composer, textvariable=self.prompt_var, bg="#061a2c", fg=bright,
-                         insertbackground=cyan, relief="flat", font=("Segoe UI", 11))
-        entry.pack(side="left", fill="x", expand=True, ipady=10, padx=(8, 6), pady=7)
-        entry.bind("<Return>", lambda _event: self.send_text())
-        ttk.Button(composer, text="SEND", style="Jarvis.TButton",
-                   command=self.send_text).pack(side="right", padx=(0, 7), pady=7)
-        entry.focus_set()
-
-        # RIGHT: live load/temperature, system graphs area, service state and controls
-        system_box = section(right, "SYSTEM MONITOR")
-        for name in ("CPU LOAD", "MEMORY", "DISK USED", "CPU TEMP",
-                     "GPU LOAD", "GPU TEMP", "GPU VRAM"):
-            metric(system_box, name, 11)
-        self.gauge_canvas = tk.Canvas(system_box, height=104, bg=panel, highlightthickness=0)
-        self.gauge_canvas.pack(fill="x", padx=7, pady=(0, 7))
-        network_box = section(right, "NETWORK / PERFORMANCE")
-        for name in ("NETWORK DOWN", "NETWORK UP", "UPTIME"):
-            metric(network_box, name, 10)
-        tools_box = section(right, "SYSTEM TOOLS")
-        ttk.Button(tools_box, text="VOICE  •  START / STOP", style="Jarvis.TButton",
-                   command=self.toggle_listening).pack(fill="x", padx=8, pady=3)
-        ttk.Button(tools_box, text="STOP SPEAKING", style="Jarvis.TButton",
-                   command=self.stop_speaking).pack(fill="x", padx=8, pady=3)
-        ttk.Button(tools_box, text="SYSTEM STATUS", style="Jarvis.TButton",
-                   command=lambda: self._send_hud_command("system status")).pack(fill="x", padx=8, pady=3)
-        ttk.Button(tools_box, text="TASK MANAGER", style="Jarvis.TButton",
-                   command=lambda: self._send_hud_command("open task manager")).pack(fill="x", padx=8, pady=3)
-        quotes_box = section(right, "J.A.R.V.I.S.  /  SYSTEM NOTES")
-        quote_text = (
-            "THE FUTURE IS BUILT, NOT GIVEN.\n\n"
-            "SYSTEMS READY. THINK CLEARLY. ACT PRECISELY.\n\n"
-            "YOUR DESKTOP. YOUR COMMANDS. YOUR JARVIS."
-        )
-        tk.Label(quotes_box, text=quote_text, bg=panel, fg="#8fcde2",
-                 font=("Segoe UI", 8, "italic"), justify="left",
-                 wraplength=245, anchor="w").pack(fill="x", padx=10, pady=(0, 9))
-        tk.Label(right, textvariable=self.metric_detail_var, bg=bg, fg=muted,
-                 font=("Segoe UI", 7), justify="left", wraplength=250, anchor="w").pack(fill="x", padx=4, pady=3)
-
-    def _draw_hud_reactor(self, _event=None):
-        """Draw the central cyan reactor using native Tk canvas primitives."""
-        canvas = getattr(self, "core_canvas", None)
-        if canvas is None or not canvas.winfo_exists():
-            return
-        canvas.delete("all")
-        width = max(260, canvas.winfo_width())
-        height = max(210, canvas.winfo_height())
-        cx, cy = width // 2, height // 2
-        radius = min(112, height // 2 - 8, width // 3)
-        import math
-        for r, color, line in ((radius, "#087da5", 3), (radius-12, "#0c527a", 2),
-                               (radius-25, "#12cfff", 4), (radius-39, "#07577a", 2),
-                               (radius-52, "#12cfff", 3), (radius-65, "#b7f7ff", 2)):
-            canvas.create_oval(cx-r, cy-r, cx+r, cy+r, outline=color, width=line)
-        for index in range(24):
-            angle = math.radians(index * 15)
-            inner, outer = radius-8, radius-20 if index % 2 else radius-3
-            canvas.create_line(cx+math.cos(angle)*inner, cy+math.sin(angle)*inner,
-                               cx+math.cos(angle)*outer, cy+math.sin(angle)*outer,
-                               fill="#38dcff", width=2)
-        core = radius - 76
-        canvas.create_oval(cx-core, cy-core, cx+core, cy+core,
-                           fill="#0b4770", outline="#c7fbff", width=3)
-        canvas.create_oval(cx-8, cy-8, cx+8, cy+8, fill="#e6ffff", outline=cyan if False else "#12cfff", width=2)
-        canvas.create_text(cx, cy+radius+4, text="SYSTEM CORE  •  ONLINE",
-                           fill="#35dfff", font=("Segoe UI", 8, "bold"))
-
-    def _draw_hud_gauges(self, metrics):
-        """Render compact live usage bars using actual local telemetry."""
-        canvas = getattr(self, "gauge_canvas", None)
-        if canvas is None or not canvas.winfo_exists():
-            return
-        canvas.delete("all")
-        width = max(180, canvas.winfo_width())
-        rows = (("CPU", metrics.get("CPU LOAD", "N/A")),
-                ("RAM", metrics.get("MEMORY", "N/A")),
-                ("DISK", metrics.get("DISK USED", "N/A")))
-        for index, (name, raw) in enumerate(rows):
-            y = 15 + index * 31
-            try:
-                value = max(0.0, min(100.0, float(str(raw).replace("%", "").strip())))
-                shown = f"{value:.0f}%"
-            except (TypeError, ValueError):
-                value, shown = 0.0, "N/A"
-            canvas.create_text(4, y, text=name, anchor="w", fill="#12cfff",
-                               font=("Segoe UI", 8, "bold"))
-            x0, x1 = 48, width - 38
-            canvas.create_rectangle(x0, y-5, x1, y+5, fill="#09263b", outline="#16445b")
-            canvas.create_rectangle(x0, y-5, x0+(x1-x0)*value/100, y+5,
-                                     fill="#12cfff", outline="")
-            canvas.create_text(width-3, y, text=shown, anchor="e", fill="#d8f7ff",
-                               font=("Segoe UI", 8, "bold"))
+    # Legacy Tk dashboard widgets have been removed; the HTML HUD is the sole dashboard.
 
     def _open_hud_url(self, url):
         import webbrowser
@@ -900,93 +661,6 @@ class JarvisDesktop:
     def _send_hud_command(self, command):
         self.prompt_var.set(command)
         self.send_text()
-
-    def _draw_reactor(self):
-        """Draw a lightweight, image-free arc-reactor accent in the native header."""
-        canvas = self.reactor_canvas
-        canvas.delete("all")
-        cx, cy = 46, 33
-        for radius, color, width in ((27, "#16445b", 1), (22, "#087da5", 1),
-                                     (14, "#1a7895", 2), (6, "#42dfff", 1)):
-            canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
-                               outline=color, width=width)
-        import math
-        angle = self._reactor_angle
-        for index in range(8):
-            theta = math.radians(angle + index * 45)
-            x1, y1 = cx + math.cos(theta)*16, cy + math.sin(theta)*16
-            x2, y2 = cx + math.cos(theta)*25, cy + math.sin(theta)*25
-            canvas.create_line(x1, y1, x2, y2, fill="#42dfff", width=2,
-                               capstyle="round", tags="reactor-spokes")
-        canvas.create_oval(cx-3, cy-3, cx+3, cy+3, fill="#b8f8ff",
-                           outline="#42dfff", width=1)
-
-    def _animate_reactor(self):
-        """Animate only the small header accent; keep all UI drawing on Tk's thread."""
-        try:
-            if not self.root.winfo_exists():
-                return
-            self._reactor_angle = (self._reactor_angle + 6) % 360
-            canvas = self.reactor_canvas
-            canvas.delete("reactor-spokes")
-            import math
-            cx, cy, angle = 46, 33, self._reactor_angle
-            for index in range(8):
-                theta = math.radians(angle + index * 45)
-                canvas.create_line(cx + math.cos(theta)*16, cy + math.sin(theta)*16,
-                                   cx + math.cos(theta)*25, cy + math.sin(theta)*25,
-                                   fill="#42dfff", width=2, capstyle="round",
-                                   tags="reactor-spokes")
-            self.root.after(90, self._animate_reactor)
-        except tk.TclError:
-            return
-
-    def _refresh_dashboard_clock(self):
-        """Keep the local clock/date accurate independently of hardware polling."""
-        try:
-            if not self.root.winfo_exists():
-                return
-            from datetime import datetime
-            now = datetime.now()
-            self.clock_var.set(now.strftime("%I:%M %p  •  %A"))
-            if hasattr(self, "hud_date_var"):
-                self.hud_date_var.set(now.strftime("%B %d"))
-            self.root.after(1000, self._refresh_dashboard_clock)
-        except tk.TclError:
-            return
-
-    def _refresh_dashboard_metrics(self):
-        """Refresh the native dashboard from local psutil readings without blocking Tk."""
-        try:
-            metrics = dict(self._get_system_metrics())
-            for name, label in getattr(self, "metric_value_labels", {}).items():
-                label.configure(text=metrics.get(name, "N/A"))
-            self._draw_hud_gauges(metrics)
-            try:
-                import platform
-                import psutil
-                memory = psutil.virtual_memory()
-                self.system_info_var.set(
-                    f"OS  {platform.system()} {platform.release()}   |   ARCH  {platform.machine()}\n"
-                    f"CPU  {platform.processor() or (str(os.cpu_count()) + ' logical cores')}   |   "
-                    f"RAM  {memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB\n"
-                    f"QUICK ACCESS  Control Panel  •  Device Manager  •  Task Manager  •  Settings"
-                )
-            except Exception:
-                self.system_info_var.set("SYSTEM INFORMATION  •  Some hardware details are unavailable")
-            process_text = self._get_dashboard_process_summary()
-            self.metric_detail_var.set(
-                "Live local Windows readings • " + process_text
-            )
-        except Exception as exc:
-            if hasattr(self, "metric_detail_var"):
-                self.metric_detail_var.set(f"System telemetry unavailable: {exc}")
-        finally:
-            try:
-                if self.root.winfo_exists():
-                    self.root.after(2500, self._refresh_dashboard_metrics)
-            except tk.TclError:
-                pass
 
     def _get_service_statuses(self):
         """Report readiness from actual configuration and installed capabilities."""
@@ -1260,13 +934,6 @@ class JarvisDesktop:
 
     def _append(self, who: str, text: str, tag: str | None = None):
         self.transcript.append((who, text, tag))
-        if self.chat is None or not self.chat.winfo_exists():
-            return
-        self.chat.configure(state="normal")
-        self.chat.insert("end", f"{who}\n", "speaker")
-        self.chat.insert("end", f"{text}\n\n", tag or "")
-        self.chat.see("end")
-        self.chat.configure(state="disabled")
 
     def _set_status(self, text: str):
         self.status_var.set(text)
@@ -2112,10 +1779,6 @@ class JarvisDesktop:
                 save_chat_history(self.history)
             except OSError as exc:
                 self._set_status(f"Chat cleared in memory; could not update history file: {exc}")
-            if self.chat is not None and self.chat.winfo_exists():
-                self.chat.configure(state="normal")
-                self.chat.delete("1.0", "end")
-                self.chat.configure(state="disabled")
             self._append("JARVIS", "Conversation cleared.")
         finally:
             self.request_lock.release()
@@ -2259,15 +1922,20 @@ class JarvisDesktop:
                     self._set_status("Reminder due.")
                     messagebox.showinfo("JARVIS Reminder", message, parent=self.root)
                 elif kind == "listener_stopped":
-                    self.listen_button.configure(text="Start wake listening", state="normal")
                     self._set_status("Wake listener stopped.")
         except queue.Empty:
             pass
         self.root.after(120, self._poll_events)
 
     def _show_window(self):
-        self.root.after(0, self.root.deiconify)
-        self.root.after(0, self.root.lift)
+        """Bring the HTML HUD forward from the system tray."""
+        try:
+            window = getattr(getattr(self, "web_bridge", None), "window", None)
+            if window is not None:
+                window.show()
+                window.restore()
+        except Exception as exc:
+            self._set_status(f"Could not restore JARVIS window: {exc}")
 
     def _start_tray(self):
         if self.tray_icon is not None:
@@ -2415,8 +2083,7 @@ class JarvisWebBridge:
 
 
 def run_web_hud():
-    """Run the supplied HTML HUD as the visible desktop window; keep the legacy
-    Tk host hidden as a compatibility layer for the existing JARVIS backend."""
+    """Run the HTML HUD as the only visible dashboard; Tk remains a hidden scheduler/dialog host."""
     import time
     import webview
 
@@ -2457,6 +2124,7 @@ def run_web_hud():
         background_color="#020b14", text_select=False,
     )
     bridge.window = window
+    state["app"].web_bridge = bridge
     webview.start(debug=False)
     app = state.get("app")
     if app is not None:
