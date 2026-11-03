@@ -2349,7 +2349,10 @@ class JarvisWebBridge:
                                        self.app_state["app"].send_text()))
 
     def toggle_voice(self):
-        return self._dispatch(self.app_state["app"].toggle_listening)
+        app = self.app_state.get("app")
+        if app is None:
+            return False
+        return self._dispatch(app.toggle_listening)
 
     def stop_speech(self):
         app = self.app_state.get("app")
@@ -2384,6 +2387,8 @@ class JarvisWebBridge:
             memory = psutil.virtual_memory()
             disk = psutil.disk_usage(str(Path.home().anchor or "/"))
             battery = psutil.sensors_battery()
+            interfaces = psutil.net_if_stats()
+            network_connected = any(item.isup for item in interfaces.values())
             result.update({
                 "cpu": f"{cpu:.0f}%",
                 "memory": f"{memory.percent:.0f}%",
@@ -2392,8 +2397,8 @@ class JarvisWebBridge:
                 "os": f"{platform.system()} {platform.release()}",
                 "cpuName": platform.processor() or f"{os.cpu_count()} logical cores",
                 "uptime": str(__import__("datetime").timedelta(seconds=int(__import__("time").time() - psutil.boot_time()))),
-                "battery": f"{battery.percent:.0f}%" if battery else "AC",
-                "network": "Connected" if psutil.net_if_stats() else "Unavailable",
+                "battery": f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC",
+                "network": "Connected" if network_connected else "Offline",
                 "ip": "Local network",
             })
         except Exception:
