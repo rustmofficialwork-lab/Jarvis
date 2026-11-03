@@ -2063,7 +2063,7 @@ class JarvisWebBridge:
                 "uptime": str(__import__("datetime").timedelta(seconds=int(__import__("time").time() - psutil.boot_time()))),
                 "battery": f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC",
                 "network": "Connected" if network_connected else "Offline",
-                "ip": "Local network",
+                "ip": next((address.address for addresses in psutil.net_if_addrs().values() for address in addresses if address.family == __import__("socket").AF_INET and address.address != "127.0.0.1"), "Unavailable"),
             })
         except Exception:
             result["status"] = "Some system readings unavailable"
