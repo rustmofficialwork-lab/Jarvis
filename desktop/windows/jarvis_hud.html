@@ -7,7 +7,7 @@
 
 <style>
 :root{--bg:#020b14;--cyan:#00e5ff;--bright:#a4f4ff;--dim:rgba(0,229,255,.3);--muted:#5c9eb3;--digital:'Consolas','Segoe UI',monospace;--head:'Segoe UI',Arial,sans-serif}
-*{box-sizing:border-box}i[class*="fa-"]{display:inline-block;width:1.4em;font-style:normal}i.fa-hard-drive:before{content:"▣"}i.fa-wifi:before{content:"◉"}i.fa-windows:before{content:"⊞"}i.fa-file-lines:before{content:"▤"}i.fa-download:before{content:"↓"}i.fa-image:before{content:"▧"}i.fa-music:before{content:"♫"}i.fa-desktop:before{content:"▣"}i.fa-envelope:before{content:"✉"}i.fa-whatsapp:before{content:"◉"}i.fa-discord:before{content:"◈"}i.fa-youtube:before{content:"▶"}i.fa-spotify:before{content:"◉"}i.fa-robot:before{content:"▣"}i.fa-xmark:before{content:"×"}body{margin:0;background:#000;color:var(--cyan);height:100vh;overflow:hidden;font-family:var(--digital);display:grid;place-items:center}
+*{box-sizing:border-box}i[class*="fa-"]{display:inline-block;width:1.4em;font-style:normal}i.fa-hard-drive:before{content:"▣"}i.fa-wifi:before{content:"◉"}i.fa-windows:before{content:"⊞"}i.fa-file-lines:before{content:"▤"}i.fa-download:before{content:"↓"}i.fa-image:before{content:"▧"}i.fa-music:before{content:"♫"}i.fa-desktop:before{content:"▣"}i.fa-envelope:before{content:"✉"}i.fa-whatsapp:before{content:"◉"}i.fa-discord:before{content:"◈"}i.fa-youtube:before{content:"▶"}i.fa-spotify:before{content:"◉"}i.fa-robot:before{content:"▣"}i.fa-xmark:before{content:"×"}html,body{width:100%;height:100%;min-width:0;min-height:0}body{margin:0;background:#000;color:var(--cyan);height:100%;overflow:hidden;font-family:var(--digital);display:grid;place-items:center}
 button{cursor:pointer}#hud{width:1400px;height:800px;position:relative;overflow:hidden;transform-origin:center;background-color:var(--bg);background-image:linear-gradient(rgba(0,229,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.035) 1px,transparent 1px);background-size:30px 30px;box-shadow:0 0 18px #00e5ff12;border:1px solid #123}
 .panel{position:absolute;border:1px solid var(--dim);background:#031522ed;padding:12px;clip-path:polygon(0 0,100% 0,100% 92%,96% 100%,0 100%)}h1,h2,h3,h4{font-family:var(--head);font-weight:400;color:var(--bright);margin:0 0 9px}small,.muted{color:var(--muted)}.date{left:35px;top:28px;width:195px;height:195px;border:4px solid #00587a;border-radius:50%;display:grid;place-content:center;text-align:center;background:radial-gradient(#00e5ff15,transparent 70%);position:absolute}.date:before{content:"";position:absolute;inset:-9px;border:4px solid transparent;border-top-color:var(--cyan);border-right-color:var(--cyan);border-radius:50%}.date strong{font:800 76px var(--head);color:white;text-shadow:0 0 7px var(--cyan)}.date span{text-transform:uppercase;letter-spacing:3px}.clock{position:absolute;top:42px;left:270px;width:225px;font-size:22px;line-height:1.35;color:white}
 .leftinfo{left:35px;top:250px;width:230px;min-height:150px}.leftinfo p,.stat p{margin:7px 0;color:var(--bright)}
@@ -52,12 +52,17 @@ const hud=document.getElementById('hud');
 function scale(){
  const w=document.documentElement.clientWidth||window.innerWidth;
  const h=document.documentElement.clientHeight||window.innerHeight;
- const availableW=Math.max(320,w-24);
- const availableH=Math.max(320,h-104);
+ // The native window is maximized to the Windows work area, which already
+ // excludes the taskbar. Keep a small, even safety margin on every edge.
+ const availableW=Math.max(320,w-32);
+ const availableH=Math.max(320,h-32);
  const factor=Math.min(availableW/1400,availableH/800,1);
+ hud.style.transformOrigin='center center';
  hud.style.transform='scale('+factor+')';
 }
-addEventListener('resize',scale);addEventListener('orientationchange',scale);scale();
+addEventListener('resize',scale);addEventListener('orientationchange',scale);
+if(window.visualViewport)window.visualViewport.addEventListener('resize',scale);
+scale();
 function clock(){const d=new Date();document.getElementById('month').textContent=d.toLocaleString('en',{month:'long'});document.getElementById('day').textContent=d.getDate();document.getElementById('weekday').textContent=d.toLocaleString('en',{weekday:'long'});document.getElementById('time').textContent=d.toLocaleTimeString()}setInterval(clock,1000);clock();
 async function api(name,...args){try{if(window.pywebview?.api?.[name])return await window.pywebview.api[name](...args)}catch(e){document.getElementById('reply').textContent='Bridge error: '+e}return null}
 function send(){const el=document.getElementById('prompt'),v=el.value.trim();if(v){api('send_command',v);document.getElementById('reply').textContent='SENT TO JARVIS';el.value=''}}document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
