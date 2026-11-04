@@ -16,7 +16,7 @@ pip install -r requirements.txt
 python jarvis_desktop.py
 ```
 
-Windows CI compiles Python source, runs configuration smoke tests, and packages a standalone executable. These checks do not exercise microphone hardware or validate live backend credentials.
+Windows CI compiles Python source, runs the desktop unit tests, packages the portable `desktop/windows/dist/JARVIS/` application folder, builds the Inno Setup installer, uploads both artifacts, and publishes the rolling `jarvis-latest` prerelease on successful pushes to `main`. These checks do not exercise microphone hardware or validate live backend credentials.
 
 ## Shared backend and limitations
 
