@@ -720,7 +720,9 @@
         };
         const folders = {
             "documents": "Documents", "downloads": "Downloads",
-            "pictures": "Pictures", "music": "Music", "this pc": "This PC"
+            "pictures": "Pictures", "images": "Pictures", "music": "Music",
+            "videos": "Videos", "this pc": "This PC", "storage": "This PC",
+            "network": "Network", "recycle bin": "Recycle Bin"
         };
         const apps = {
             "gmail": "https://mail.google.com/",
@@ -733,7 +735,9 @@
             "steam": "https://store.steampowered.com/",
             "notion": "https://www.notion.so/",
             "spotify": "https://open.spotify.com/",
-            "chatgpt": "https://chatgpt.com/"
+            "chatgpt": "https://chatgpt.com/",
+            "vscp": "https://code.visualstudio.com/",
+            "games": "https://store.steampowered.com/"
         };
         const openFolder = (name) => {
             const api = bridge();
@@ -744,12 +748,12 @@
             if (api && api.open_url && apps[name]) api.open_url(apps[name]);
         };
         document.addEventListener("click", (event) => {
-            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .orb-wrapper, .stat-box");
+            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .orb-wrapper, .data-row");
             if (!target) return;
             const label = target.textContent.trim().toLowerCase().replace(/\s+/g, " ");
             if (target.matches(".power-controls i")) {
                 const index = [...target.parentElement.children].indexOf(target);
-                command(index === 0 ? "play pause" : index === 1 ? "volume down" : "next track");
+                command(index === 2 ? "next track" : "play pause");
                 return;
             }
             if (target.matches(".orb-wrapper")) {
@@ -772,17 +776,22 @@
                 openFolder(folders[folderName]);
                 return;
             }
+            if (target.matches(".data-row")) {
+                const section = target.closest(".stat-box")?.querySelector("h4")?.textContent.trim().toLowerCase() || "";
+                if (!section.includes("quick access")) return;
+                const api = bridge();
+                if (!api || !api.open_system_tool) return;
+                if (label.includes("control panel")) api.open_system_tool("control_panel");
+                else if (label.includes("device manager")) api.open_system_tool("device_manager");
+                else if (label.includes("task manager")) api.open_system_tool("task_manager");
+                else if (label.includes("settings")) api.open_settings();
+                else if (label.includes("run")) api.open_system_tool("run");
+                return;
+            }
             if (target.matches(".hex-btn")) {
                 const index = [...target.parentElement.children].indexOf(target);
                 command(["system status", "find file", "open settings", "show reminders"][index] || "system status");
                 return;
-            }
-            if (target.matches(".stat-box")) {
-                const text = label;
-                if (text.includes("task manager")) command("open task manager");
-                else if (text.includes("settings") || text.includes("control panel")) {
-                    const api = bridge(); if (api && api.open_settings) api.open_settings();
-                }
             }
         });
         document.addEventListener("keydown", (event) => {
@@ -819,6 +828,8 @@
                 });
                 const battery = document.querySelector(".top-bat h3");
                 if (battery && data.battery) battery.textContent = data.battery;
+                const batteryWidget = document.querySelector(".battery-widget h2");
+                if (batteryWidget && data.battery) batteryWidget.textContent = data.battery;
                 const cpu = document.querySelector(".cpu-widget h2");
                 if (cpu && data.cpu) cpu.textContent = data.cpu;
                 const status = document.querySelector(".jarvis-header h3");
