@@ -744,7 +744,7 @@
             if (api && api.open_url && apps[name]) api.open_url(apps[name]);
         };
         document.addEventListener("click", (event) => {
-            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .tools-widget, .stat-box");
+            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .orb-wrapper, .stat-box");
             if (!target) return;
             const label = target.textContent.trim().toLowerCase().replace(/\s+/g, " ");
             if (target.matches(".power-controls i")) {
@@ -752,7 +752,7 @@
                 command(index === 0 ? "play pause" : index === 1 ? "volume down" : "next track");
                 return;
             }
-            if (target.matches(".back-btn")) {
+            if (target.matches(".orb-wrapper")) {\n                const prompt = window.prompt("What should JARVIS do?");\n                if (prompt && prompt.trim()) command(prompt.trim());\n                return;\n            }\n            if (target.matches(".back-btn")) {
                 const api = bridge();
                 if (api && api.close_window) api.close_window();
                 return;
