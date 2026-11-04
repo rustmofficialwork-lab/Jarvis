@@ -654,7 +654,13 @@ class JarvisDesktop:
     def _open_hud_folder(self, folder):
         import subprocess
         from pathlib import Path
-        target = Path.home() / folder if folder != "This PC" else Path.home()
+        special_locations = {
+            "Recycle Bin": "shell:RecycleBinFolder",
+            "Network": "shell:NetworkPlacesFolder",
+        }
+        target = special_locations.get(folder)
+        if target is None:
+            target = Path.home() / folder if folder != "This PC" else Path.home()
         if os.name == "nt":
             subprocess.Popen(["explorer.exe", str(target)], shell=False)
 
@@ -2038,11 +2044,35 @@ class JarvisWebBridge:
         return bool(app and app.wake_thread and app.wake_thread.is_alive())
 
     def open_folder(self, folder):
-        allowed = {"Documents", "Downloads", "Pictures", "Music", "This PC"}
+        allowed = {"Documents", "Downloads", "Pictures", "Music", "Videos", "This PC", "Network", "Recycle Bin"}
         folder = str(folder or "")
         if folder not in allowed:
             return False
         return self._dispatch(lambda: self.app_state["app"]._open_hud_folder(folder))
+
+    def open_system_tool(self, tool):
+        """Open a small allowlist of Windows system utilities from the HUD."""
+        import subprocess
+        import ctypes
+
+        commands = {
+            "control_panel": ["control.exe"],
+            "device_manager": ["devmgmt.msc"],
+            "task_manager": ["taskmgr.exe"],
+        }
+        tool = str(tool or "")
+        if tool == "run":
+            def show_run_dialog():
+                user32 = ctypes.windll.user32
+                user32.keybd_event(0x5B, 0, 0, 0)
+                user32.keybd_event(0x52, 0, 0, 0)
+                user32.keybd_event(0x52, 0, 2, 0)
+                user32.keybd_event(0x5B, 0, 2, 0)
+            return self._dispatch(show_run_dialog)
+        command = commands.get(tool)
+        if command is None:
+            return False
+        return self._dispatch(lambda: subprocess.Popen(command, shell=False))
 
     def open_url(self, url):
         import webbrowser
