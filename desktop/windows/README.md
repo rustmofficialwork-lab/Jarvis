@@ -61,7 +61,7 @@ Type `read file` (or `document kholo`) in the JARVIS command bar and choose a fi
 
 ## Updates
 
-JARVIS checks the official rolling Windows release once at startup. You can also use **SETTINGS → Check for updates** to check manually. Main-branch Windows builds publish to the `jarvis-latest` prerelease with a unique build version, installer, and SHA-256 checksums. JARVIS downloads the installer only after confirmation, verifies its SHA-256 against the published checksum file, and asks before launching the installer. Version-tagged releases (`v1.1.0`, etc.) remain available as separate manual releases.
+JARVIS checks the official rolling Windows release once at startup. You can also use **SETTINGS → Check for updates** to check manually. Main-branch Windows builds publish to the `jarvis-latest` prerelease with a unique build version, installer, `JARVIS-Portable-x64.zip` (the complete onedir app), and SHA-256 checksums. JARVIS downloads the installer only after confirmation, verifies its SHA-256 against the published checksum file, and asks before launching the installer. Version-tagged releases (`v1.1.0`, etc.) remain available as separate manual releases.
 
 ## Run from source
 
