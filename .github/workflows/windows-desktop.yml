@@ -11,6 +11,7 @@ on:
     branches: [main, feat/offline-wake-word, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard, feature/complete-realtime-dashboard]
     paths:
       - "desktop/windows/**"
+      - "README.md"
       - ".github/workflows/windows-desktop.yml"
   workflow_dispatch:
 
