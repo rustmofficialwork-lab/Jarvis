@@ -2057,7 +2057,7 @@ class JarvisWebBridge:
 
         commands = {
             "control_panel": ["control.exe"],
-            "device_manager": ["devmgmt.msc"],
+            "device_manager": ["mmc.exe", "devmgmt.msc"],
             "task_manager": ["taskmgr.exe"],
         }
         tool = str(tool or "")
