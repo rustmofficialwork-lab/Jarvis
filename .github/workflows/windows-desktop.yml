@@ -119,12 +119,12 @@ jobs:
             Latest successful Windows desktop build from the main branch.
             Version: ${{ env.JARVIS_VERSION }}
             Installer: JARVIS-Setup-x64.exe
-            Portable executable: JARVIS.exe
+            Portable build: JARVIS/ folder (run JARVIS.exe)
             The release is updated by the Windows Desktop workflow.
           prerelease: true
           make_latest: false
           overwrite_files: true
           files: |
             desktop/windows/dist-installer/JARVIS-Setup-x64.exe
-            desktop/windows/dist/JARVIS.exe
+            desktop/windows/dist/JARVIS/JARVIS.exe
             SHA256SUMS.txt
