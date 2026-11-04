@@ -752,7 +752,9 @@
                 command(index === 0 ? "play pause" : index === 1 ? "volume down" : "next track");
                 return;
             }
-            if (target.matches(".orb-wrapper")) {\n                const prompt = window.prompt("What should JARVIS do?");\n                if (prompt && prompt.trim()) command(prompt.trim());\n                return;\n            }\n            if (target.matches(".back-btn")) {
+            if (target.matches(".orb-wrapper")) {
+                const prompt = window.prompt("What should JARVIS do?");\n                if (prompt && prompt.trim()) command(prompt.trim());
+                return;\n            }\n            if (target.matches(".back-btn")) {
                 const api = bridge();
                 if (api && api.close_window) api.close_window();
                 return;
