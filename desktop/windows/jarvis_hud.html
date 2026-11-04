@@ -15,6 +15,36 @@ button{cursor:pointer}#hud{width:1400px;height:800px;position:relative;overflow:
 .nav{position:absolute;left:300px;top:190px;width:185px;display:grid;gap:7px}.nav button{border:1px solid var(--dim);background:#031522;color:white;text-align:left;padding:10px;font:14px var(--digital)}.nav button:hover,.apps button:hover{background:#07506a}.nav i,.apps i{width:25px;color:var(--cyan)}
 .orb{position:absolute;left:535px;top:220px;width:300px;height:300px;border:3px dotted #087b9a;border-radius:50%;display:grid;place-items:center;}.orb:before,.orb:after{content:"";position:absolute;border:8px solid transparent;border-top-color:var(--cyan);border-bottom-color:var(--cyan);border-radius:50%;inset:15px;}.orb:after{inset:45px;border:2px dashed var(--bright);}.core{width:75px;height:75px;border-radius:50%;background:radial-gradient(white 5%,var(--bright) 35%,var(--cyan) 65%,transparent);box-shadow:0 0 18px var(--cyan),0 0 32px #00e5ff55}
 .apps{position:absolute;right:35px;top:300px;width:180px;display:grid;gap:8px;color:white}.apps button{border:1px solid transparent;background:none;color:white;text-align:left;padding:7px;font:14px var(--digital)}.righttop{right:35px;top:28px;width:280px;min-height:230px}.righttop .tagline{margin:12px 0;color:var(--muted);font-size:13px;line-height:1.5}.action{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.stats{left:300px;bottom:12px;width:650px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.stat{border:1px solid var(--dim);padding:10px;background:#020e19dd;font-size:12px}.tools{right:35px;bottom:12px;width:280px}.tools button{width:48%;height:54px;margin:1%;background:#00e5ff0b;border:1px solid var(--cyan);color:var(--cyan);font-size:20px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}.chatbar{position:absolute;left:300px;right:340px;bottom:155px;display:flex;gap:7px}.chatbar input{flex:1;min-width:0;background:#031522;color:white;border:1px solid var(--dim);padding:12px;font:16px var(--digital);outline:none}.chatbar button{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.status{position:absolute;left:300px;bottom:120px;color:var(--muted);font-size:12px}.back{position:absolute;right:20px;top:20px;background:transparent;border:1px solid var(--cyan);color:var(--cyan);border-radius:50%;width:38px;height:38px}
+/* Live HUD motion: layered orbital rings, reactor pulse, scan sweep and subtle UI activity. */
+#hud{animation:gridDrift 24s linear infinite;background-size:30px 30px;isolation:isolate}
+#hud:after{content:"";position:absolute;z-index:4;left:0;right:0;top:-2px;height:2px;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(0,229,255,.75),transparent);box-shadow:0 0 14px rgba(0,229,255,.55);animation:scanSweep 8s ease-in-out infinite}
+.date:before{animation:dateOrbit 10s linear infinite}
+.date{animation:panelArrive .9s cubic-bezier(.2,.8,.2,1) both}
+.clock{animation:panelArrive .8s .12s both}
+.panel,.nav,.apps,.chatbar,.status,.ring{animation:panelArrive .75s cubic-bezier(.2,.8,.2,1) both}
+.leftinfo{animation-delay:.16s}.righttop{animation-delay:.28s}.stats{animation-delay:.38s}.tools{animation-delay:.48s}
+.nav{animation-delay:.22s}.apps{animation-delay:.32s}.chatbar{animation-delay:.42s}.status{animation-delay:.5s}
+.orb{box-shadow:0 0 24px rgba(0,229,255,.08),inset 0 0 24px rgba(0,229,255,.05);animation:orbBreathe 4.5s ease-in-out infinite}
+.orb:before{animation:orbitClockwise 12s linear infinite}
+.orb:after{animation:orbitCounter 18s linear infinite}
+.core{animation:reactorPulse 2.4s ease-in-out infinite;position:relative}
+.core:after{content:"";position:absolute;inset:-18px;border:1px solid rgba(0,229,255,.35);border-radius:50%;animation:reactorRipple 2.4s ease-out infinite}
+.ring{transition:background 1s ease,filter .5s ease}
+.ring b{position:relative;z-index:1}
+.nav button,.apps button,.action,.chatbar button,.tools button,.back{transition:background .22s ease,border-color .22s ease,box-shadow .22s ease,transform .22s ease}
+.nav button:hover,.apps button:hover,.action:hover,.chatbar button:hover,.tools button:hover,.back:hover{transform:translateY(-2px);box-shadow:0 0 14px rgba(0,229,255,.22);border-color:var(--bright)}
+.nav button:active,.apps button:active,.action:active,.chatbar button:active{transform:translateY(0) scale(.98)}
+.leftinfo p,.stat p{transition:color .3s ease,text-shadow .3s ease}
+.leftinfo p:hover,.stat p:hover{color:white;text-shadow:0 0 8px var(--cyan)}
+@keyframes orbitClockwise{to{transform:rotate(360deg)}}
+@keyframes orbitCounter{to{transform:rotate(-360deg)}}
+@keyframes dateOrbit{to{transform:rotate(360deg)}}
+@keyframes reactorPulse{0%,100%{transform:scale(.88);filter:brightness(.9);box-shadow:0 0 16px var(--cyan),0 0 30px #00e5ff55}50%{transform:scale(1.08);filter:brightness(1.35);box-shadow:0 0 28px var(--cyan),0 0 58px #00e5ff99}}
+@keyframes reactorRipple{0%{transform:scale(.72);opacity:.8}100%{transform:scale(1.65);opacity:0}}
+@keyframes orbBreathe{0%,100%{filter:brightness(.9)}50%{filter:brightness(1.22)}}
+@keyframes scanSweep{0%{transform:translateY(0);opacity:0}8%{opacity:.8}90%{opacity:.55}100%{transform:translateY(800px);opacity:0}}
+@keyframes gridDrift{to{background-position:30px 30px}}
+@keyframes panelArrive{from{opacity:0;translate:0 10px}to{opacity:1;translate:0 0}}
 @keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
