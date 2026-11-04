@@ -701,7 +701,7 @@
             const scaleY = windowHeight / designHeight;
             const scale = Math.min(scaleX, scaleY); 
             
-            hud.style.transform = \`scale(\${scale})\`;
+            hud.style.transform = `scale(${scale})`;
         }
 
         window.addEventListener('resize', scaleHUD);
@@ -801,10 +801,20 @@
             try {
                 const data = await api.get_dashboard();
                 document.querySelectorAll(".data-row").forEach((row) => {
-                    const label = row.querySelector("span")?.textContent.trim().replace(/[:\-]/g, "").toLowerCase();
+                    const label = row.querySelector("span")?.textContent.trim().replace(/^[-\\s]+|[:\\s]+$/g, "").toLowerCase();
                     const value = row.querySelector(".val");
-                    if (!value) return;
-                    const fields = {cpu: data.cpu, ram: data.ram, os: data.os, uptime: data.uptime, battery: data.battery, ip: data.ip, disk: data.disk, network: data.network};
+                    if (!value || !label) return;
+                    const section = row.closest(".stat-box")?.querySelector("h4")?.textContent.trim().toLowerCase() || "";
+                    const fields = {
+                        cpu: section.includes("system") ? data.cpuName : data.cpu,
+                        ram: data.ram,
+                        os: data.os,
+                        uptime: data.uptime,
+                        battery: data.battery,
+                        ip: data.ip,
+                        disk: data.disk,
+                        network: data.network
+                    };
                     if (fields[label]) value.textContent = fields[label];
                 });
                 const battery = document.querySelector(".top-bat h3");
