@@ -801,7 +801,7 @@
             try {
                 const data = await api.get_dashboard();
                 document.querySelectorAll(".data-row").forEach((row) => {
-                    const label = row.querySelector("span")?.textContent.trim().replace(/^[-\\s]+|[:\\s]+$/g, "").toLowerCase();
+                    const label = row.querySelector("span")?.textContent.trim().replace(/^[-\s]+|[:\s]+$/g, "").toLowerCase();
                     const value = row.querySelector(".val");
                     if (!value || !label) return;
                     const section = row.closest(".stat-box")?.querySelector("h4")?.textContent.trim().toLowerCase() || "";
