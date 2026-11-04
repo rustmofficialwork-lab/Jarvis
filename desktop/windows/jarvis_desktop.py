@@ -635,12 +635,12 @@ class JarvisDesktop:
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
-        self.root.after(200, self._poll_events)
+        self.root.after(350, self._poll_events)
         # Offline speech models can be large; prepare them only when voice is enabled.
         # This keeps ordinary app startup fast and avoids an unexpected background download.
         self.root.after(1000, self._check_reminders)
         self.root.after(10000, self._check_automations)
-        self.root.after(3000, self._sync_reminder_tasks)
+        self.root.after(15000, self._sync_reminder_tasks)
         # Defer network activity until the HUD has settled.
         self.root.after(30000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
@@ -1923,7 +1923,7 @@ class JarvisDesktop:
                     self._set_status("Wake listener stopped.")
         except queue.Empty:
             pass
-        self.root.after(200, self._poll_events)
+        self.root.after(350, self._poll_events)
 
     def _show_window(self):
         """Bring the HTML HUD forward from the system tray."""
@@ -1996,6 +1996,9 @@ class JarvisWebBridge:
     def __init__(self, app_state):
         self.app_state = app_state
         self.window = None
+        self._dashboard_cache = None
+        self._dashboard_cache_at = 0.0
+        self._dashboard_lock = threading.Lock()
 
     def _dispatch(self, callback):
         root, app = self.app_state.get("root"), self.app_state.get("app")
@@ -2045,31 +2048,49 @@ class JarvisWebBridge:
         return True
 
     def get_dashboard(self):
-        result = {"status": "J.A.R.V.I.S. ONLINE"}
-        try:
-            import platform
-            import psutil
-            cpu = psutil.cpu_percent(interval=None)
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage(str(Path.home().anchor or "/"))
-            battery = psutil.sensors_battery()
-            interfaces = psutil.net_if_stats()
-            network_connected = any(item.isup for item in interfaces.values())
-            result.update({
-                "cpu": f"{cpu:.0f}%",
-                "memory": f"{memory.percent:.0f}%",
-                "ram": f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB",
-                "disk": f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB",
-                "os": f"{platform.system()} {platform.release()}",
-                "cpuName": platform.processor() or f"{os.cpu_count()} logical cores",
-                "uptime": str(__import__("datetime").timedelta(seconds=int(__import__("time").time() - psutil.boot_time()))),
-                "battery": f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC",
-                "network": "Connected" if network_connected else "Offline",
-                "ip": next((address.address for addresses in psutil.net_if_addrs().values() for address in addresses if address.family == __import__("socket").AF_INET and address.address != "127.0.0.1"), "Unavailable"),
-            })
-        except Exception:
-            result["status"] = "Some system readings unavailable"
-        return result
+        """Return cached hardware readings to keep WebView polling inexpensive."""
+        import time
+        now = time.monotonic()
+        with self._dashboard_lock:
+            if self._dashboard_cache is not None and now - self._dashboard_cache_at < 12:
+                return dict(self._dashboard_cache)
+            result = {"status": "J.A.R.V.I.S. ONLINE"}
+            try:
+                import platform
+                import psutil
+                import socket
+                cpu = psutil.cpu_percent(interval=None)
+                memory = psutil.virtual_memory()
+                disk = psutil.disk_usage(str(Path.home().anchor or "/"))
+                battery = psutil.sensors_battery()
+                interfaces = psutil.net_if_stats()
+                network_connected = any(item.isup for name, item in interfaces.items()
+                                         if name.casefold() not in {"lo", "loopback"})
+                ip_address = next(
+                    (address.address for addresses in psutil.net_if_addrs().values()
+                     for address in addresses
+                     if address.family == socket.AF_INET
+                     and address.address != "127.0.0.1"),
+                    "Unavailable",
+                )
+                result.update({
+                    "cpu": f"{cpu:.0f}%",
+                    "memory": f"{memory.percent:.0f}%",
+                    "ram": f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB",
+                    "disk": f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB",
+                    "os": f"{platform.system()} {platform.release()}",
+                    "cpuName": platform.processor() or f"{os.cpu_count()} logical cores",
+                    "uptime": str(__import__("datetime").timedelta(
+                        seconds=int(time.time() - psutil.boot_time()))),
+                    "battery": f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC",
+                    "network": "Connected" if network_connected else "Offline",
+                    "ip": ip_address,
+                })
+            except Exception:
+                result["status"] = "Some system readings unavailable"
+            self._dashboard_cache = dict(result)
+            self._dashboard_cache_at = now
+            return result
 
     def close_window(self):
         try:
