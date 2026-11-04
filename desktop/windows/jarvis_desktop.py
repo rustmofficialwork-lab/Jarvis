@@ -2030,6 +2030,13 @@ class JarvisWebBridge:
             return True
         return False
 
+    def open_settings(self):
+        return self._dispatch(self.app_state["app"].open_settings)
+
+    def get_voice_state(self):
+        app = self.app_state.get("app")
+        return bool(app and app.wake_thread and app.wake_thread.is_alive())
+
     def open_folder(self, folder):
         allowed = {"Documents", "Downloads", "Pictures", "Music", "This PC"}
         folder = str(folder or "")
