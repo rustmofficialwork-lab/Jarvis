@@ -708,5 +708,115 @@
         window.addEventListener('DOMContentLoaded', scaleHUD);
     </script>
 
+
+    <!-- JARVIS desktop bridge: connect existing HUD controls without changing its visual design. -->
+    <script>
+    (() => {
+        const bridge = () => window.pywebview && window.pywebview.api;
+        const command = (value) => {
+            const api = bridge();
+            if (api) api.send_command(value);
+            else console.warn("JARVIS desktop bridge is not available.");
+        };
+        const folders = {
+            "documents": "Documents", "downloads": "Downloads",
+            "pictures": "Pictures", "music": "Music", "this pc": "This PC"
+        };
+        const apps = {
+            "gmail": "https://mail.google.com/",
+            "whatsapp": "https://web.whatsapp.com/",
+            "discord": "https://discord.com/app",
+            "twitter": "https://x.com/",
+            "facebook": "https://www.facebook.com/",
+            "instagram": "https://www.instagram.com/",
+            "youtube": "https://www.youtube.com/",
+            "steam": "https://store.steampowered.com/",
+            "notion": "https://www.notion.so/",
+            "spotify": "https://open.spotify.com/",
+            "chatgpt": "https://chatgpt.com/"
+        };
+        const openFolder = (name) => {
+            const api = bridge();
+            if (api && api.open_folder) api.open_folder(name);
+        };
+        const openApp = (name) => {
+            const api = bridge();
+            if (api && api.open_url && apps[name]) api.open_url(apps[name]);
+        };
+        document.addEventListener("click", (event) => {
+            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .tools-widget, .stat-box");
+            if (!target) return;
+            const label = target.textContent.trim().toLowerCase().replace(/\s+/g, " ");
+            if (target.matches(".power-controls i")) {
+                const index = [...target.parentElement.children].indexOf(target);
+                command(index === 0 ? "play pause" : index === 1 ? "volume down" : "next track");
+                return;
+            }
+            if (target.matches(".back-btn")) {
+                const api = bridge();
+                if (api && api.close_window) api.close_window();
+                return;
+            }
+            if (target.matches(".app-row, .m-icon")) {
+                const name = label.split(" ")[0];
+                openApp(name);
+                return;
+            }
+            const folderName = Object.keys(folders).find((key) => label.includes(key));
+            if (folderName && (target.matches(".file-row, .center-nav-left > div, .f-label, .desktop-icons > div"))) {
+                openFolder(folders[folderName]);
+                return;
+            }
+            if (target.matches(".hex-btn")) {
+                const index = [...target.parentElement.children].indexOf(target);
+                command(["system status", "find file", "open settings", "show reminders"][index] || "system status");
+                return;
+            }
+            if (target.matches(".stat-box")) {
+                const text = label;
+                if (text.includes("task manager")) command("open task manager");
+                else if (text.includes("settings") || text.includes("control panel")) {
+                    const api = bridge(); if (api && api.open_settings) api.open_settings();
+                }
+            }
+        });
+        document.addEventListener("keydown", (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+                event.preventDefault();
+                const prompt = window.prompt("Enter a JARVIS command");
+                if (prompt && prompt.trim()) command(prompt.trim());
+            }
+            if (event.key === "Escape") {
+                const api = bridge(); if (api && api.stop_speech) api.stop_speech();
+            }
+        });
+        async function refreshDashboard() {
+            const api = bridge();
+            if (!api || !api.get_dashboard) return;
+            try {
+                const data = await api.get_dashboard();
+                document.querySelectorAll(".data-row").forEach((row) => {
+                    const label = row.querySelector("span")?.textContent.trim().replace(/[:\-]/g, "").toLowerCase();
+                    const value = row.querySelector(".val");
+                    if (!value) return;
+                    const fields = {cpu: data.cpu, ram: data.ram, os: data.os, uptime: data.uptime, battery: data.battery, ip: data.ip, disk: data.disk, network: data.network};
+                    if (fields[label]) value.textContent = fields[label];
+                });
+                const battery = document.querySelector(".top-bat h3");
+                if (battery && data.battery) battery.textContent = data.battery;
+                const cpu = document.querySelector(".cpu-widget h2");
+                if (cpu && data.cpu) cpu.textContent = data.cpu;
+                const status = document.querySelector(".jarvis-header h3");
+                if (status && data.status) status.title = data.status;
+            } catch (error) {
+                console.warn("JARVIS dashboard refresh failed", error);
+            }
+        }
+        window.addEventListener("pywebviewready", () => {
+            refreshDashboard();
+            window.setInterval(refreshDashboard, 15000);
+        });
+    })();
+    </script>
 </body>
 </html>
