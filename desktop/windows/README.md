@@ -90,10 +90,10 @@ Keys are stored using the Windows Credential Manager through Python's `keyring` 
 From the same folder, after installing requirements:
 
 ```powershell
-pyinstaller --noconfirm --clean --onefile --windowed --name JARVIS jarvis_desktop.py
+pyinstaller --noconfirm --clean --onedir --windowed --add-data "jarvis_hud.html;." --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --name JARVIS jarvis_desktop.py
 ```
 
-The executable is written to `dist\JARVIS.exe`. Keep the original `requirements.txt` and this guide for maintenance. Some endpoint/microphone/Picovoice configurations can require troubleshooting on the target PC.
+The application is written to `dist\\JARVIS\\` (run `dist\\JARVIS\\JARVIS.exe`). Keep the complete folder together; the HUD and collected WebView/runtime dependencies are required. This matches the automated Windows build and installer. Some endpoint/microphone/Picovoice configurations can require troubleshooting on the target PC.
 
 ## Current scope and limitations
 
