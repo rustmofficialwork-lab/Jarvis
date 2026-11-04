@@ -2085,45 +2085,84 @@ class JarvisWebBridge:
         return True
 
     def get_dashboard(self):
-        """Return cached hardware readings to keep WebView polling inexpensive."""
+        """Return cached hardware readings; one unavailable sensor must not hide other metrics."""
         import time
         now = time.monotonic()
         with self._dashboard_lock:
             if self._dashboard_cache is not None and now - self._dashboard_cache_at < 12:
                 return dict(self._dashboard_cache)
+
+            def safe_read(callback, fallback=None):
+                try:
+                    return callback()
+                except Exception:
+                    return fallback
+
             result = {"status": "J.A.R.V.I.S. ONLINE"}
             try:
                 import platform
                 import psutil
                 import socket
-                cpu = psutil.cpu_percent(interval=None)
-                memory = psutil.virtual_memory()
-                disk = psutil.disk_usage(str(Path.home().anchor or "/"))
-                battery = psutil.sensors_battery()
-                interfaces = psutil.net_if_stats()
-                network_connected = any(item.isup for name, item in interfaces.items()
-                                         if name.casefold() not in {"lo", "loopback"})
-                ip_address = next(
-                    (address.address for addresses in psutil.net_if_addrs().values()
-                     for address in addresses
+            except Exception:
+                result["status"] = "System readings unavailable"
+                self._dashboard_cache = dict(result)
+                self._dashboard_cache_at = now
+                return result
+
+            cpu = safe_read(lambda: psutil.cpu_percent(interval=None))
+            memory = safe_read(psutil.virtual_memory)
+            disk = safe_read(lambda: psutil.disk_usage(str(Path.home().anchor or "/")))
+            battery = safe_read(psutil.sensors_battery, "unavailable")
+            interfaces = safe_read(psutil.net_if_stats)
+            addresses = safe_read(psutil.net_if_addrs, {})
+            network_connected = (
+                any(item.isup for name, item in interfaces.items()
+                    if name.casefold() not in {"lo", "loopback"})
+                if interfaces is not None else None
+            )
+            ip_address = safe_read(
+                lambda: next(
+                    (address.address for items in addresses.values()
+                     for address in items
                      if address.family == socket.AF_INET
                      and address.address != "127.0.0.1"),
                     "Unavailable",
-                )
-                result.update({
-                    "cpu": f"{cpu:.0f}%",
-                    "memory": f"{memory.percent:.0f}%",
-                    "ram": f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB",
-                    "disk": f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB",
-                    "os": f"{platform.system()} {platform.release()}",
-                    "cpuName": platform.processor() or f"{os.cpu_count()} logical cores",
-                    "uptime": str(__import__("datetime").timedelta(
-                        seconds=int(time.time() - psutil.boot_time()))),
-                    "battery": f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC",
-                    "network": "Connected" if network_connected else "Offline",
-                    "ip": ip_address,
-                })
-            except Exception:
+                ),
+                "Unavailable",
+            )
+            result.update({
+                "cpu": f"{cpu:.0f}%" if cpu is not None else "N/A",
+                "memory": f"{memory.percent:.0f}%" if memory is not None else "N/A",
+                "ram": (
+                    f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB"
+                    if memory is not None else "N/A"
+                ),
+                "disk": (
+                    f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB"
+                    if disk is not None else "N/A"
+                ),
+                "os": safe_read(lambda: f"{platform.system()} {platform.release()}", "Unavailable"),
+                "cpuName": safe_read(
+                    lambda: platform.processor() or f"{os.cpu_count()} logical cores",
+                    "Unavailable",
+                ),
+                "uptime": safe_read(
+                    lambda: str(__import__("datetime").timedelta(
+                        seconds=int(time.time() - psutil.boot_time())
+                    )),
+                    "Unavailable",
+                ),
+                "battery": (
+                    "Unavailable" if battery == "unavailable" else
+                    f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC"
+                ),
+                "network": (
+                    "Unavailable" if network_connected is None else
+                    "Connected" if network_connected else "Offline"
+                ),
+                "ip": ip_address,
+            })
+            if cpu is None or memory is None or disk is None:
                 result["status"] = "Some system readings unavailable"
             self._dashboard_cache = dict(result)
             self._dashboard_cache_at = now
