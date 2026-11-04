@@ -753,9 +753,11 @@
                 return;
             }
             if (target.matches(".orb-wrapper")) {
-                const prompt = window.prompt("What should JARVIS do?");\n                if (prompt && prompt.trim()) command(prompt.trim());
+                const prompt = window.prompt("What should JARVIS do?");
+                if (prompt && prompt.trim()) command(prompt.trim());
                 return;
-            }\n            if (target.matches(".back-btn")) {
+            }
+            if (target.matches(".back-btn")) {
                 const api = bridge();
                 if (api && api.close_window) api.close_window();
                 return;
