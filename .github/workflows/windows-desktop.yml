@@ -5,6 +5,7 @@ on:
     branches: [main, feat/offline-wake-word, feature/complete-realtime-dashboard]
     paths:
       - "desktop/windows/**"
+      - "README.md"
       - ".github/workflows/windows-desktop.yml"
   push:
     branches: [main, feat/offline-wake-word, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard, feature/complete-realtime-dashboard]
@@ -19,7 +20,7 @@ permissions:
 # Only the newest main-branch build may publish the rolling latest release.
 concurrency:
   group: jarvis-windows-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   source-checks:
