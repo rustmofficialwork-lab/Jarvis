@@ -33,6 +33,20 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - name: Set up Node.js for HUD script validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate inline HUD JavaScript
+        shell: pwsh
+        run: |
+          python -c "import pathlib,re; html=pathlib.Path('desktop/windows/jarvis_hud.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\\b[^>]*>(.*?)</script>', html, re.I|re.S); [pathlib.Path(f'hud-script-{i}.js').write_text(script, encoding='utf-8') for i,script in enumerate(scripts)]"
+          $scripts = Get-ChildItem hud-script-*.js
+          if (-not $scripts) { throw "No inline HUD scripts were found." }
+          foreach ($script in $scripts) {
+            node --check $script.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - name: Compile Python source
         run: python -m compileall -q desktop/windows
       - name: Install PDF parser for document tests
