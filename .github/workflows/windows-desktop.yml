@@ -40,7 +40,7 @@ jobs:
       - name: Validate inline HUD JavaScript
         shell: pwsh
         run: |
-          python -c "import pathlib,re; html=pathlib.Path('desktop/windows/jarvis_hud.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\\b[^>]*>(.*?)</script>', html, re.I|re.S); [pathlib.Path(f'hud-script-{i}.js').write_text(script, encoding='utf-8') for i,script in enumerate(scripts)]"
+          python -c "import pathlib,re; html=pathlib.Path('desktop/windows/jarvis_hud.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.I|re.S); [pathlib.Path(f'hud-script-{i}.js').write_text(script, encoding='utf-8') for i,script in enumerate(scripts)]"
           $scripts = Get-ChildItem hud-script-*.js
           if (-not $scripts) { throw "No inline HUD scripts were found." }
           foreach ($script in $scripts) {
