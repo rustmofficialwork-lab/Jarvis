@@ -32,7 +32,7 @@ jobs:
 
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all pystray --collect-all PIL --collect-all vosk --collect-all pypdf --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --clean --onedir --windowed --add-data "jarvis_hud.html;." --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --name JARVIS jarvis_desktop.py
 
       - name: Create Windows installer
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
@@ -44,7 +44,7 @@ jobs:
         shell: pwsh
         run: |
           $files = @(
-            "desktop/windows/dist/JARVIS.exe",
+            "desktop/windows/dist/JARVIS/JARVIS.exe",
             "desktop/windows/dist-installer/JARVIS-Setup-x64.exe"
           )
           $lines = foreach ($file in $files) {
@@ -58,6 +58,6 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            desktop/windows/dist/JARVIS.exe
             desktop/windows/dist-installer/JARVIS-Setup-x64.exe
+            desktop/windows/dist/JARVIS/JARVIS.exe
             SHA256SUMS.txt
