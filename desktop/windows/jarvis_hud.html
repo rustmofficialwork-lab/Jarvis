@@ -15,7 +15,7 @@ button{cursor:pointer}#hud{width:1400px;height:800px;position:relative;overflow:
 .nav{position:absolute;left:300px;top:190px;width:185px;display:grid;gap:7px}.nav button{border:1px solid var(--dim);background:#031522;color:white;text-align:left;padding:10px;font:14px var(--digital)}.nav button:hover,.apps button:hover{background:#07506a}.nav i,.apps i{width:25px;color:var(--cyan)}
 .orb{position:absolute;left:535px;top:220px;width:300px;height:300px;border:3px dotted #087b9a;border-radius:50%;display:grid;place-items:center;}.orb:before,.orb:after{content:"";position:absolute;border:8px solid transparent;border-top-color:var(--cyan);border-bottom-color:var(--cyan);border-radius:50%;inset:15px;}.orb:after{inset:45px;border:2px dashed var(--bright);}.core{width:75px;height:75px;border-radius:50%;background:radial-gradient(white 5%,var(--bright) 35%,var(--cyan) 65%,transparent);box-shadow:0 0 18px var(--cyan),0 0 32px #00e5ff55}
 .apps{position:absolute;right:35px;top:300px;width:180px;display:grid;gap:8px;color:white}.apps button{border:1px solid transparent;background:none;color:white;text-align:left;padding:7px;font:14px var(--digital)}.righttop{right:35px;top:28px;width:280px;min-height:230px}.righttop .tagline{margin:12px 0;color:var(--muted);font-size:13px;line-height:1.5}.action{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.stats{left:300px;bottom:12px;width:650px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.stat{border:1px solid var(--dim);padding:10px;background:#020e19dd;font-size:12px}.tools{right:35px;bottom:12px;width:280px}.tools button{width:48%;height:54px;margin:1%;background:#00e5ff0b;border:1px solid var(--cyan);color:var(--cyan);font-size:20px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}.chatbar{position:absolute;left:300px;right:340px;bottom:155px;display:flex;gap:7px}.chatbar input{flex:1;min-width:0;background:#031522;color:white;border:1px solid var(--dim);padding:12px;font:16px var(--digital);outline:none}.chatbar button{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.status{position:absolute;left:300px;bottom:120px;color:var(--muted);font-size:12px}.back{position:absolute;right:20px;top:20px;background:transparent;border:1px solid var(--cyan);color:var(--cyan);border-radius:50%;width:38px;height:38px}
-@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}@media(max-width:700px){#hud{transform-origin:center}}
+@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body><main id="hud">
@@ -46,7 +46,18 @@ button{cursor:pointer}#hud{width:1400px;height:800px;position:relative;overflow:
 </main>
 <script>
 const hud=document.getElementById('hud');
-function scale(){const availableW=Math.max(320,document.documentElement.clientWidth-24),availableH=Math.max(320,document.documentElement.clientHeight-24);hud.style.transform='scale('+Math.min(availableW/1400,availableH/800)+')'}addEventListener('resize',scale);scale();
+// Reserve space for the Windows taskbar/title chrome. The previous fit calculation
+// used the full WebView height, so maximized windows could place the HUD beneath
+// the taskbar even though its own 800px canvas appeared to fit.
+function scale(){
+ const w=document.documentElement.clientWidth||window.innerWidth;
+ const h=document.documentElement.clientHeight||window.innerHeight;
+ const availableW=Math.max(320,w-24);
+ const availableH=Math.max(320,h-104);
+ const factor=Math.min(availableW/1400,availableH/800,1);
+ hud.style.transform='scale('+factor+')';
+}
+addEventListener('resize',scale);addEventListener('orientationchange',scale);scale();
 function clock(){const d=new Date();document.getElementById('month').textContent=d.toLocaleString('en',{month:'long'});document.getElementById('day').textContent=d.getDate();document.getElementById('weekday').textContent=d.toLocaleString('en',{weekday:'long'});document.getElementById('time').textContent=d.toLocaleTimeString()}setInterval(clock,1000);clock();
 async function api(name,...args){try{if(window.pywebview?.api?.[name])return await window.pywebview.api[name](...args)}catch(e){document.getElementById('reply').textContent='Bridge error: '+e}return null}
 function send(){const el=document.getElementById('prompt'),v=el.value.trim();if(v){api('send_command',v);document.getElementById('reply').textContent='SENT TO JARVIS';el.value=''}}document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
