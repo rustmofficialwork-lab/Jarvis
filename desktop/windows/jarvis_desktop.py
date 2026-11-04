@@ -2140,7 +2140,7 @@ def run_web_hud():
     window = webview.create_window(
         "J.A.R.V.I.S. | Circular HUD", hud_path.resolve().as_uri(),
         js_api=bridge, width=1400, height=800, min_size=(900, 560),
-        background_color="#020b14", text_select=False,
+        maximized=True, background_color="#020b14", text_select=False,
     )
     bridge.window = window
     state["app"].web_bridge = bridge
