@@ -26,7 +26,7 @@ RestartApplications=no
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "..\dist\JARVIS.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"
