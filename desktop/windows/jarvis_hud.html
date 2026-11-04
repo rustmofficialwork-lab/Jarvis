@@ -14,7 +14,7 @@ button{cursor:pointer}#hud{width:1920px;height:1080px;position:relative;overflow
 .ring{position:absolute;border:3px solid #00587a;border-radius:50%;display:grid;place-content:center;text-align:center;background:conic-gradient(var(--cyan) 0 var(--progress,0%),#052338 var(--progress,0%) 100%);--progress:0%}.ring b{background:#020e19;border-radius:50%;padding:17px;color:white;font:20px var(--head)}.battery{left:55px;top:430px;width:105px;height:105px}.cpu{left:90px;top:585px;width:115px;height:115px}
 .nav{position:absolute;left:300px;top:190px;width:185px;display:grid;gap:7px}.nav button{border:1px solid var(--dim);background:#031522;color:white;text-align:left;padding:10px;font:14px var(--digital)}.nav button:hover,.apps button:hover{background:#07506a}.nav i,.apps i{width:25px;color:var(--cyan)}
 .orb{position:absolute;left:535px;top:220px;width:300px;height:300px;border:3px dotted #087b9a;border-radius:50%;display:grid;place-items:center;}.orb:before,.orb:after{content:"";position:absolute;border:8px solid transparent;border-top-color:var(--cyan);border-bottom-color:var(--cyan);border-radius:50%;inset:15px;}.orb:after{inset:45px;border:2px dashed var(--bright);}.core{width:75px;height:75px;border-radius:50%;background:radial-gradient(white 5%,var(--bright) 35%,var(--cyan) 65%,transparent);box-shadow:0 0 18px var(--cyan),0 0 32px #00e5ff55}
-.apps{position:absolute;right:35px;top:300px;width:180px;display:grid;gap:8px;color:white}.apps button{border:1px solid transparent;background:none;color:white;text-align:left;padding:7px;font:14px var(--digital)}.righttop{right:35px;top:28px;width:280px;min-height:230px}.righttop .tagline{margin:12px 0;color:var(--muted);font-size:13px;line-height:1.5}.action{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.stats{left:300px;bottom:12px;width:650px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.stat{border:1px solid var(--dim);padding:10px;background:#020e19dd;font-size:12px}.tools{right:35px;bottom:12px;width:280px}.tools button{width:48%;height:54px;margin:1%;background:#00e5ff0b;border:1px solid var(--cyan);color:var(--cyan);font-size:20px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}.chatbar{position:absolute;left:300px;right:340px;bottom:155px;display:flex;gap:7px}.chatbar input{flex:1;min-width:0;background:#031522;color:white;border:1px solid var(--dim);padding:12px;font:16px var(--digital);outline:none}.chatbar button{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.status{position:absolute;left:300px;bottom:120px;color:var(--muted);font-size:12px}.back{position:absolute;right:20px;top:20px;background:transparent;border:1px solid var(--cyan);color:var(--cyan);border-radius:50%;width:38px;height:38px}
+.apps{position:absolute;right:35px;top:300px;width:180px;display:grid;gap:8px;color:white}.apps button{border:1px solid transparent;background:none;color:white;text-align:left;padding:7px;font:14px var(--digital)}.righttop{right:35px;top:28px;width:280px;min-height:230px}.righttop .tagline{margin:12px 0;color:var(--muted);font-size:13px;line-height:1.5}.action{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.stats{left:300px;bottom:12px;width:650px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.stat{border:1px solid var(--dim);padding:10px;background:#020e19dd;font-size:12px}.tools{right:35px;bottom:12px;width:280px}.tools button{width:48%;height:54px;margin:1%;background:#00e5ff0b;border:1px solid var(--cyan);color:var(--cyan);font-size:20px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}.chatbar{position:absolute;left:300px;right:340px;bottom:155px;display:flex;gap:7px}.chatbar input{flex:1;min-width:0;background:#031522;color:white;border:1px solid var(--dim);padding:12px;font:16px var(--digital);outline:none}.chatbar button{background:#06344a;border:1px solid var(--cyan);color:var(--bright);padding:10px 14px;font:12px var(--head)}.status{position:absolute;left:300px;bottom:120px;color:var(--muted);font-size:12px}
 /* Live HUD motion: layered orbital rings, reactor pulse, scan sweep and subtle UI activity. */
 #hud{animation:gridDrift 24s linear infinite;background-size:30px 30px;isolation:isolate}
 #hud:after{content:"";position:absolute;z-index:4;left:0;right:0;top:-2px;height:2px;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(0,229,255,.75),transparent);box-shadow:0 0 14px rgba(0,229,255,.55);animation:scanSweep 8s ease-in-out infinite}
@@ -31,8 +31,8 @@ button{cursor:pointer}#hud{width:1920px;height:1080px;position:relative;overflow
 .core:after{content:"";position:absolute;inset:-18px;border:1px solid rgba(0,229,255,.35);border-radius:50%;animation:reactorRipple 2.4s ease-out infinite}
 .ring{transition:background 1s ease,filter .5s ease}
 .ring b{position:relative;z-index:1}
-.nav button,.apps button,.action,.chatbar button,.tools button,.back{transition:background .22s ease,border-color .22s ease,box-shadow .22s ease,transform .22s ease}
-.nav button:hover,.apps button:hover,.action:hover,.chatbar button:hover,.tools button:hover,.back:hover{transform:translateY(-2px);box-shadow:0 0 14px rgba(0,229,255,.22);border-color:var(--bright)}
+.nav button,.apps button,.action,.chatbar button,.tools button{transition:background .22s ease,border-color .22s ease,box-shadow .22s ease,transform .22s ease}
+.nav button:hover,.apps button:hover,.action:hover,.chatbar button:hover,.tools button:hover{transform:translateY(-2px);box-shadow:0 0 14px rgba(0,229,255,.22);border-color:var(--bright)}
 .nav button:active,.apps button:active,.action:active,.chatbar button:active{transform:translateY(0) scale(.98)}
 .leftinfo p,.stat p{transition:color .3s ease,text-shadow .3s ease}
 .leftinfo p:hover,.stat p:hover{color:white;text-shadow:0 0 8px var(--cyan)}
@@ -72,7 +72,7 @@ button{cursor:pointer}#hud{width:1920px;height:1080px;position:relative;overflow
 <section class="panel stats"><div class="stat"><h4>SYSTEM INFORMATION</h4><p>CPU <b id="cpuName">—</b></p><p>RAM <b id="ram">—</b></p><p>OS <b id="os">—</b></p></div><div class="stat"><h4>QUICK ACCESS</h4><p><button class="action" onclick="command('open task manager')">TASK MANAGER</button></p><p><button class="action" onclick="command('system status')">SYSTEM STATUS</button></p></div><div class="stat"><h4>NETWORK DETAILS</h4><p>IP <b id="ip">—</b></p><p>UPTIME <b id="uptime">—</b></p><p>MEMORY <b id="memory">—</b></p></div></section>
 <div class="chatbar"><input id="prompt" placeholder="Ask JARVIS anything…" autocomplete="off"><button onclick="send()">SEND</button></div><div class="status" id="reply">J.A.R.V.I.S. DESKTOP INTERFACE</div>
 <section class="panel tools"><h4>FREQUENT FOLDERS</h4><button title="Documents" onclick="folder('Documents')"><i class="fa-regular fa-file-lines"></i></button><button title="Downloads" onclick="folder('Downloads')"><i class="fa-solid fa-download"></i></button><button title="Pictures" onclick="folder('Pictures')"><i class="fa-regular fa-image"></i></button><button title="Music" onclick="folder('Music')"><i class="fa-solid fa-music"></i></button></section>
-<button class="back" title="Close JARVIS" onclick="closeApp()"><i class="fa-solid fa-xmark"></i></button>
+
 </main>
 <script>
 const hud=document.getElementById('hud');
@@ -84,9 +84,9 @@ function scale(){
  const h=document.documentElement.clientHeight||window.innerHeight;
  // The native window is maximized to the Windows work area, which already
  // excludes the taskbar. Keep a small, even safety margin on every edge.
- const availableW=Math.max(320,w-32);
- const availableH=Math.max(320,h-32);
- const factor=Math.min(availableW/1920,availableH/1080,1);
+ const availableW=Math.max(320,w);
+ const availableH=Math.max(320,h);
+ const factor=Math.min(availableW/1920,availableH/1080);
  hud.style.transformOrigin='center center';
  hud.style.transform='scale('+factor+')';
 }
