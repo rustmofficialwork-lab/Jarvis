@@ -82,8 +82,7 @@ const hud=document.getElementById('hud');
 function scale(){
  const w=document.documentElement.clientWidth||window.innerWidth;
  const h=document.documentElement.clientHeight||window.innerHeight;
- // The native window is maximized to the Windows work area, which already
- // excludes the taskbar. Keep a small, even safety margin on every edge.
+ // Fullscreen viewport: scale the 1920x1080 HUD proportionally without cropping.
  const availableW=Math.max(320,w);
  const availableH=Math.max(320,h);
  const factor=Math.min(availableW/1920,availableH/1080);
