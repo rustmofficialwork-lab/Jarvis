@@ -1214,3 +1214,41 @@ class SingleInstanceTests(unittest.TestCase):
         ):
             self.assertEqual(jarvis_desktop.main([]), 0)
         tk_root.assert_not_called()
+
+class DashboardIsolationTests(unittest.TestCase):
+    def test_one_failed_hardware_sensor_does_not_hide_other_metrics(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        class FakePsutil:
+            def cpu_percent(self, interval=None):
+                return 27.0
+
+            def virtual_memory(self):
+                return SimpleNamespace(percent=48.0, used=4 * 1024**3, total=8 * 1024**3)
+
+            def disk_usage(self, path):
+                return SimpleNamespace(free=100 * 1024**3, total=500 * 1024**3)
+
+            def sensors_battery(self):
+                raise OSError("battery sensor unavailable")
+
+            def net_if_stats(self):
+                return {"Ethernet": SimpleNamespace(isup=True)}
+
+            def net_if_addrs(self):
+                return {}
+
+            def boot_time(self):
+                return 1000
+
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
+        with patch.dict(sys.modules, {"psutil": FakePsutil()}):
+            result = bridge.get_dashboard()
+
+        self.assertEqual(result["cpu"], "27%")
+        self.assertEqual(result["ram"], "4.0/8.0 GB")
+        self.assertEqual(result["network"], "Connected")
+        self.assertEqual(result["battery"], "Unavailable")
+
