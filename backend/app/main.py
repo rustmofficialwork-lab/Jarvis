@@ -119,6 +119,21 @@ def _verify_device_token(token: str, now: int | None = None) -> str | None:
         return None
 
 
+def _prune_rate_buckets(
+    buckets: dict[str, deque[float]], *, now: float, window: int, maximum_keys: int = 10_000
+) -> None:
+    for key in list(buckets):
+        bucket = buckets[key]
+        while bucket and bucket[0] <= now - window:
+            bucket.popleft()
+        if not bucket:
+            buckets.pop(key, None)
+    if len(buckets) > maximum_keys:
+        excess = len(buckets) - maximum_keys
+        for key in list(buckets)[:excess]:
+            buckets.pop(key, None)
+
+
 async def _enforce_window_limit(
     bucket: deque[float], *, now: float, window: int, maximum: int, detail: str
 ) -> None:
@@ -168,6 +183,9 @@ async def register_device(request: Request) -> Response:
     client_ip = forwarded_ip or (request.client.host if request.client else "unknown")
     now = time.monotonic()
     async with _rate_lock:
+        _prune_rate_buckets(
+            _registration_attempts, now=now, window=REGISTRATION_WINDOW_SECONDS
+        )
         await _enforce_window_limit(
             _registration_attempts[client_ip],
             now=now,
@@ -219,6 +237,7 @@ async def chat_completions(
     if device_id is not None:
         now = time.monotonic()
         async with _rate_lock:
+            _prune_rate_buckets(_chat_attempts, now=now, window=CHAT_DAY_SECONDS)
             bucket = _chat_attempts[device_id]
             while bucket and bucket[0] <= now - CHAT_DAY_SECONDS:
                 bucket.popleft()
