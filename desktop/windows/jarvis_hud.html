@@ -47,7 +47,7 @@
             height: 100%;
             min-width: 0;
             min-height: 0;
-            background-color: #000;
+            background-color: var(--bg);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -165,7 +165,7 @@
         .wifi-widget { position: absolute; top: 490px; left: 40px; font-size: 0.75rem; line-height: 1.6;}
         .wifi-widget div { display: flex; align-items: center; gap: 8px; color: var(--bright-cyan);}
         .wifi-widget i { color: var(--cyan); font-size: 0.9rem; border: 1px solid var(--cyan); border-radius: 50%; padding: 2px;}
-        .win-logo { position: absolute; top: 550px; left: 170px; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border: 2px solid var(--cyan); border-radius: 50%; font-size: 1.5rem; color: var(--cyan); filter: drop-shadow(0 0 8px var(--cyan)); opacity: 0.8;}
+        .win-logo { position: absolute; top: 550px; left: 290px; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border: 2px solid var(--cyan); border-radius: 50%; font-size: 1.5rem; color: var(--cyan); filter: drop-shadow(0 0 8px var(--cyan)); opacity: 0.8;}
 
         /* CPU Widget */
         .cpu-widget {
@@ -478,6 +478,20 @@
             right: 25px;
             width: 200px;
             z-index: 11;
+            pointer-events: none;
+        }
+        .jarvis-header {
+            margin-bottom: 8px;
+        }
+        .jarvis-status {
+            border-left: 1px solid var(--dim-border);
+            padding: 5px 8px;
+            color: var(--cyan);
+            font-size: 0.62rem;
+            letter-spacing: 0.7px;
+            line-height: 1.35;
+            white-space: nowrap;
+            background: rgba(2, 11, 20, 0.72);
         }
         .jarvis-header {
             margin-bottom: 9px;
@@ -499,7 +513,7 @@
         /* Move the CPU dial out of the bottom-left file list's footprint. */
         .cpu-widget {
             top: 610px;
-            left: 280px;
+            left: 290px;
             width: 100px;
             height: 100px;
         }
@@ -716,7 +730,6 @@
                     <div class="data-row"><span>- DOWNLOAD:</span> <span class="val">120 Mbps</span></div>
                     <div class="data-row"><span>- UPLOAD:</span> <span class="val">80 Mbps</span></div>
                     <h4 style="margin-top: 8px; border:none; padding:0;">SYSTEM STATUS</h4>
-                    <div class="data-row"><span>- BATTERY:</span> <span class="val">98%</span></div>
                     <div class="data-row"><span>- CPU:</span> <span class="val">16%</span></div>
                     <div class="data-row"><span>- RAM:</span> <span class="val">3.4/8.0 GB</span></div>
                     <div class="data-row"><span>- DISK:</span> <span class="val">68%</span></div>
@@ -725,14 +738,8 @@
 
             <!-- ================= RIGHT PANEL ================= -->
             
-            <div class="back-btn"><i class="fa-solid fa-arrow-right"></i></div>
-
-            <div class="top-bat">
-                <h3>98%</h3>
-                <span>Battery</span>
-            </div>
-            
-            <div class="mini-top-graph">
+            <div class="back-btn"><i class="fa-solid fa-arrow-right"></i></div> 
+<div class="mini-top-graph">
                 <div class="mtg-bar"></div><div class="mtg-bar"></div><div class="mtg-bar"></div>
                 <div class="mtg-bar"></div><div class="mtg-bar"></div><div class="mtg-bar"></div>
             </div>
@@ -755,10 +762,7 @@
                         <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
                     </div>
                 </div>
-                <div class="quote">"The future is not a gift. It is an achievement." <span>- Tony Stark</span></div>
-                <div class="quote">"Sometimes you gotta run before you can walk." <span>- Tony Stark</span></div>
-                <div class="quote">"I'm not a hero. I'm just a guy who runs a company." <span>- Tony Stark</span></div>
-                <div class="quote">"Genius, billionaire, playboy, philanthropist." <span>- Tony Stark</span></div>
+                <div class="jarvis-status">PERSONAL AI SYSTEM · ONLINE</div>
             </div>
 
             <div class="mid-right-icons">
@@ -992,8 +996,6 @@
                     };
                     if (fields[label]) value.textContent = fields[label];
                 });
-                const battery = document.querySelector(".top-bat h3");
-                if (battery && data.battery) battery.textContent = data.battery;
                 const batteryWidget = document.querySelector(".battery-widget h2");
                 if (batteryWidget && data.battery) batteryWidget.textContent = data.battery;
                 const cpu = document.querySelector(".cpu-widget h2");
