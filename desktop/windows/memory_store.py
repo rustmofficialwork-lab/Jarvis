@@ -30,6 +30,10 @@ _CARD_VALUE_PATTERN = re.compile(
     r"\b(?:credit|debit)?\s*card\s*(?:number|no\.?)?\s*[:#-]?\s*((?:\d[ -]?){13,19})\b",
     re.IGNORECASE,
 )
+_BANK_ACCOUNT_PATTERN = re.compile(
+    r"\b(?:bank\s+)?account\s*(?:number|no\.?)\s*[:#-]?\s*((?:\d[ -]?){8,18})\b",
+    re.IGNORECASE,
+)
 
 
 def _has_luhn_valid_card_number(content: str) -> bool:
@@ -55,6 +59,7 @@ def _contains_sensitive_data(content: str) -> bool:
         _SECRET_PATTERN.search(content)
         or _PAN_VALUE_PATTERN.search(content)
         or _AADHAAR_VALUE_PATTERN.search(content)
+        or _BANK_ACCOUNT_PATTERN.search(content)
         or _has_luhn_valid_card_number(content)
     )
 
