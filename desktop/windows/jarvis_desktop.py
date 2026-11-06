@@ -721,9 +721,9 @@ class JarvisDesktop:
             return
         accepted = messagebox.askyesno(
             "JARVIS microphone setup",
-            "JARVIS can use your microphone for voice commands and the “Jarvis” wake word.\\n\\n"
+            "JARVIS can use your microphone for voice commands and the “Jarvis” wake word.\n\n"
             "The microphone is used only when you activate voice listening. "
-            "Windows may show its own permission prompt.\\n\\n"
+            "Windows may show its own permission prompt.\n\n"
             "Allow JARVIS to check microphone access now?",
             parent=self.root,
         )
@@ -2085,7 +2085,7 @@ class JarvisDesktop:
                         self._set_status("Microphone access is unavailable; check Windows Privacy Settings.")
                         open_settings = messagebox.askyesno(
                             "Microphone access unavailable",
-                            "JARVIS could not open the microphone. Check Windows Settings → Privacy & security → Microphone, and enable microphone access for apps and desktop apps.\\n\\n"
+                            "JARVIS could not open the microphone. Check Windows Settings → Privacy & security → Microphone, and enable microphone access for apps and desktop apps.\n\n"
                             "Open Windows microphone settings now?",
                             parent=self.root,
                         )
