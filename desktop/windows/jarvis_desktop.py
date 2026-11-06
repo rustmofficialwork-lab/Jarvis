@@ -681,29 +681,37 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
         if len(tool_calls) > 2:
             raise RuntimeError("The AI requested too many tools in one step.")
 
+        # Validate the complete provider envelope before executing any tool.
+        # This prevents malformed/duplicate calls from causing partial side effects.
+        seen_call_ids = set()
+        validated_calls = []
+        for call in tool_calls:
+            if not isinstance(call, dict) or call.get("type") != "function":
+                raise RuntimeError("The AI returned a malformed tool call.")
+            call_id = call.get("id")
+            function = call.get("function")
+            if (not isinstance(call_id, str) or not call_id or len(call_id) > 256
+                    or call_id in seen_call_ids or not isinstance(function, dict)
+                    or not isinstance(function.get("name"), str)
+                    or not isinstance(function.get("arguments"), str)):
+                raise RuntimeError("The AI returned a malformed or duplicate tool-call envelope.")
+            seen_call_ids.add(call_id)
+            validated_calls.append((call_id, function["name"], function["arguments"]))
+
         # Keep the provider's assistant tool-call envelope intact for the next turn.
         messages.append({
             "role": "assistant",
             "content": message.get("content"),
             "tool_calls": tool_calls,
         })
-        seen_call_ids = set()
-        for call in tool_calls:
-            if not isinstance(call, dict):
-                raise RuntimeError("The AI returned a malformed tool call.")
+        for call_id, name, raw_arguments in validated_calls:
             try:
-                function = call["function"]
-                name = function["name"]
-                arguments = json.loads(function.get("arguments", "{}"))
-                if not isinstance(name, str) or not isinstance(arguments, dict):
-                    raise ValueError("Invalid tool call.")
+                arguments = json.loads(raw_arguments)
+                if not isinstance(arguments, dict):
+                    raise ValueError("Tool arguments must be a JSON object.")
                 output = execute_tool(name, arguments)
-            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
                 output = f"Tool unavailable: {str(exc)[:240]}"
-            call_id = call.get("id")
-            if not isinstance(call_id, str) or not call_id or call_id in seen_call_ids:
-                raise RuntimeError("The AI returned a missing or duplicate tool-call ID.")
-            seen_call_ids.add(call_id)
             messages.append({
                 "role": "tool",
                 "tool_call_id": call_id,
