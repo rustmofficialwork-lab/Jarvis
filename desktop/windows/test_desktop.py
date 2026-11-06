@@ -665,6 +665,28 @@ class ServiceStatusTests(unittest.TestCase):
         self.assertTrue(by_name["MEMORY"])
         self.assertEqual(len(statuses), 4)
 
+    def test_managed_backend_is_ready_after_automatic_device_registration(self):
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.ai_api_key = ""
+        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT}
+        app.device_token = "jdt1.test-device-token"
+        app.picovoice_access_key = ""
+        statuses = app._get_service_statuses()
+        ai_status = next(item for item in statuses if item[0] == "AI CHAT")
+        self.assertTrue(ai_status[1])
+        self.assertEqual(ai_status[2], "AUTO-CONNECTED")
+
+    def test_custom_endpoint_without_api_key_is_not_reported_as_ready(self):
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.ai_api_key = ""
+        app.settings = {"endpoint": "https://example.com/v1/chat/completions"}
+        app.device_token = "jdt1.test-device-token"
+        app.picovoice_access_key = ""
+        statuses = app._get_service_statuses()
+        ai_status = next(item for item in statuses if item[0] == "AI CHAT")
+        self.assertFalse(ai_status[1])
+        self.assertEqual(ai_status[2], "ADD API TOKEN")
+
     def test_configured_ai_and_voice_readiness_uses_installed_packages(self):
         from unittest.mock import patch
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
