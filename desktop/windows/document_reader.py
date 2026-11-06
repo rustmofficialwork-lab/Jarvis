@@ -8,6 +8,8 @@ import xml.etree.ElementTree as ET
 MAX_FILE_BYTES = 15 * 1024 * 1024
 MAX_TEXT_CHARS = 40_000
 MAX_PDF_PAGES = 100
+MAX_DOCX_ARCHIVE_ENTRIES = 10_000
+MAX_DOCX_UNCOMPRESSED_BYTES = 30 * 1024 * 1024
 TEXT_EXTENSIONS = {
     ".txt", ".md", ".csv", ".log", ".json", ".py", ".ini",
     ".yaml", ".yml", ".xml", ".html", ".htm", ".rst",
@@ -35,8 +37,10 @@ def _read_docx(path: Path) -> str:
     try:
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
+            if len(infos) > MAX_DOCX_ARCHIVE_ENTRIES:
+                raise ValueError("This Word document contains too many archive entries.")
             total_uncompressed = sum(item.file_size for item in infos)
-            if total_uncompressed > 30 * 1024 * 1024:
+            if total_uncompressed > MAX_DOCX_UNCOMPRESSED_BYTES:
                 raise ValueError("This Word document expands to an unsafe size.")
             try:
                 xml = archive.read("word/document.xml")
