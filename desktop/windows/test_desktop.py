@@ -1331,7 +1331,11 @@ class SharedOnlineReplyTests(unittest.TestCase):
         from unittest.mock import patch
 
         class Store:
-            def context(self):
+            def __init__(self):
+                self.query = None
+
+            def context(self, query=None):
+                self.query = query
                 return ["User prefers Hindi"]
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
@@ -1348,6 +1352,7 @@ class SharedOnlineReplyTests(unittest.TestCase):
                 self.assertEqual(app._get_online_reply("hello"), "Namaste")
         self.assertEqual(completion.call_args.args[0], "https://example.com/chat")
         self.assertEqual(completion.call_args.args[5], ["User prefers Hindi"])
+        self.assertEqual(app.memory_store.query, "hello")
 
 
 if __name__ == "__main__":
