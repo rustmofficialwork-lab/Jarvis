@@ -28,6 +28,25 @@ DEFAULT_MODEL_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "JA
 MAX_MODEL_DOWNLOAD_BYTES = 250 * 1024 * 1024
 MAX_MODEL_EXTRACTED_BYTES = 500 * 1024 * 1024
 MAX_MODEL_ARCHIVE_ENTRIES = 20000
+ALLOWED_MODEL_HOSTS = {"alphacephei.com", "www.alphacephei.com"}
+
+
+def _is_allowed_model_redirect_url(value: str) -> bool:
+    """Keep model downloads on the official HTTPS model host."""
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(value)
+        valid_port = parsed.port is None or parsed.port == 443
+    except ValueError:
+        return False
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname in ALLOWED_MODEL_HOSTS
+        and not parsed.username
+        and not parsed.password
+        and valid_port
+    )
 
 
 class OfflineModelUnavailable(RuntimeError):
@@ -65,7 +84,7 @@ def transcribe_offline_vosk(audio, language: str, model_dir: Path = DEFAULT_MODE
 
 
 def install_offline_model(language: str, model_dir: Path = DEFAULT_MODEL_DIR,
-                          urlopen=urllib.request.urlopen) -> Path:
+                          urlopen=None) -> Path:
     """Download and safely extract one official, small Vosk model for later offline use."""
     try:
         model_name, url = MODEL_CATALOG[language]
@@ -76,6 +95,16 @@ def install_offline_model(language: str, model_dir: Path = DEFAULT_MODEL_DIR,
     destination = model_dir / model_name
     if destination.is_dir():
         return destination
+
+    if urlopen is None:
+        class SafeModelRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                if not _is_allowed_model_redirect_url(newurl):
+                    return None
+                return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+        opener = urllib.request.build_opener(SafeModelRedirect)
+        urlopen = opener.open
 
     staging = Path(tempfile.mkdtemp(prefix="jarvis-vosk-", dir=str(model_dir)))
     archive_path = staging / "model.zip"
