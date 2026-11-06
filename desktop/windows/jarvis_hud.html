@@ -34,8 +34,10 @@
 
         /* --- OUTER CONTAINER (1920x1080) --- */
         .hud-container {
-            width: 1920px;
-            height: 1080px;
+            /* Fill the real viewport; the original HUD stays centered inside it. */
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
             background-color: #000;
             display: flex;
             justify-content: center;
@@ -70,8 +72,9 @@
                 linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
             background-size: 30px 30px;
-            /* Fit the 1400x800 design inside the 1920x1080 frame without vertical clipping. */
-            transform: scale(1.35); 
+            /* JavaScript applies one uniform, viewport-aware scale to this unchanged layout. */
+            transform: scale(1.35);
+            transform-origin: center center;
             box-shadow: 0 0 50px rgba(0, 229, 255, 0.1);
         }
 
@@ -688,33 +691,30 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Viewport-only fitting: keep the original HUD artwork and layout untouched.
-        // The 1920x1080 canvas is uniformly scaled to fit any available viewport.
+        // Responsive viewport fitting: preserve the original 1400x800 HUD layout.
+        // Only its uniform scale changes; panels, artwork, colors and coordinates do not.
         (() => {
             const hud = document.getElementById('hud');
-            const DESIGN_WIDTH = 1920;
-            const DESIGN_HEIGHT = 1080;
+            const design = document.querySelector('.hud-inner');
+            const DESIGN_WIDTH = 1400;
+            const DESIGN_HEIGHT = 800;
             let resizeFrame = 0;
 
             function scaleHUD() {
-                if (!hud) return;
+                if (!hud || !design) return;
 
-                // Prefer the visual viewport when browser zoom or an embedded webview
-                // changes the actually visible area; fall back to the layout viewport.
-                const visualViewport = window.visualViewport;
-                const viewportWidth = (visualViewport && visualViewport.width) ||
-                    document.documentElement.clientWidth || window.innerWidth;
-                const viewportHeight = (visualViewport && visualViewport.height) ||
-                    document.documentElement.clientHeight || window.innerHeight;
+                // Match the CSS viewport that the full-screen outer frame occupies.
+                const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+                const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
                 if (!(viewportWidth > 0) || !(viewportHeight > 0)) return;
 
-                // Uniform scaling prevents stretching and guarantees the full canvas
-                // stays inside both viewport dimensions, including unusual aspect ratios.
+                // Fit the original design to the largest possible size without
+                // stretching, cropping, or changing the relative panel positions.
                 const scale = Math.min(
                     viewportWidth / DESIGN_WIDTH,
                     viewportHeight / DESIGN_HEIGHT
                 );
-                hud.style.transform = `scale(${scale})`;
+                design.style.transform = `scale(${scale})`;
             }
 
             function scheduleScale() {
@@ -725,8 +725,6 @@
                 });
             }
 
-            // Initial fit plus updates for resize, orientation, zoom, fullscreen and
-            // embedded-webview viewport changes. ResizeObserver is feature-detected.
             scaleHUD();
             window.addEventListener('resize', scheduleScale, { passive: true });
             window.addEventListener('orientationchange', scheduleScale, { passive: true });
@@ -734,7 +732,6 @@
             window.addEventListener('load', scheduleScale, { once: true });
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', scheduleScale, { passive: true });
-                window.visualViewport.addEventListener('scroll', scheduleScale, { passive: true });
             }
             if (typeof ResizeObserver !== 'undefined' && document.documentElement) {
                 const viewportObserver = new ResizeObserver(scheduleScale);
