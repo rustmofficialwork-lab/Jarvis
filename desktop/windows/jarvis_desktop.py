@@ -445,11 +445,28 @@ def configure_voice_recognizer(recognizer, request_timeout: float = 8.0):
 
 def listen_for_voice_command(recognizer, source, stop_event, language: str,
                              wait_timeout_error, request_error=None,
-                             unknown_value_error=None) -> str | None:
-    """Try online transcription, using local Vosk for network failures or unclear audio."""
+                             unknown_value_error=None,
+                             capture_timeout: float = 8.0) -> str | None:
+    """Capture one wake-word command, returning to wake detection after idle silence."""
+    import math
+    import time
+
+    try:
+        capture_timeout = float(capture_timeout)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Voice capture timeout must be a positive finite number.") from exc
+    if not math.isfinite(capture_timeout) or capture_timeout <= 0:
+        raise ValueError("Voice capture timeout must be a positive finite number.")
+
+    deadline = time.monotonic() + capture_timeout
     while not stop_event.is_set():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
         try:
-            audio = recognizer.listen(source, timeout=1, phrase_time_limit=12)
+            audio = recognizer.listen(
+                source, timeout=min(1.0, remaining), phrase_time_limit=12
+            )
         except wait_timeout_error:
             continue
         # Do not start an online recognition request after the user has stopped listening.

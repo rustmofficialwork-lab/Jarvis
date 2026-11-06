@@ -1090,6 +1090,54 @@ class CancellableVoiceCaptureTests(unittest.TestCase):
         self.assertEqual(recognizer.asserted_phrase_limit, 12)
         self.assertEqual(recognizer.recognized_language, "hi-IN")
 
+    def test_silence_timeout_returns_to_wake_word_detection(self):
+        import threading
+        import time
+        from unittest.mock import patch
+
+        class WaitTimeoutError(Exception):
+            pass
+
+        class FakeRecognizer:
+            def __init__(self):
+                self.calls = 0
+
+            def listen(self, source, timeout, phrase_time_limit):
+                self.calls += 1
+                self.asserted_timeout = timeout
+                raise WaitTimeoutError()
+
+            def recognize_google(self, audio, language):
+                raise AssertionError("No audio was captured.")
+
+        recognizer = FakeRecognizer()
+        with patch.object(time, "monotonic", side_effect=[0.0, 0.0, 8.0]):
+            command = jarvis_desktop.listen_for_voice_command(
+                recognizer, object(), threading.Event(), "en-IN",
+                WaitTimeoutError, capture_timeout=8.0,
+            )
+        self.assertIsNone(command)
+        self.assertEqual(recognizer.calls, 1)
+        self.assertEqual(recognizer.asserted_timeout, 1.0)
+
+    def test_non_positive_or_non_finite_capture_timeout_is_rejected(self):
+        import threading
+
+        class WaitTimeoutError(Exception):
+            pass
+
+        class FakeRecognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                raise AssertionError("Invalid timeout must be rejected first.")
+
+        for timeout in (0, -1, float("inf"), float("nan")):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(ValueError):
+                    jarvis_desktop.listen_for_voice_command(
+                        FakeRecognizer(), object(), threading.Event(), "en-IN",
+                        WaitTimeoutError, capture_timeout=timeout,
+                    )
+
     def test_stop_during_idle_wait_does_not_start_cloud_recognition(self):
         import threading
 
