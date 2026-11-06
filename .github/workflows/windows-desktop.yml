@@ -57,7 +57,7 @@ jobs:
         run: python -m unittest discover -s desktop/windows -p "test_*.py"
 
   package-windows:
-    needs: source-checks
+    needs: [source-checks, backend-checks]
     runs-on: windows-latest
     permissions:
       contents: write
