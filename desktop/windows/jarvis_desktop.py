@@ -868,7 +868,21 @@ class JarvisDesktop:
         """Report readiness from actual configuration and installed capabilities."""
         import importlib.util
 
-        ai_ready = bool(getattr(self, "ai_api_key", "").strip())
+        api_key_ready = bool(getattr(self, "ai_api_key", "").strip())
+        settings = getattr(self, "settings", {})
+        endpoint = settings.get("endpoint", DEFAULT_ENDPOINT) if isinstance(settings, dict) else DEFAULT_ENDPOINT
+        uses_managed_backend = str(endpoint).strip() == DEFAULT_ENDPOINT
+        device_token_ready = bool(getattr(self, "device_token", "").strip())
+        ai_ready = api_key_ready or (uses_managed_backend and device_token_ready)
+        if api_key_ready:
+            ai_detail = "CONFIGURED"
+        elif uses_managed_backend and device_token_ready:
+            ai_detail = "AUTO-CONNECTED"
+        elif uses_managed_backend:
+            ai_detail = "CONNECTING"
+        else:
+            ai_detail = "ADD API TOKEN"
+
         voice_key_ready = bool(getattr(self, "picovoice_access_key", "").strip())
         voice_packages = all(
             importlib.util.find_spec(module) is not None
@@ -877,7 +891,7 @@ class JarvisDesktop:
         memory_store = getattr(self, "memory_store", None)
         memory_detail = f"{len(memory_store.list())} SAVED LOCALLY" if memory_store else "LOCAL STORE"
         return [
-            ("AI CHAT", ai_ready, "CONFIGURED" if ai_ready else "ADD API TOKEN"),
+            ("AI CHAT", ai_ready, ai_detail),
             ("VOICE ENGINE", voice_key_ready and voice_packages,
              "CONFIGURED" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
             ("MEMORY", True, memory_detail),
