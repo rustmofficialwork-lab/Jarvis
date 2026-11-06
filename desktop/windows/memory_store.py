@@ -15,8 +15,10 @@ DEFAULT_MEMORY_PATH = (
 MAX_MEMORIES = 500
 MAX_CONTENT_LENGTH = 500
 _SECRET_PATTERN = re.compile(
-    r"\b(password|passcode|api[ _-]?key|access[ _-]?token|secret|otp|"
-    r"recovery code|private key)\b",
+    r"\b(password|passphrase|passcode|pin|api[ _-]?key|access[ _-]?token|"
+    r"secret|otp|one[ -]?time password|recovery code|private key|"
+    r"credit card|debit card|cvv|cvc|bank account|routing number|"
+    r"aadhaar|aadhar|pan number|passport number|social security number)\b",
     re.IGNORECASE,
 )
 
@@ -74,7 +76,10 @@ class MemoryStore:
         if len(content) > MAX_CONTENT_LENGTH:
             raise ValueError(f"Memory must be {MAX_CONTENT_LENGTH} characters or fewer.")
         if _SECRET_PATTERN.search(content):
-            raise ValueError("JARVIS will not save passwords, API keys, tokens, OTPs, or secrets.")
+            raise ValueError(
+                "JARVIS will not save passwords, PINs, account credentials, "
+                "payment-card details, government ID numbers, or other secrets."
+            )
         return content
 
     def add(self, content: str, category: str = "general") -> dict:
