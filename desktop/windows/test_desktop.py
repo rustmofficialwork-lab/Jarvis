@@ -310,6 +310,7 @@ class SettingsPersistenceTests(unittest.TestCase):
             "language": "hi-IN",
             "start_with_windows": True,
             "share_memory_with_ai": False,
+            "microphone_setup_completed": False,
         }
         jarvis_desktop.save_settings(settings, path)
         self.assertEqual(jarvis_desktop.load_settings(path), settings)
