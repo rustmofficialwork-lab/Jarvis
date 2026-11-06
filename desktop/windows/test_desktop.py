@@ -369,9 +369,7 @@ class ChatToolCallingTests(unittest.TestCase):
             def open(self, request, timeout):
                 return FakeResponse()
 
-        with patch.object(jarvis_desktop.urllib.request, "build_opener",
-                          return_value=FakeOpener()), \\
-             patch.object(jarvis_desktop, "execute_tool") as execute:
+        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=FakeOpener()), patch.object(jarvis_desktop, "execute_tool") as execute:
             with self.assertRaisesRegex(RuntimeError, "malformed or duplicate"):
                 jarvis_desktop.chat_completion(
                     "https://example.com/chat", "model", "test-key", "calculate", []
