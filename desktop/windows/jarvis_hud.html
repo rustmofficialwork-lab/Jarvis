@@ -70,8 +70,8 @@
                 linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
             background-size: 30px 30px;
-            /* 1920 / 1400 = 1.371428 */
-            transform: scale(1.371428); 
+            /* Fit the 1400x800 design inside the 1920x1080 frame without vertical clipping. */
+            transform: scale(1.35); 
             box-shadow: 0 0 50px rgba(0, 229, 255, 0.1);
         }
 
@@ -688,24 +688,44 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Auto Scaling Script
-        function scaleHUD() {
+        // Responsive HUD scaling: preserve the original 16:9 design and keep every
+        // panel visible on small, large, and resized displays without stretching.
+        (() => {
             const hud = document.getElementById('hud');
-            const designWidth = 1920;
-            const designHeight = 1080;
-            
-            const windowWidth = window.innerWidth;
-            const windowHeight = window.innerHeight;
-            
-            const scaleX = windowWidth / designWidth;
-            const scaleY = windowHeight / designHeight;
-            const scale = Math.min(scaleX, scaleY); 
-            
-            hud.style.transform = `scale(${scale})`;
-        }
+            const DESIGN_WIDTH = 1920;
+            const DESIGN_HEIGHT = 1080;
+            let resizeFrame = 0;
 
-        window.addEventListener('resize', scaleHUD);
-        window.addEventListener('DOMContentLoaded', scaleHUD);
+            function scaleHUD() {
+                if (!hud) return;
+                const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+                const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+                if (!viewportWidth || !viewportHeight) return;
+
+                const scale = Math.min(
+                    viewportWidth / DESIGN_WIDTH,
+                    viewportHeight / DESIGN_HEIGHT
+                );
+                hud.style.transform = `scale(${scale})`;
+            }
+
+            function scheduleScale() {
+                if (resizeFrame) cancelAnimationFrame(resizeFrame);
+                resizeFrame = requestAnimationFrame(() => {
+                    resizeFrame = 0;
+                    scaleHUD();
+                });
+            }
+
+            // Run immediately, then react to window and visual viewport changes.
+            scaleHUD();
+            window.addEventListener('resize', scheduleScale, { passive: true });
+            window.addEventListener('orientationchange', scheduleScale, { passive: true });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', scheduleScale, { passive: true });
+            }
+            window.addEventListener('load', scheduleScale, { once: true });
+        })();
     </script>
 
 
