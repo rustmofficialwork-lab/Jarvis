@@ -161,8 +161,11 @@ async def register_device(request: Request) -> Response:
     if device_id != raw_device_id.lower():
         raise HTTPException(status_code=422, detail="Installation ID must be a canonical UUID.")
 
-    # Use the socket peer address, not a caller-controlled X-Forwarded-For header.
-    client_ip = request.client.host if request.client else "unknown"
+    # Render appends the connecting client address to X-Forwarded-For.
+    # Use the last entry (the proxy-appended address), not caller-supplied earlier entries.
+    forwarded = request.headers.get("x-forwarded-for", "")
+    forwarded_ip = forwarded.rsplit(",", 1)[-1].strip() if forwarded else ""
+    client_ip = forwarded_ip or (request.client.host if request.client else "unknown")
     now = time.monotonic()
     async with _rate_lock:
         await _enforce_window_limit(
