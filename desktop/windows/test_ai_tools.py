@@ -17,7 +17,7 @@ class SafeToolTests(unittest.TestCase):
                     calculate(expression)
 
     def test_calculator_rejects_oversized_or_dangerous_math(self):
-        for expression in ("9 ** 9", "1 / 0", "9" * 121):
+        for expression in ("9 ** 9", "1 / 0", "1e999 - 1e999", "9" * 121):
             with self.subTest(expression=expression):
                 with self.assertRaises(ValueError):
                     calculate(expression)
