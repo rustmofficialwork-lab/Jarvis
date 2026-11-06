@@ -35,7 +35,7 @@ class SafeToolTests(unittest.TestCase):
 
     def test_local_time_is_timezone_aware(self):
         value = execute_tool("get_local_time", {})
-        self.assertRegex(value, r".+[+-]\\d{2}:\\d{2}$")
+        self.assertRegex(value, r".+[+-]\d{2}:\d{2}$")
 
 
 if __name__ == "__main__":
