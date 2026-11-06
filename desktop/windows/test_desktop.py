@@ -21,15 +21,16 @@ class AdvancedAutomationConfirmationTests(unittest.TestCase):
         return app
 
     def test_recurring_automation_requires_confirmation_before_saving(self):
-        from datetime import datetime
+        from datetime import datetime, timezone
         from unittest.mock import Mock
 
         store = Mock()
-        store.add_automation.return_value = (7, datetime(2026, 11, 7, 10, 30).astimezone())
+        store.add_automation.return_value = (
+            7, datetime(2026, 11, 7, 10, 30, tzinfo=timezone.utc)
+        )
         app = self._make_app(store)
 
-        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=True) as confirm, \\
-             patch.object(jarvis_desktop, "save_chat_history"):
+        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=True) as confirm, patch.object(jarvis_desktop, "save_chat_history"):
             self.assertTrue(app._handle_advanced_command(
                 "repeat study workflow every 60 minutes"
             ))
@@ -44,8 +45,7 @@ class AdvancedAutomationConfirmationTests(unittest.TestCase):
         store = Mock()
         app = self._make_app(store)
 
-        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=False) as confirm, \\
-             patch.object(jarvis_desktop, "save_chat_history"):
+        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=False) as confirm, patch.object(jarvis_desktop, "save_chat_history"):
             self.assertTrue(app._handle_advanced_command(
                 "schedule meeting setup every 30 minutes"
             ))
