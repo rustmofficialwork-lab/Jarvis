@@ -688,8 +688,8 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Responsive HUD scaling: preserve the original 16:9 design and keep every
-        // panel visible on small, large, and resized displays without stretching.
+        // Viewport-only fitting: keep the original HUD artwork and layout untouched.
+        // The 1920x1080 canvas is uniformly scaled to fit any available viewport.
         (() => {
             const hud = document.getElementById('hud');
             const DESIGN_WIDTH = 1920;
@@ -698,10 +698,18 @@
 
             function scaleHUD() {
                 if (!hud) return;
-                const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-                const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-                if (!viewportWidth || !viewportHeight) return;
 
+                // Prefer the visual viewport when browser zoom or an embedded webview
+                // changes the actually visible area; fall back to the layout viewport.
+                const visualViewport = window.visualViewport;
+                const viewportWidth = (visualViewport && visualViewport.width) ||
+                    document.documentElement.clientWidth || window.innerWidth;
+                const viewportHeight = (visualViewport && visualViewport.height) ||
+                    document.documentElement.clientHeight || window.innerHeight;
+                if (!(viewportWidth > 0) || !(viewportHeight > 0)) return;
+
+                // Uniform scaling prevents stretching and guarantees the full canvas
+                // stays inside both viewport dimensions, including unusual aspect ratios.
                 const scale = Math.min(
                     viewportWidth / DESIGN_WIDTH,
                     viewportHeight / DESIGN_HEIGHT
@@ -710,21 +718,28 @@
             }
 
             function scheduleScale() {
-                if (resizeFrame) cancelAnimationFrame(resizeFrame);
+                if (resizeFrame) return;
                 resizeFrame = requestAnimationFrame(() => {
                     resizeFrame = 0;
                     scaleHUD();
                 });
             }
 
-            // Run immediately, then react to window and visual viewport changes.
+            // Initial fit plus updates for resize, orientation, zoom, fullscreen and
+            // embedded-webview viewport changes. ResizeObserver is feature-detected.
             scaleHUD();
             window.addEventListener('resize', scheduleScale, { passive: true });
             window.addEventListener('orientationchange', scheduleScale, { passive: true });
+            window.addEventListener('fullscreenchange', scheduleScale, { passive: true });
+            window.addEventListener('load', scheduleScale, { once: true });
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', scheduleScale, { passive: true });
+                window.visualViewport.addEventListener('scroll', scheduleScale, { passive: true });
             }
-            window.addEventListener('load', scheduleScale, { once: true });
+            if (typeof ResizeObserver !== 'undefined' && document.documentElement) {
+                const viewportObserver = new ResizeObserver(scheduleScale);
+                viewportObserver.observe(document.documentElement);
+            }
         })();
     </script>
 
