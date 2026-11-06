@@ -21,6 +21,7 @@ _BINARY_OPERATORS = {
     ast.Div: operator.truediv,
     ast.FloorDiv: operator.floordiv,
     ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
 }
 _UNARY_OPERATORS = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
