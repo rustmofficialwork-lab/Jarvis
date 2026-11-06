@@ -108,6 +108,17 @@ class UpdaterTests(unittest.TestCase):
                 )
             self.assertEqual(list(Path(folder).iterdir()), [])
 
+    def test_redirect_allowlist_rejects_unapproved_hosts_and_nonstandard_ports(self):
+        from updater import _is_allowed_redirect_url
+
+        self.assertTrue(_is_allowed_redirect_url("https://objects.githubusercontent.com/assets/file"))
+        self.assertTrue(_is_allowed_redirect_url("https://release-assets.githubusercontent.com/file"))
+        self.assertFalse(_is_allowed_redirect_url("http://objects.githubusercontent.com/file"))
+        self.assertFalse(_is_allowed_redirect_url("https://example.com/file"))
+        self.assertFalse(_is_allowed_redirect_url("https://github.com:444/file"))
+        self.assertFalse(_is_allowed_redirect_url("https://user@github.com/file"))
+        self.assertFalse(_is_allowed_redirect_url("https://github.com:bad/file"))
+
     def test_rejects_non_github_download_url(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(ValueError, "unsafe"):
