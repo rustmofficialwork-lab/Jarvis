@@ -75,7 +75,7 @@ pip install -r requirements.txt
 python jarvis_desktop.py
 ```
 
-On first launch, JARVIS quietly registers this installation with the official backend and stores its unique, short-lived credential in Windows Credential Manager. Registration retries automatically when the internet becomes available, and credentials renew in the background after reconnecting. No account, manual backend token, or OpenRouter key is required. The OpenRouter secret stays on the server. If Windows Credential Manager is unavailable, the credential remains in memory for that run and JARVIS can register again next time.
+On first launch, JARVIS quietly registers this installation with the official backend and stores its unique, short-lived credential in Windows Credential Manager. If the first launch is offline, registration retries automatically until the backend becomes reachable. If a saved credential expires, JARVIS renews it automatically when the next online request is made. No account, manual backend token, or OpenRouter key is required. The OpenRouter secret stays on the server. If Windows Credential Manager is unavailable, the credential remains in memory for that run and JARVIS can register again next time.
 
 In Settings, you only need to add a **Picovoice AccessKey** (from https://console.picovoice.ai/) if you want optional wake-word listening. The default AI endpoint and model are already configured. A legacy backend token field remains optional for existing installations; leave it blank for automatic enrollment.
 
