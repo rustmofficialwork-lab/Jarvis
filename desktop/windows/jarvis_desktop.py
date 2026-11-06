@@ -58,10 +58,13 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
             "endpoint": data.get("endpoint") if isinstance(data.get("endpoint"), str) else DEFAULT_ENDPOINT,
             "model": data.get("model") if isinstance(data.get("model"), str) else DEFAULT_MODEL,
             "language": data.get("language") if isinstance(data.get("language"), str) and data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
-            "device_id": data.get("device_id") if isinstance(data.get("device_id"), str) else "",
             "start_with_windows": data.get("start_with_windows") is True,
             "share_memory_with_ai": data.get("share_memory_with_ai") is True,
         }
+        # Keep the per-install ID optional for older settings files. The desktop
+        # app creates and persists it during startup when it is missing.
+        if "device_id" in data:
+            settings["device_id"] = data["device_id"] if isinstance(data["device_id"], str) else ""
         # Older installs used OpenRouter directly. Migrate them to the secured JARVIS gateway.
         if settings["endpoint"].strip() == "https://openrouter.ai/api/v1/chat/completions":
             settings["endpoint"] = DEFAULT_ENDPOINT
@@ -2080,7 +2083,11 @@ class JarvisDesktop:
         """Stop background listening and interrupt speech before destroying the UI."""
         self.stop_event.set()
         self.speech_stop_event.set()
-        self.device_auth_stop_event.set()
+        # Tests and partially initialized instances may not have started device
+        # authentication; shut it down when the worker state exists.
+        device_auth_stop_event = getattr(self, "device_auth_stop_event", None)
+        if device_auth_stop_event is not None:
+            device_auth_stop_event.set()
         if self.tray_icon is not None:
             try:
                 self.tray_icon.stop()
