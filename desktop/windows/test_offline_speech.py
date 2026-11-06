@@ -15,6 +15,18 @@ from offline_speech import (
 )
 
 
+class OfflineSpeechRedirectTests(unittest.TestCase):
+    def test_model_redirect_allowlist_requires_official_https_host(self):
+        from offline_speech import _is_allowed_model_redirect_url
+
+        self.assertTrue(_is_allowed_model_redirect_url("https://alphacephei.com/vosk/models/model.zip"))
+        self.assertTrue(_is_allowed_model_redirect_url("https://www.alphacephei.com/models/model.zip"))
+        self.assertFalse(_is_allowed_model_redirect_url("http://alphacephei.com/model.zip"))
+        self.assertFalse(_is_allowed_model_redirect_url("https://example.com/model.zip"))
+        self.assertFalse(_is_allowed_model_redirect_url("https://alphacephei.com:444/model.zip"))
+        self.assertFalse(_is_allowed_model_redirect_url("https://user@alphacephei.com/model.zip"))
+
+
 class OfflineSpeechTests(unittest.TestCase):
     def test_language_models_have_distinct_local_paths(self):
         with tempfile.TemporaryDirectory() as temp:
