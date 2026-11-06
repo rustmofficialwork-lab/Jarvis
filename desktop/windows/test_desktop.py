@@ -339,6 +339,46 @@ class ChatToolCallingTests(unittest.TestCase):
         execute.assert_not_called()
 
 
+    def test_oversized_tool_arguments_are_rejected_before_execution(self):
+        malformed = {
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [{
+                        "id": "call_large",
+                        "type": "function",
+                        "function": {
+                            "name": "calculator",
+                            "arguments": " " * (jarvis_desktop.MAX_TOOL_ARGUMENT_LENGTH + 1),
+                        },
+                    }],
+                },
+            }],
+        }
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *_args):
+                return False
+            def read(self, _size=-1):
+                return json.dumps(malformed).encode("utf-8")
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                return FakeResponse()
+
+        with patch.object(jarvis_desktop.urllib.request, "build_opener",
+                          return_value=FakeOpener()), \\
+             patch.object(jarvis_desktop, "execute_tool") as execute:
+            with self.assertRaisesRegex(RuntimeError, "malformed or duplicate"):
+                jarvis_desktop.chat_completion(
+                    "https://example.com/chat", "model", "test-key", "calculate", []
+                )
+        execute.assert_not_called()
+
+
 class TranscriptTests(unittest.TestCase):
     def test_append_keeps_transcript_when_chat_window_is_closed(self):
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
