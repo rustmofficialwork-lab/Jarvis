@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ast
 import operator
+import math
 from datetime import datetime
 from typing import Any
 
@@ -57,7 +58,7 @@ TOOL_DEFINITIONS = [
 def _safe_number(value: Any) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("Only numeric arithmetic is supported.")
-    if abs(value) > MAX_ABS_RESULT:
+    if not math.isfinite(value) or abs(value) > MAX_ABS_RESULT:
         raise ValueError("The result is outside the supported range.")
     return value
 
