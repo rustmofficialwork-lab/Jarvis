@@ -40,6 +40,20 @@ class MemoryStoreTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.store.add(value)
 
+    def test_structured_indian_ids_and_payment_cards_are_rejected(self):
+        for value in (
+            "PAN: ABCDE1234F",
+            "Aadhaar 1234 5678 9012",
+            "Card number: 4111 1111 1111 1111",
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    self.store.add(value)
+
+    def test_unlabelled_number_sequence_is_not_treated_as_a_card(self):
+        item = self.store.add("My project code is 4111 1111 1111 1111")
+        self.assertEqual(item["content"], "My project code is 4111 1111 1111 1111")
+
     def test_blank_and_oversized_memories_are_rejected(self):
         with self.assertRaises(ValueError):
             self.store.add("   ")
