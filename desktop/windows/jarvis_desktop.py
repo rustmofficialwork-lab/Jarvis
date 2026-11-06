@@ -48,7 +48,7 @@ SYSTEM_PROMPT = (
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> dict:
-    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN"}
+    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN", "device_id": ""}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
@@ -58,6 +58,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
             "endpoint": data.get("endpoint") if isinstance(data.get("endpoint"), str) else DEFAULT_ENDPOINT,
             "model": data.get("model") if isinstance(data.get("model"), str) else DEFAULT_MODEL,
             "language": data.get("language") if isinstance(data.get("language"), str) and data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
+            "device_id": data.get("device_id") if isinstance(data.get("device_id"), str) else "",
             "start_with_windows": data.get("start_with_windows") is True,
             "share_memory_with_ai": data.get("share_memory_with_ai") is True,
         }
