@@ -215,11 +215,8 @@ def require_client_token(authorization: str | None = Header(default=None)) -> st
 
     device_id = _verify_device_token(supplied)
     if device_id is None:
-        if not _device_token_secret():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Backend client authentication is not configured.",
-            )
+        # Keep authentication failures indistinguishable to unauthenticated callers.
+        # A missing signing secret also means the supplied device token cannot be trusted.
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired credentials.")
     return device_id
 
