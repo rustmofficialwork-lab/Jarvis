@@ -312,11 +312,17 @@ def acquire_single_instance() -> bool:
     kernel32.CreateMutexW.restype = ctypes.c_void_p
     kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
     kernel32.CloseHandle.restype = ctypes.c_bool
+    # Clear the thread-local last-error value before CreateMutexW. Windows
+    # documents ERROR_ALREADY_EXISTS as the signal that the named mutex existed;
+    # without clearing first, an unrelated earlier API call can cause a false
+    # "already running" result and silently block a fresh JARVIS launch.
+    ctypes.set_last_error(0)
     handle = kernel32.CreateMutexW(None, True, _INSTANCE_MUTEX_NAME)
+    last_error = ctypes.get_last_error()
     if not handle:
-        error = ctypes.get_last_error()
+        error = last_error
         raise OSError(error, "Could not create the JARVIS single-instance mutex.")
-    if ctypes.get_last_error() == ERROR_ALREADY_EXISTS:
+    if last_error == ERROR_ALREADY_EXISTS:
         kernel32.CloseHandle(handle)
         return False
     # Keep the handle alive for the entire process lifetime; Windows releases it on exit.
