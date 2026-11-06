@@ -30,7 +30,12 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertEqual(self.store.list()[0]["category"], "preference")
 
     def test_sensitive_secrets_are_rejected(self):
-        for value in ("my password is abc", "API key: xyz", "OTP 123456"):
+        for value in (
+            "my password is abc", "API key: xyz", "OTP 123456",
+            "my PIN is 1234", "credit card number is 4111111111111111",
+            "debit card CVV 123", "bank account number 123456",
+            "Aadhaar number 1234 5678 9012", "passport number ABC123",
+        ):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     self.store.add(value)
