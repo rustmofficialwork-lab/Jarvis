@@ -88,7 +88,7 @@ def _read_pdf(path: Path) -> tuple[str, int]:
         pages = []
         used_chars = 0
         truncated = False
-        notice = "\\n\\n[PDF text truncated at 40,000 characters.]"
+        notice = "\n\n[PDF text truncated at 40,000 characters.]"
         content_budget = MAX_TEXT_CHARS - len(notice)
         for number, page in enumerate(reader.pages, start=1):
             try:
@@ -98,8 +98,8 @@ def _read_pdf(path: Path) -> tuple[str, int]:
             if not page_text:
                 continue
 
-            separator = "\\n\\n" if pages else ""
-            prefix = f"[Page {number}]\\n"
+            separator = "\n\n" if pages else ""
+            prefix = f"[Page {number}]\n"
             available = content_budget - used_chars - len(separator) - len(prefix)
             if available <= 0:
                 truncated = True
