@@ -12,8 +12,9 @@ on:
     branches: [main, feat/offline-wake-word, feat/secure-backend-foundation, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard, feature/complete-realtime-dashboard]
     paths:
       - "desktop/windows/**"
+      - "backend/**"
       - "README.md"
-      - ".github/workflows/windows-desktop.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
