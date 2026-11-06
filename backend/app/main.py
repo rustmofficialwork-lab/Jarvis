@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+import base64
+import hashlib
 import hmac
 import json
 import os
+import re
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from typing import Any
+from uuid import UUID
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
@@ -42,18 +49,155 @@ app = FastAPI(
 )
 
 
-def require_client_token(authorization: str | None = Header(default=None)) -> None:
-    expected = os.getenv("JARVIS_CLIENT_TOKEN", "").strip()
-    if len(expected) < 32:
+DEVICE_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60
+REGISTRATION_WINDOW_SECONDS = 60 * 60
+REGISTRATION_MAX_ATTEMPTS = 10
+CHAT_WINDOW_SECONDS = 60
+CHAT_MAX_REQUESTS_PER_WINDOW = 8
+CHAT_DAY_SECONDS = 24 * 60 * 60
+CHAT_MAX_REQUESTS_PER_DAY = 120
+_rate_lock = asyncio.Lock()
+_registration_attempts: dict[str, deque[float]] = defaultdict(deque)
+_chat_attempts: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _device_token_secret() -> bytes:
+    value = os.getenv("JARVIS_DEVICE_TOKEN_SECRET", "").strip()
+    if len(value) < 32:
+        return b""
+    return value.encode("utf-8")
+
+
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _issue_device_token(device_id: str, now: int | None = None) -> tuple[str, int]:
+    secret = _device_token_secret()
+    if not secret:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Backend client authentication is not configured.",
+            detail="Automatic device registration is not configured.",
         )
-    supplied = ""
-    if authorization and authorization.startswith("Bearer "):
-        supplied = authorization[7:].strip()
-    if not supplied or not hmac.compare_digest(supplied, expected):
+    issued_at = int(time.time()) if now is None else int(now)
+    expires_at = issued_at + DEVICE_TOKEN_TTL_SECONDS
+    payload = _b64url(json.dumps({
+        "sub": device_id,
+        "iat": issued_at,
+        "exp": expires_at,
+        "iss": "jarvis-backend",
+        "aud": "jarvis-desktop",
+    }, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    signature = _b64url(hmac.new(secret, payload.encode("ascii"), hashlib.sha256).digest())
+    return f"jdt1.{payload}.{signature}", expires_at
+
+
+def _verify_device_token(token: str, now: int | None = None) -> str | None:
+    secret = _device_token_secret()
+    if not secret or not token.startswith("jdt1."):
+        return None
+    try:
+        prefix, payload_part, signature = token.split(".", 2)
+        if prefix != "jdt1":
+            return None
+        expected = _b64url(hmac.new(
+            secret, payload_part.encode("ascii"), hashlib.sha256
+        ).digest())
+        if not hmac.compare_digest(signature, expected):
+            return None
+        padded = payload_part + "=" * (-len(payload_part) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        current = int(time.time()) if now is None else int(now)
+        if (payload.get("iss") != "jarvis-backend"
+                or payload.get("aud") != "jarvis-desktop"
+                or not isinstance(payload.get("sub"), str)
+                or payload.get("exp", 0) <= current
+                or payload.get("iat", current + 1) > current + 60):
+            return None
+        return payload["sub"]
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return None
+
+
+async def _enforce_window_limit(
+    bucket: deque[float], *, now: float, window: int, maximum: int, detail: str
+) -> None:
+    while bucket and bucket[0] <= now - window:
+        bucket.popleft()
+    if len(bucket) >= maximum:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=detail,
+            headers={"Retry-After": str(max(1, int(window - (now - bucket[0]))))},
+        )
+    bucket.append(now)
+
+
+@app.post("/v1/devices/register")
+async def register_device(request: Request) -> Response:
+    length = request.headers.get("content-length")
+    if length:
+        try:
+            if int(length) > 512:
+                raise HTTPException(status_code=413, detail="Registration request is too large.")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid Content-Length.")
+    try:
+        payload = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Request body must be valid JSON.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Request body must be a JSON object.")
+    raw_device_id = payload.get("device_id")
+    if not isinstance(raw_device_id, str) or len(raw_device_id) > 64:
+        raise HTTPException(status_code=422, detail="A valid installation ID is required.")
+    try:
+        device_id = str(UUID(raw_device_id))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=422, detail="A valid installation ID is required.")
+    if device_id != raw_device_id.lower():
+        raise HTTPException(status_code=422, detail="Installation ID must be a canonical UUID.")
+
+    # Use the socket peer address, not a caller-controlled X-Forwarded-For header.
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    async with _rate_lock:
+        await _enforce_window_limit(
+            _registration_attempts[client_ip],
+            now=now,
+            window=REGISTRATION_WINDOW_SECONDS,
+            maximum=REGISTRATION_MAX_ATTEMPTS,
+            detail="Too many device registrations from this network. Try again later.",
+        )
+    token, expires_at = _issue_device_token(device_id)
+    return Response(
+        content=json.dumps({"access_token": token, "token_type": "Bearer",
+                            "expires_at": expires_at, "expires_in": DEVICE_TOKEN_TTL_SECONDS}),
+        status_code=200,
+        media_type="application/json",
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+    )
+
+
+def require_client_token(authorization: str | None = Header(default=None)) -> str | None:
+    supplied = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else ""
+    if not supplied:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+
+    # Keep existing manually provisioned installations working during migration.
+    legacy = os.getenv("JARVIS_CLIENT_TOKEN", "").strip()
+    if len(legacy) >= 32 and hmac.compare_digest(supplied, legacy):
+        return None
+
+    device_id = _verify_device_token(supplied)
+    if device_id is None:
+        if not _device_token_secret():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Backend client authentication is not configured.",
+            )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired credentials.")
+    return device_id
 
 
 @app.get("/health")
@@ -62,8 +206,26 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": "jarvis-backend"}
 
 
-@app.post("/v1/chat/completions", dependencies=[Depends(require_client_token)])
-async def chat_completions(request: Request) -> Response:
+@app.post("/v1/chat/completions")
+async def chat_completions(
+    request: Request, device_id: str | None = Depends(require_client_token)
+) -> Response:
+    if device_id is not None:
+        now = time.monotonic()
+        async with _rate_lock:
+            bucket = _chat_attempts[device_id]
+            while bucket and bucket[0] <= now - CHAT_DAY_SECONDS:
+                bucket.popleft()
+            minute_count = sum(1 for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS)
+            if minute_count >= CHAT_MAX_REQUESTS_PER_WINDOW or len(bucket) >= CHAT_MAX_REQUESTS_PER_DAY:
+                retry_after = CHAT_WINDOW_SECONDS if minute_count >= CHAT_MAX_REQUESTS_PER_WINDOW else CHAT_DAY_SECONDS
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="JARVIS usage limit reached. Please try again later.",
+                    headers={"Retry-After": str(retry_after)},
+                )
+            bucket.append(now)
+
     length = request.headers.get("content-length")
     if length:
         try:
