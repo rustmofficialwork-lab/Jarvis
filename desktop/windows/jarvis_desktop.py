@@ -34,6 +34,7 @@ try:
 except ImportError:
     APP_VERSION = "1.1.0"
 MAX_CHAT_RESPONSE_BYTES = 2_000_000
+MAX_TOOL_ARGUMENT_LENGTH = 4096
 KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
@@ -690,10 +691,11 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                 raise RuntimeError("The AI returned a malformed tool call.")
             call_id = call.get("id")
             function = call.get("function")
-            if (not isinstance(call_id, str) or not call_id or len(call_id) > 256
+            if (not isinstance(call_id, str) or not call_id.strip() or len(call_id) > 256
                     or call_id in seen_call_ids or not isinstance(function, dict)
-                    or not isinstance(function.get("name"), str)
-                    or not isinstance(function.get("arguments"), str)):
+                    or not isinstance(function.get("name"), str) or not function.get("name").strip()
+                    or not isinstance(function.get("arguments"), str)
+                    or len(function.get("arguments")) > MAX_TOOL_ARGUMENT_LENGTH):
                 raise RuntimeError("The AI returned a malformed or duplicate tool-call envelope.")
             seen_call_ids.add(call_id)
             validated_calls.append((call_id, function["name"], function["arguments"]))
@@ -710,7 +712,7 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                 if not isinstance(arguments, dict):
                     raise ValueError("Tool arguments must be a JSON object.")
                 output = execute_tool(name, arguments)
-            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
                 output = f"Tool unavailable: {str(exc)[:240]}"
             messages.append({
                 "role": "tool",
