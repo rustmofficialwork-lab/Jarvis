@@ -2,13 +2,14 @@ name: Windows Desktop Checks
 
 on:
   pull_request:
-    branches: [main, feat/offline-wake-word, feature/complete-realtime-dashboard]
+    branches: [main, feat/offline-wake-word, feat/secure-backend-foundation, feature/complete-realtime-dashboard]
     paths:
       - "desktop/windows/**"
+      - "backend/**"
       - "README.md"
       - ".github/workflows/windows-desktop.yml"
   push:
-    branches: [main, feat/offline-wake-word, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard, feature/complete-realtime-dashboard]
+    branches: [main, feat/offline-wake-word, feat/secure-backend-foundation, feat/windows-desktop-app, feat/jarvis-live-holographic-dashboard, feature/complete-realtime-dashboard]
     paths:
       - "desktop/windows/**"
       - "README.md"
@@ -150,3 +151,28 @@ jobs:
             desktop/windows/dist-installer/JARVIS-Setup-x64.exe
             desktop/windows/dist-installer/JARVIS-Portable-x64.zip
             SHA256SUMS.txt
+
+
+  backend-checks:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run backend unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Compile backend Python
+        run: python -m compileall -q app tests
