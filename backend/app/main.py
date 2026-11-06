@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import hashlib
 import hmac
 import json
 import os
-import re
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -94,7 +94,7 @@ def _issue_device_token(device_id: str, now: int | None = None) -> tuple[str, in
 
 def _verify_device_token(token: str, now: int | None = None) -> str | None:
     secret = _device_token_secret()
-    if not secret or not token.startswith("jdt1."):
+    if not secret or len(token) > 4096 or not token.startswith("jdt1."):
         return None
     try:
         prefix, payload_part, signature = token.split(".", 2)
@@ -115,7 +115,7 @@ def _verify_device_token(token: str, now: int | None = None) -> str | None:
                 or payload.get("iat", current + 1) > current + 60):
             return None
         return payload["sub"]
-    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError, binascii.Error):
         return None
 
 
@@ -142,8 +142,11 @@ async def register_device(request: Request) -> Response:
                 raise HTTPException(status_code=413, detail="Registration request is too large.")
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid Content-Length.")
+    raw_body = await request.body()
+    if len(raw_body) > 512:
+        raise HTTPException(status_code=413, detail="Registration request is too large.")
     try:
-        payload = await request.json()
+        payload = json.loads(raw_body)
     except (ValueError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="Request body must be valid JSON.")
     if not isinstance(payload, dict):
