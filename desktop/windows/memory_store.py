@@ -21,6 +21,42 @@ _SECRET_PATTERN = re.compile(
     r"aadhaar|aadhar|pan number|passport number|social security number)\b",
     re.IGNORECASE,
 )
+_PAN_VALUE_PATTERN = re.compile(r"\b(?:PAN\s*[:#-]?\s*)[A-Z]{5}\d{4}[A-Z]\b", re.IGNORECASE)
+_AADHAAR_VALUE_PATTERN = re.compile(
+    r"\b(?:aadhaar|aadhar)\s*(?:number|no\.?)?\s*[:#-]?\s*(?:\d[ -]?){12}\b",
+    re.IGNORECASE,
+)
+_CARD_VALUE_PATTERN = re.compile(
+    r"\b(?:credit|debit)?\s*card\s*(?:number|no\.?)?\s*[:#-]?\s*((?:\d[ -]?){13,19})\b",
+    re.IGNORECASE,
+)
+
+
+def _has_luhn_valid_card_number(content: str) -> bool:
+    """Detect labelled payment-card numbers without treating arbitrary digit strings as secrets."""
+    for match in _CARD_VALUE_PATTERN.finditer(content):
+        digits = re.sub(r"\D", "", match.group(1))
+        total = 0
+        parity = len(digits) % 2
+        for index, char in enumerate(digits):
+            number = int(char)
+            if index % 2 == parity:
+                number *= 2
+                if number > 9:
+                    number -= 9
+            total += number
+        if total % 10 == 0:
+            return True
+    return False
+
+
+def _contains_sensitive_data(content: str) -> bool:
+    return bool(
+        _SECRET_PATTERN.search(content)
+        or _PAN_VALUE_PATTERN.search(content)
+        or _AADHAAR_VALUE_PATTERN.search(content)
+        or _has_luhn_valid_card_number(content)
+    )
 
 
 class MemoryStore:
@@ -75,7 +111,7 @@ class MemoryStore:
             raise ValueError("Memory cannot be empty.")
         if len(content) > MAX_CONTENT_LENGTH:
             raise ValueError(f"Memory must be {MAX_CONTENT_LENGTH} characters or fewer.")
-        if _SECRET_PATTERN.search(content):
+        if _contains_sensitive_data(content):
             raise ValueError(
                 "JARVIS will not save passwords, PINs, account credentials, "
                 "payment-card details, government ID numbers, or other secrets."
