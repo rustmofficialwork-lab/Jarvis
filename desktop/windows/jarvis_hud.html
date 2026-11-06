@@ -20,14 +20,22 @@
             --font-head: 'Orbitron', sans-serif;
         }
 
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background-color: #000;
+            background-color: var(--bg);
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: stretch;
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
             font-family: var(--font-digital);
         }
@@ -35,9 +43,10 @@
         /* --- OUTER CONTAINER (1920x1080) --- */
         .hud-container {
             /* Fill the real viewport; the original HUD stays centered inside it. */
-            width: 100vw;
-            height: 100vh;
-            height: 100dvh;
+            width: 100%;
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
             background-color: #000;
             display: flex;
             justify-content: center;
@@ -72,8 +81,8 @@
                 linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
             background-size: 30px 30px;
-            /* JavaScript applies one uniform, viewport-aware scale to this unchanged layout. */
-            transform: scale(1.35);
+            /* JavaScript stretches this fixed design to the exact available viewport. */
+            transform: scale(1, 1);
             transform-origin: center center;
             box-shadow: 0 0 50px rgba(0, 229, 255, 0.1);
         }
@@ -715,8 +724,8 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Responsive viewport fitting: preserve the original 1400x800 HUD layout.
-        // Only its uniform scale changes; panels, artwork, colors and coordinates do not.
+        // Auto-fit the original 1400x800 HUD to the actual pywebview client area.
+        // Independent X/Y scaling removes unused black margins at every resolution.
         (() => {
             const hud = document.getElementById('hud');
             const design = document.querySelector('.hud-inner');
@@ -727,18 +736,16 @@
             function scaleHUD() {
                 if (!hud || !design) return;
 
-                // Match the CSS viewport that the full-screen outer frame occupies.
-                const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-                const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-                if (!(viewportWidth > 0) || !(viewportHeight > 0)) return;
+                // Measure the rendered HUD container, not screen pixels or a guessed
+                // 1920x1080 size. This also handles Windows display scaling correctly.
+                const bounds = hud.getBoundingClientRect();
+                const width = hud.clientWidth || bounds.width;
+                const height = hud.clientHeight || bounds.height;
+                if (!(width > 0) || !(height > 0)) return;
 
-                // Fit the original design to the largest possible size without
-                // stretching, cropping, or changing the relative panel positions.
-                const scale = Math.min(
-                    viewportWidth / DESIGN_WIDTH,
-                    viewportHeight / DESIGN_HEIGHT
-                );
-                design.style.transform = `scale(${scale})`;
+                const scaleX = width / DESIGN_WIDTH;
+                const scaleY = height / DESIGN_HEIGHT;
+                design.style.transform = `scale(${scaleX}, ${scaleY})`;
             }
 
             function scheduleScale() {
@@ -757,9 +764,9 @@
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', scheduleScale, { passive: true });
             }
-            if (typeof ResizeObserver !== 'undefined' && document.documentElement) {
+            if (typeof ResizeObserver !== 'undefined' && hud) {
                 const viewportObserver = new ResizeObserver(scheduleScale);
-                viewportObserver.observe(document.documentElement);
+                viewportObserver.observe(hud);
             }
         })();
     </script>
