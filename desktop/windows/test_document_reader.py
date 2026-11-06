@@ -59,6 +59,15 @@ class DocumentReaderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "empty"):
             read_document(path)
 
+    def test_rejects_docx_with_too_many_archive_entries(self):
+        path = self.root / "many-entries.docx"
+        with zipfile.ZipFile(path, "w") as archive:
+            for index in range(10_001):
+                archive.writestr(f"extra/{index}.txt", "")
+            archive.writestr("word/document.xml", "<document/>")
+        with self.assertRaisesRegex(ValueError, "too many archive entries"):
+            read_document(path)
+
     def test_rejects_invalid_docx(self):
         path = self.root / "broken.docx"
         path.write_text("not a zip")
