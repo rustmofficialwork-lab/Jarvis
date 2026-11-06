@@ -6,14 +6,17 @@ never executes shell commands, Python supplied by a model, or filesystem work.
 from __future__ import annotations
 
 import ast
-import operator
 import math
+import operator
 from datetime import datetime
 from typing import Any
+
+from system_monitor import get_system_status, get_top_processes
 
 MAX_EXPRESSION_LENGTH = 120
 MAX_ABS_RESULT = 1_000_000_000_000
 MAX_POWER = 8
+MAX_PROCESS_RESULTS = 10
 
 _BINARY_OPERATORS = {
     ast.Add: operator.add,
@@ -48,6 +51,32 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {},
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_system_status",
+            "description": "Read a live, local-only snapshot of CPU, RAM, disk, battery, network link, and uptime. Read-only; use when the user asks about this PC's health or resources.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_top_processes",
+            "description": "Read the names and resource usage of up to 10 running processes. Read-only; use only when the user asks which apps or processes are using PC resources.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "minimum": 1, "maximum": MAX_PROCESS_RESULTS}
+                },
                 "additionalProperties": False,
             },
         },
@@ -102,7 +131,7 @@ def calculate(expression: str) -> str:
 
 
 def execute_tool(name: str, arguments: dict[str, Any]) -> str:
-    """Execute one allowlisted read-only tool with exact argument validation."""
+    """Execute one allowlisted, read-only tool with exact argument validation."""
     if not isinstance(arguments, dict):
         raise ValueError("Tool arguments must be a JSON object.")
     if name == "calculator":
@@ -113,4 +142,15 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> str:
         if arguments:
             raise ValueError("The time tool does not accept arguments.")
         return datetime.now().astimezone().isoformat(timespec="seconds")
+    if name == "get_system_status":
+        if arguments:
+            raise ValueError("The system status tool does not accept arguments.")
+        return get_system_status()
+    if name == "get_top_processes":
+        if set(arguments) - {"limit"}:
+            raise ValueError("Top processes accepts only an optional limit.")
+        limit = arguments.get("limit", 5)
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PROCESS_RESULTS:
+            raise ValueError("Process limit must be an integer from 1 to 10.")
+        return get_top_processes(limit=limit)
     raise ValueError("That JARVIS tool is not available.")
