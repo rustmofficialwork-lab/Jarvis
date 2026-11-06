@@ -45,6 +45,7 @@ class MemoryStoreTests(unittest.TestCase):
             "PAN: ABCDE1234F",
             "Aadhaar 1234 5678 9012",
             "Card number: 4111 1111 1111 1111",
+            "Account number: 123456789012",
         ):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
