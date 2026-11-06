@@ -74,6 +74,33 @@ class DocumentReaderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "damaged"):
             read_document(path)
 
+    def test_pdf_extraction_is_bounded_before_joining_all_pages(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from document_reader import MAX_TEXT_CHARS
+
+        class FakePage:
+            def __init__(self, text):
+                self.text = text
+
+            def extract_text(self):
+                return self.text
+
+        class FakeReader:
+            is_encrypted = False
+            pages = [FakePage("A" * 30_000), FakePage("B" * 30_000)]
+
+        path = self.root / "large-text.pdf"
+        path.write_bytes(b"%PDF fake")
+        fake_module = SimpleNamespace(PdfReader=lambda *args, **kwargs: FakeReader())
+        with patch.dict(sys.modules, {"pypdf": fake_module}):
+            result = read_document(path)
+
+        self.assertLessEqual(result["characters"], MAX_TEXT_CHARS)
+        self.assertIn("[Page 1]", result["text"])
+        self.assertIn("[PDF text truncated at 40,000 characters.]", result["text"])
+
     def test_rejects_invalid_pdf(self):
         path = self.root / "broken.pdf"
         path.write_bytes(b"%PDF this is not a valid PDF")

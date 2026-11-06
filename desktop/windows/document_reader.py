@@ -86,14 +86,37 @@ def _read_pdf(path: Path) -> tuple[str, int]:
         if page_count > MAX_PDF_PAGES:
             raise ValueError(f"This PDF has {page_count} pages; the limit is {MAX_PDF_PAGES} pages per read.")
         pages = []
+        used_chars = 0
+        truncated = False
+        notice = "\\n\\n[PDF text truncated at 40,000 characters.]"
+        content_budget = MAX_TEXT_CHARS - len(notice)
         for number, page in enumerate(reader.pages, start=1):
             try:
-                page_text = page.extract_text() or ""
+                page_text = (page.extract_text() or "").strip()
             except Exception as exc:
                 raise ValueError(f"Could not extract text from PDF page {number}.") from exc
-            if page_text.strip():
-                pages.append(f"[Page {number}]\n{page_text.strip()}")
-        return "\n\n".join(pages), page_count
+            if not page_text:
+                continue
+
+            separator = "\\n\\n" if pages else ""
+            prefix = f"[Page {number}]\\n"
+            available = content_budget - used_chars - len(separator) - len(prefix)
+            if available <= 0:
+                truncated = True
+                break
+            if len(page_text) > available:
+                pages.append(separator + prefix + page_text[:available].rstrip())
+                used_chars += len(pages[-1])
+                truncated = True
+                break
+            piece = separator + prefix + page_text
+            pages.append(piece)
+            used_chars += len(piece)
+
+        extracted = "".join(pages)
+        if truncated:
+            extracted += notice
+        return extracted, page_count
     except ValueError:
         raise
     except Exception as exc:
