@@ -1050,12 +1050,14 @@ class VoiceRecognizerTimeoutTests(unittest.TestCase):
         recognizer = jarvis_desktop.configure_voice_recognizer(FakeRecognizer(), 3.5)
         self.assertEqual(recognizer.operation_timeout, 3.5)
 
-    def test_non_positive_timeout_is_rejected(self):
+    def test_non_positive_or_non_finite_timeout_is_rejected(self):
         class FakeRecognizer:
             operation_timeout = None
 
-        with self.assertRaises(ValueError):
-            jarvis_desktop.configure_voice_recognizer(FakeRecognizer(), 0)
+        for timeout in (0, -1, float("inf"), float("nan"), "invalid"):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(ValueError):
+                    jarvis_desktop.configure_voice_recognizer(FakeRecognizer(), timeout)
 
 
 class CancellableVoiceCaptureTests(unittest.TestCase):

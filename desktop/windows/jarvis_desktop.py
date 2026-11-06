@@ -437,8 +437,14 @@ def release_wake_recorder(recorder) -> None:
 
 def configure_voice_recognizer(recognizer, request_timeout: float = 8.0):
     """Bound online speech-recognition requests so network stalls cannot hang the worker."""
-    if request_timeout <= 0:
-        raise ValueError("Speech recognition timeout must be positive.")
+    import math
+
+    try:
+        request_timeout = float(request_timeout)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Speech recognition timeout must be a positive finite number.") from exc
+    if not math.isfinite(request_timeout) or request_timeout <= 0:
+        raise ValueError("Speech recognition timeout must be a positive finite number.")
     recognizer.operation_timeout = request_timeout
     return recognizer
 
