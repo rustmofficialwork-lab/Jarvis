@@ -9,6 +9,7 @@ import os
 import queue
 import sys
 import threading
+import uuid
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -37,6 +38,7 @@ SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDeskto
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 HISTORY_FILE = SETTINGS_DIR / "chat_history.json"
 DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
+DEVICE_REGISTER_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/devices/register"
 DEFAULT_MODEL = "openrouter/free"
 SYSTEM_PROMPT = (
     'You are J.A.R.V.I.S., a calm, polished personal AI butler with subtle dry wit. '
@@ -532,6 +534,46 @@ def filter_memory_history(history: list[dict]) -> list[dict]:
     return filtered
 
 
+def register_device(device_id: str, timeout: float = 12.0) -> str:
+    """Obtain a short-lived per-installation credential from the JARVIS backend."""
+    try:
+        normalized_id = str(uuid.UUID(device_id))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise ValueError("JARVIS installation identity is invalid.") from exc
+    payload = json.dumps({"device_id": normalized_id}).encode("utf-8")
+    request = urllib.request.Request(
+        DEVICE_REGISTER_ENDPOINT,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    try:
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=timeout) as response:
+            raw = response.read(4097)
+            if len(raw) > 4096:
+                raise RuntimeError("JARVIS registration response was unexpectedly large.")
+            body = json.loads(raw.decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise RuntimeError("JARVIS registration endpoint redirected; request blocked.") from exc
+        detail = exc.read(1024).decode("utf-8", errors="replace")
+        raise RuntimeError(f"JARVIS automatic registration failed (HTTP {exc.code}): {detail}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"JARVIS backend is not reachable: {exc.reason}") from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("JARVIS registration returned invalid JSON.") from exc
+
+    token = body.get("access_token") if isinstance(body, dict) else None
+    if not isinstance(token, str) or not token.startswith("jdt1.") or len(token) > 2048:
+        raise RuntimeError("JARVIS backend returned an invalid device credential.")
+    return token
+
+
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     history: list[dict], memories: list[str] | None = None) -> str:
     endpoint, model = validate_chat_configuration(endpoint, model)
@@ -606,6 +648,19 @@ class JarvisDesktop:
         self.root = root
         # Tk is retained only as a hidden event-loop/dialog host; the visible UI is the HTML HUD.
         self.settings = load_settings()
+        self.device_id = self.settings.get("device_id", "")
+        try:
+            self.device_id = str(uuid.UUID(self.device_id))
+        except (ValueError, TypeError, AttributeError):
+            self.device_id = str(uuid.uuid4())
+            self.settings["device_id"] = self.device_id
+            try:
+                save_settings(self.settings)
+            except OSError:
+                pass
+        self.device_auth_lock = threading.Lock()
+        self.device_auth_stop_event = threading.Event()
+        self.device_token = ""
         self.events: queue.Queue = queue.Queue()
         self.history: list[dict] = load_chat_history()
         self.last_file_search_results: list[str] = []
@@ -636,6 +691,8 @@ class JarvisDesktop:
         self.ai_api_key = self.api_key_var.get()
         self.picovoice_access_key = self.picovoice_var.get()
         self.root.after(350, self._poll_events)
+        # Register quietly in the background; failures retry when connectivity returns.
+        threading.Thread(target=self._device_auth_worker, daemon=True).start()
         # Offline speech models can be large; prepare them only when voice is enabled.
         # This keeps ordinary app startup fast and avoids an unexpected background download.
         self.root.after(1000, self._check_reminders)
@@ -931,11 +988,13 @@ class JarvisDesktop:
         if self.keyring:
             try:
                 self.api_key_var = tk.StringVar(value=self.keyring.get_password(KEYRING_SERVICE, "ai_api_key") or "")
+                self.device_token = self.keyring.get_password(KEYRING_SERVICE, "device_token") or ""
                 self.picovoice_var = tk.StringVar(value=self.keyring.get_password(KEYRING_SERVICE, "picovoice_access_key") or os.getenv("PICOVOICE_ACCESS_KEY", ""))
                 return
             except Exception:
                 pass
         self.api_key_var = tk.StringVar(value=os.getenv("JARVIS_AI_API_KEY", ""))
+        self.device_token = ""
         self.picovoice_var = tk.StringVar(value=os.getenv("PICOVOICE_ACCESS_KEY", ""))
 
     def _append(self, who: str, text: str, tag: str | None = None):
@@ -1335,6 +1394,36 @@ class JarvisDesktop:
             self.request_lock.release()
             raise
 
+    def _ensure_device_token(self, force: bool = False) -> str:
+        """Get or renew this installation's backend token without user interaction."""
+        if self.ai_api_key.strip():
+            return self.ai_api_key.strip()
+        endpoint = self.settings.get("endpoint", DEFAULT_ENDPOINT).strip()
+        if endpoint != DEFAULT_ENDPOINT:
+            raise ValueError("A custom AI endpoint requires its own API token in Settings.")
+        with self.device_auth_lock:
+            if self.device_token and not force:
+                return self.device_token
+            token = register_device(self.device_id)
+            self.device_token = token
+            if self.keyring:
+                try:
+                    self.keyring.set_password(KEYRING_SERVICE, "device_token", token)
+                except Exception:
+                    # Keep the credential in memory for this run if Credential Manager is unavailable.
+                    pass
+            return token
+
+    def _device_auth_worker(self):
+        delay = 5
+        while not self.device_auth_stop_event.is_set():
+            try:
+                self._ensure_device_token(force=True)
+                return
+            except Exception:
+                self.device_auth_stop_event.wait(delay)
+                delay = min(delay * 2, 300)
+
     def _get_online_reply(self, prompt: str) -> str:
         """Resolve online service commands first, then use the configured AI endpoint."""
         answer = handle_online_command(prompt)
@@ -1345,14 +1434,21 @@ class JarvisDesktop:
             if self.settings.get("share_memory_with_ai", False)
             else []
         )
-        return chat_completion(
-            self.settings.get("endpoint", DEFAULT_ENDPOINT),
-            self.settings.get("model", DEFAULT_MODEL),
-            self.ai_api_key,
-            prompt,
-            self.history,
-            memories,
-        )
+        endpoint = self.settings.get("endpoint", DEFAULT_ENDPOINT)
+        token = self._ensure_device_token() if endpoint.strip() == DEFAULT_ENDPOINT else self.ai_api_key
+        try:
+            return chat_completion(
+                endpoint, self.settings.get("model", DEFAULT_MODEL), token,
+                prompt, self.history, memories,
+            )
+        except RuntimeError as exc:
+            if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
+                raise
+            renewed = self._ensure_device_token(force=True)
+            return chat_completion(
+                endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
+                prompt, self.history, memories,
+            )
 
     def _answer_worker(self, prompt: str):
         try:
@@ -1656,7 +1752,7 @@ class JarvisDesktop:
         fields = [
             ("AI endpoint (HTTPS)", "endpoint", self.settings.get("endpoint", DEFAULT_ENDPOINT)),
             ("Model", "model", self.settings.get("model", DEFAULT_MODEL)),
-            ("JARVIS backend client token (not OpenRouter key)", "ai_key", self.api_key_var.get()),
+            ("Legacy backend token (optional; auto-connect if blank)", "ai_key", self.api_key_var.get()),
             ("Picovoice AccessKey", "picovoice_key", self.picovoice_var.get()),
         ]
         entries = {}
@@ -1983,6 +2079,7 @@ class JarvisDesktop:
         """Stop background listening and interrupt speech before destroying the UI."""
         self.stop_event.set()
         self.speech_stop_event.set()
+        self.device_auth_stop_event.set()
         if self.tray_icon is not None:
             try:
                 self.tray_icon.stop()
