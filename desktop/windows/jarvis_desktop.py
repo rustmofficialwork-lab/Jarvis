@@ -60,6 +60,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
             "language": data.get("language") if isinstance(data.get("language"), str) and data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
             "start_with_windows": data.get("start_with_windows") is True,
             "share_memory_with_ai": data.get("share_memory_with_ai") is True,
+            "microphone_setup_completed": data.get("microphone_setup_completed") is True,
         }
         # Keep the per-install ID optional for older settings files. The desktop
         # app creates and persists it during startup when it is missing.
@@ -711,6 +712,55 @@ class JarvisDesktop:
         # Defer network activity until the HUD has settled.
         self.root.after(30000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
+        # Ask once at first launch; Windows itself controls the actual microphone grant.
+        if not self.settings.get("microphone_setup_completed", False):
+            self.root.after(1800, self._first_launch_permission_setup)
+
+    def _first_launch_permission_setup(self):
+        if self.settings.get("microphone_setup_completed", False):
+            return
+        accepted = messagebox.askyesno(
+            "JARVIS microphone setup",
+            "JARVIS can use your microphone for voice commands and the “Jarvis” wake word.\\n\\n"
+            "The microphone is used only when you activate voice listening. "
+            "Windows may show its own permission prompt.\\n\\n"
+            "Allow JARVIS to check microphone access now?",
+            parent=self.root,
+        )
+        self.settings["microphone_setup_completed"] = True
+        try:
+            save_settings(self.settings)
+        except OSError:
+            pass
+        if accepted:
+            self._request_microphone_access()
+        else:
+            self._set_status("Microphone setup skipped. Chat and HUD remain available.")
+
+    def _request_microphone_access(self):
+        """Open and immediately release the default input device after user consent."""
+        self._set_status("Checking Windows microphone access…")
+
+        def worker():
+            try:
+                import speech_recognition as sr
+                with sr.Microphone():
+                    pass
+                self.events.put(("permission_result", {"ok": True}))
+            except Exception as exc:
+                self.events.put(("permission_result", {"ok": False, "error": str(exc)}))
+
+        threading.Thread(target=worker, name="JARVIS-microphone-check", daemon=True).start()
+
+    @staticmethod
+    def _open_microphone_privacy_settings():
+        if os.name == "nt":
+            try:
+                os.startfile("ms-settings:privacy-microphone")
+                return True
+            except OSError:
+                pass
+        return False
 
     # Legacy Tk dashboard widgets have been removed; the HTML HUD is the sole dashboard.
 
@@ -1840,7 +1890,8 @@ class JarvisDesktop:
 
         actions = tk.Frame(content, bg="#07111b")
         actions.grid(row=10, column=0, columnspan=2, sticky="ew", padx=14, pady=(4, 16))
-        ttk.Button(actions, text="Check for updates", command=self._check_for_updates).pack(side="left")
+        ttk.Button(actions, text="Check microphone access", command=self._request_microphone_access).pack(side="left")
+        ttk.Button(actions, text="Check for updates", command=self._check_for_updates).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Save settings", command=save).pack(side="right")
         content.grid_columnconfigure(1, weight=1)
 
@@ -2022,6 +2073,28 @@ class JarvisDesktop:
                         self._set_status("Update download failed.")
                 elif kind == "memory_clear_confirmation":
                     self._handle_memory_command(value, display_user=False)
+                elif kind == "permission_result":
+                    if value.get("ok"):
+                        self._set_status("Microphone access is available. Voice listening still starts only when you activate it.")
+                        messagebox.showinfo(
+                            "Microphone ready",
+                            "Windows allowed JARVIS to open the microphone. Voice listening is not running yet; activate it when you want.",
+                            parent=self.root,
+                        )
+                    else:
+                        self._set_status("Microphone access is unavailable; check Windows Privacy Settings.")
+                        open_settings = messagebox.askyesno(
+                            "Microphone access unavailable",
+                            "JARVIS could not open the microphone. Check Windows Settings → Privacy & security → Microphone, and enable microphone access for apps and desktop apps.\\n\\n"
+                            "Open Windows microphone settings now?",
+                            parent=self.root,
+                        )
+                        if open_settings and not self._open_microphone_privacy_settings():
+                            messagebox.showinfo(
+                                "Open microphone settings",
+                                "Open Start → Settings → Privacy & security → Microphone, then enable Microphone access and Let desktop apps access your microphone.",
+                                parent=self.root,
+                            )
                 elif kind == "status":
                     self._set_status(value)
                 elif kind == "voice_command":
