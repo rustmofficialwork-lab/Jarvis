@@ -2,11 +2,13 @@
 
 This repository currently contains the native Windows laptop edition of JARVIS. The Android edition is maintained separately. It provides a blue JARVIS-themed command dashboard, separate conversation window, text input, spoken replies, persistent local chat history, offline-first private personal memory, a small allowlist of safe Windows app/website commands, and optional always-listening wake-word detection through Picovoice Porcupine.
 
+JARVIS requests microphone access only after a first-launch consent prompt. If you allow the check, it briefly opens and releases the default input device so Windows can apply its microphone privacy controls; it does not start continuous listening. Voice listening starts only when you activate it. If Windows blocks access, JARVIS offers to open **Settings → Privacy & security → Microphone**. You can retry the check from JARVIS Settings. JARVIS does not require camera, location, contacts, or administrator permissions for its current features. Windows sign-in startup is optional and uses the current user's settings; it does not require elevation.
+
 ## Requirements
 
 - Windows 10/11, 64-bit
 - Python 3.11 (recommended)
-- Microphone and speakers/headphones
+- Microphone and speakers/headphones (microphone access is optional until you enable voice setup; Windows controls the permission)
 - Internet for online AI responses and the one-time download of offline speech models
 - A Picovoice AccessKey for the optional Porcupine wake-word engine
 - Internet access for automatic JARVIS backend enrollment and online AI replies
