@@ -429,6 +429,30 @@
             100% { background-position: 0 100%; }
         }
 
+
+        /* Layout collision fixes: keep the original HUD artwork and animations. */
+        .app-list {
+            right: 320px;
+            width: 150px;
+            z-index: 11;
+        }
+        .app-row {
+            width: 100%;
+            min-width: 0;
+        }
+        .app-row span {
+            white-space: nowrap;
+        }
+        /* Keep the three information cards clear of the right-side tools panel. */
+        .bottom-grid {
+            right: 340px;
+        }
+        /* This duplicate desktop shortcut row repeats the This PC / Recycle Bin
+           entries already present in the center navigation and covered the status card. */
+        .desktop-icons {
+            display: none;
+        }
+
     </style>
 </head>
 <body>
