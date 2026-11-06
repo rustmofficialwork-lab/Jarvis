@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -247,6 +248,59 @@ class ChatCompletionValidationTests(unittest.TestCase):
                 "hello",
                 [],
             )
+
+class ChatToolCallingTests(unittest.TestCase):
+    def test_calculator_tool_call_is_executed_and_returned_to_model(self):
+        first = {
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [{
+                        "id": "call_calc_1",
+                        "type": "function",
+                        "function": {
+                            "name": "calculator",
+                            "arguments": json.dumps({"expression": "6 * 7"}),
+                        },
+                    }],
+                },
+            }],
+        }
+        second = {"choices": [{"message": {"role": "assistant", "content": "42"}}]}
+
+        class FakeResponse:
+            def __init__(self, payload):
+                self.payload = json.dumps(payload).encode("utf-8")
+            def __enter__(self):
+                return self
+            def __exit__(self, *_args):
+                return False
+            def read(self, _size=-1):
+                return self.payload
+
+        class FakeOpener:
+            def __init__(self):
+                self.requests = []
+                self.responses = [first, second]
+            def open(self, request, timeout):
+                self.requests.append(json.loads(request.data.decode("utf-8")))
+                return FakeResponse(self.responses.pop(0))
+
+        opener = FakeOpener()
+        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=opener):
+            answer = jarvis_desktop.chat_completion(
+                "https://example.com/chat", "model", "test-key", "What is 6 times 7?", []
+            )
+
+        self.assertEqual(answer, "42")
+        self.assertEqual(len(opener.requests), 2)
+        self.assertIn("tools", opener.requests[0])
+        tool_message = opener.requests[1]["messages"][-1]
+        self.assertEqual(tool_message["role"], "tool")
+        self.assertEqual(tool_message["tool_call_id"], "call_calc_1")
+        self.assertEqual(tool_message["content"], "42")
+
 
 class TranscriptTests(unittest.TestCase):
     def test_append_keeps_transcript_when_chat_window_is_closed(self):
