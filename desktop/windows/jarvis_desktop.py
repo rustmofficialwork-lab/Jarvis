@@ -687,7 +687,10 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
             "content": message.get("content"),
             "tool_calls": tool_calls,
         })
+        seen_call_ids = set()
         for call in tool_calls:
+            if not isinstance(call, dict):
+                raise RuntimeError("The AI returned a malformed tool call.")
             try:
                 function = call["function"]
                 name = function["name"]
@@ -698,8 +701,9 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 output = f"Tool unavailable: {str(exc)[:240]}"
             call_id = call.get("id")
-            if not isinstance(call_id, str) or not call_id:
-                raise RuntimeError("The AI returned a tool call without an ID.")
+            if not isinstance(call_id, str) or not call_id or call_id in seen_call_ids:
+                raise RuntimeError("The AI returned a missing or duplicate tool-call ID.")
+            seen_call_ids.add(call_id)
             messages.append({
                 "role": "tool",
                 "tool_call_id": call_id,
