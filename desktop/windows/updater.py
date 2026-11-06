@@ -59,6 +59,22 @@ def _safe_github_url(value: str) -> str:
     return value
 
 
+def _is_allowed_redirect_url(value: str) -> bool:
+    """Accept only HTTPS redirects to approved GitHub asset hosts on the default port."""
+    try:
+        parsed = urlparse(value)
+        valid_port = parsed.port is None or parsed.port == 443
+    except ValueError:
+        return False
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname in ALLOWED_REDIRECT_HOSTS
+        and not parsed.username
+        and not parsed.password
+        and valid_port
+    )
+
+
 def _open(url: str, timeout: int, opener=None):
     request = urllib.request.Request(
         url,
@@ -69,8 +85,7 @@ def _open(url: str, timeout: int, opener=None):
 
     class SafeRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
-            parsed = urlparse(newurl)
-            if parsed.scheme != "https" or parsed.hostname not in ALLOWED_REDIRECT_HOSTS:
+            if not _is_allowed_redirect_url(newurl):
                 return None
             return super().redirect_request(req, fp, code, msg, headers, newurl)
 
