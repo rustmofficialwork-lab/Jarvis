@@ -1329,8 +1329,19 @@ class JarvisDesktop:
                 reply = self._execute_workflow(value)
             elif action == "automation_add":
                 workflow, interval = value
-                automation_id, next_run = self.advanced_store.add_automation(workflow, interval)
-                reply = f"Recurring {WORKFLOWS[workflow][0]} automation #{automation_id} saved. First run: {next_run.astimezone().strftime('%d %b %I:%M %p')}."
+                label = WORKFLOWS[workflow][0]
+                confirmed = messagebox.askyesno(
+                    "Confirm recurring JARVIS automation",
+                    f"Schedule {label} to run every {interval} minute(s)?\n\n"
+                    "JARVIS will automatically open the approved apps at each interval "
+                    "while this automation remains enabled.",
+                    parent=self.root,
+                )
+                if not confirmed:
+                    reply = "Recurring automation cancelled; nothing was scheduled."
+                else:
+                    automation_id, next_run = self.advanced_store.add_automation(workflow, interval)
+                    reply = f"Recurring {label} automation #{automation_id} saved. First run: {next_run.astimezone().strftime('%d %b %I:%M %p')}."
             elif action == "automation_list":
                 items = self.advanced_store.list_automations()
                 reply = ("No recurring automations configured." if not items else

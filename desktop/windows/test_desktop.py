@@ -10,6 +10,50 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class AdvancedAutomationConfirmationTests(unittest.TestCase):
+    def _make_app(self, store):
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.advanced_store = store
+        app.root = object()
+        app.history = []
+        app._append = lambda *args, **kwargs: None
+        app._set_status = lambda *args, **kwargs: None
+        return app
+
+    def test_recurring_automation_requires_confirmation_before_saving(self):
+        from datetime import datetime
+        from unittest.mock import Mock
+
+        store = Mock()
+        store.add_automation.return_value = (7, datetime(2026, 11, 7, 10, 30).astimezone())
+        app = self._make_app(store)
+
+        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=True) as confirm, \\
+             patch.object(jarvis_desktop, "save_chat_history"):
+            self.assertTrue(app._handle_advanced_command(
+                "repeat study workflow every 60 minutes"
+            ))
+
+        confirm.assert_called_once()
+        store.add_automation.assert_called_once_with("study", 60)
+        self.assertIn("automation #7 saved", app.history[-1]["content"])
+
+    def test_declined_recurring_automation_is_not_saved(self):
+        from unittest.mock import Mock
+
+        store = Mock()
+        app = self._make_app(store)
+
+        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=False) as confirm, \\
+             patch.object(jarvis_desktop, "save_chat_history"):
+            self.assertTrue(app._handle_advanced_command(
+                "schedule meeting setup every 30 minutes"
+            ))
+
+        confirm.assert_called_once()
+        store.add_automation.assert_not_called()
+        self.assertIn("cancelled", app.history[-1]["content"])
+
 class InterruptibleSpeechTests(unittest.TestCase):
     def test_speech_finishes_when_engine_becomes_idle(self):
         class FakeEngine:
