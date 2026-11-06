@@ -35,6 +35,32 @@ _BANK_ACCOUNT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_TOKEN_PATTERN = re.compile(r"[a-z0-9\u0900-\u097f]+", re.IGNORECASE)
+_MEMORY_STOP_WORDS = frozenset({
+    "a", "about", "above", "after", "again", "all", "am", "an", "and", "any",
+    "are", "as", "at", "be", "because", "been", "before", "being", "below",
+    "between", "both", "but", "by", "can", "could", "did", "do", "does", "for",
+    "from", "had", "has", "have", "he", "her", "here", "him", "his", "how",
+    "i", "if", "in", "into", "is", "it", "its", "just", "me", "more", "most",
+    "my", "no", "not", "of", "on", "or", "our", "out", "over", "please",
+    "same", "she", "should", "so", "some", "than", "that", "the", "their",
+    "them", "then", "there", "these", "they", "this", "those", "through",
+    "to", "too", "under", "up", "us", "very", "was", "we", "were", "what",
+    "when", "where", "which", "who", "why", "will", "with", "would", "you",
+    "your", "hai", "hain", "ho", "ka", "ki", "ko", "kya", "ke", "liye",
+    "mein", "mera", "meri", "mere", "mujhe", "mujh", "par", "se", "aur",
+    "kaise", "kab", "karo", "batao", "jarvis",
+})
+
+
+def _query_terms(query: str) -> list[str]:
+    """Extract a small set of meaningful English/Hinglish terms for local retrieval."""
+    return [
+        term for term in _TOKEN_PATTERN.findall(str(query).casefold())
+        if len(term) > 1 and term not in _MEMORY_STOP_WORDS
+    ][:12]
+
+
 
 def _has_luhn_valid_card_number(content: str) -> bool:
     """Detect labelled payment-card numbers without treating arbitrary digit strings as secrets."""
@@ -202,12 +228,37 @@ class MemoryStore:
             cursor = db.execute("DELETE FROM memories")
         return cursor.rowcount
 
-    def context(self, limit: int = 12, max_chars: int = 3000) -> list[str]:
-        """Return a small, newest-first memory slice for the local chat request."""
+    def context(
+        self, limit: int = 12, max_chars: int = 3000, query: str | None = None
+    ) -> list[str]:
+        """Return a bounded memory slice, ranked by relevance when a prompt is supplied."""
+        limit = max(1, min(int(limit), MAX_MEMORIES))
+        max_chars = max(1, min(int(max_chars), 10_000))
+        memories = self.list(MAX_MEMORIES)
+        terms = _query_terms(query) if query else []
+        if terms:
+            ranked = []
+            for item in memories:
+                content_terms = set(_TOKEN_PATTERN.findall(
+                    (item["content"] + " " + item["category"]).casefold()
+                ))
+                matched = content_terms.intersection(terms)
+                if not matched:
+                    continue
+                score = len(matched)
+                normalized_content = " ".join(item["content"].casefold().split())
+                normalized_query = " ".join(str(query).casefold().split())
+                if len(normalized_query) >= 4 and normalized_query in normalized_content:
+                    score += 3
+                ranked.append((score, item["updated_at"], item["id"], item["content"]))
+            ranked.sort(key=lambda entry: (entry[0], entry[1], entry[2]), reverse=True)
+            candidates = [entry[3] for entry in ranked[:limit]]
+        else:
+            candidates = [item["content"] for item in memories[:limit]]
+
         selected = []
         used = 0
-        for item in self.list(limit):
-            content = item["content"]
+        for content in candidates:
             if used + len(content) > max_chars:
                 continue
             selected.append(content)

@@ -1594,7 +1594,7 @@ class JarvisDesktop:
         if answer is not None:
             return answer
         memories = (
-            self.memory_store.context()
+            self.memory_store.context(query=prompt)
             if self.settings.get("share_memory_with_ai", False)
             else []
         )

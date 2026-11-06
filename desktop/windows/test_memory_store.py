@@ -68,6 +68,30 @@ class MemoryStoreTests(unittest.TestCase):
         reopened = MemoryStore(self.store.path)
         self.assertEqual(len(reopened.list()), 2)
 
+    def test_context_ranks_relevant_memories_for_current_prompt(self):
+        self.store.add("User prefers concise Hinglish replies", "preference")
+        self.store.add("User works on Windows desktop projects", "project")
+        self.store.add("User likes dark blue interface themes", "preference")
+
+        self.assertEqual(
+            self.store.context(query="Help with my Windows desktop project"),
+            ["User works on Windows desktop projects"],
+        )
+        self.assertEqual(
+            self.store.context(query="How should you reply in Hinglish"),
+            ["User prefers concise Hinglish replies"],
+        )
+
+    def test_context_with_no_matching_terms_does_not_leak_unrelated_memories(self):
+        self.store.add("User prefers Hindi replies")
+        self.store.add("User works on Windows")
+        self.assertEqual(self.store.context(query="What is quantum entanglement"), [])
+
+    def test_context_query_remains_bounded(self):
+        for index in range(20):
+            self.store.add(f"Windows project preference number {index}")
+        self.assertLessEqual(len(self.store.context(limit=3, query="Windows project")), 3)
+
     def test_clear_removes_all_memories(self):
         self.store.add("One")
         self.store.add("Two")
