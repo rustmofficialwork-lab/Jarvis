@@ -767,6 +767,27 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
     return final_content or "I stopped after the safe tool-use limit. Please ask me to continue."
 
 
+def build_document_history_entries(prompt: str, document: dict) -> list[dict]:
+    """Persist document metadata only; extracted contents stay out of future AI context."""
+    name = str(document.get("name", "selected document"))[:260]
+    try:
+        characters = max(0, int(document.get("characters", 0)))
+    except (TypeError, ValueError):
+        characters = 0
+    detail = f"Read locally: {name} ({characters:,} characters"
+    pages = document.get("pages")
+    if pages is not None:
+        try:
+            detail += f", {max(0, int(pages))} pages"
+        except (TypeError, ValueError):
+            pass
+    detail += "). Document contents were displayed locally and were not saved to chat history."
+    return [
+        {"role": "user", "content": str(prompt)[:12000]},
+        {"role": "assistant", "content": detail},
+    ]
+
+
 class JarvisDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -2145,8 +2166,9 @@ class JarvisDesktop:
                         + (f", {value['pages']} pages" if value.get("pages") is not None else "")
                         + ").\n\n" + excerpt
                     )
-                    self.history.extend([{"role": "user", "content": prompt},
-                                         {"role": "assistant", "content": reply}])
+                    # Chat history is sent with later online requests. Keep document
+                    # contents local by persisting metadata only, never the excerpt.
+                    self.history.extend(build_document_history_entries(prompt, value))
                     try:
                         save_chat_history(self.history)
                     except OSError as exc:

@@ -10,6 +10,29 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class DocumentHistoryPrivacyTests(unittest.TestCase):
+    def test_document_text_is_not_persisted_in_chat_history(self):
+        document = {
+            "name": "private-notes.txt",
+            "characters": 42,
+            "pages": None,
+            "text": "CONFIDENTIAL CONTENT THAT MUST STAY LOCAL",
+        }
+        entries = jarvis_desktop.build_document_history_entries("read document", document)
+        self.assertEqual(entries[0], {"role": "user", "content": "read document"})
+        self.assertEqual(entries[1]["role"], "assistant")
+        self.assertIn("private-notes.txt", entries[1]["content"])
+        self.assertIn("42 characters", entries[1]["content"])
+        self.assertNotIn(document["text"], json.dumps(entries))
+
+    def test_document_history_handles_invalid_metadata_types(self):
+        entries = jarvis_desktop.build_document_history_entries(
+            "read file", {"name": "x" * 400, "characters": "invalid", "pages": []}
+        )
+        self.assertLessEqual(len(entries[1]["content"]), 500)
+        self.assertIn("0 characters", entries[1]["content"])
+
+
 class AdvancedAutomationConfirmationTests(unittest.TestCase):
     def _make_app(self, store):
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
