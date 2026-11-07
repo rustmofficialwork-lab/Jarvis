@@ -1657,12 +1657,38 @@ class DashboardIsolationTests(unittest.TestCase):
 
         bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
         with patch.dict(sys.modules, {"psutil": FakePsutil()}):
-            result = bridge.get_dashboard()
+            result = bridge._collect_dashboard()
 
         self.assertEqual(result["cpu"], "27%")
         self.assertEqual(result["ram"], "4.0/8.0 GB")
         self.assertEqual(result["network"], "Connected")
         self.assertEqual(result["battery"], "Unavailable")
+
+    def test_dashboard_api_returns_without_waiting_for_slow_hardware_sensor(self):
+        import threading
+        import sys
+        from unittest.mock import patch
+
+        entered = threading.Event()
+        release = threading.Event()
+
+        class SlowPsutil:
+            def cpu_percent(self, interval=None):
+                entered.set()
+                release.wait(timeout=2)
+                return 19.0
+
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
+        with patch.dict(sys.modules, {"psutil": SlowPsutil()}):
+            result = bridge.get_dashboard()
+            self.assertEqual(result["status"], "Reading system sensors…")
+            self.assertTrue(entered.wait(timeout=1))
+            self.assertTrue(bridge._dashboard_worker.is_alive())
+            release.set()
+            bridge._dashboard_worker.join(timeout=2)
+
+        self.assertFalse(bridge._dashboard_worker.is_alive())
+        self.assertEqual(bridge._dashboard_cache["cpu"], "19%")
 
 
 
