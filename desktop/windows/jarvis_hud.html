@@ -173,11 +173,13 @@
             width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--dark-cyan);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
+        .cpu-widget { --cpu-usage: 0%; }
         .cpu-widget::before {
             content: ''; position: absolute; top: -3px; left: -3px; right: -3px; bottom: -3px;
-            border-radius: 50%; background: conic-gradient(var(--cyan) 0% 16%, transparent 16%);
+            border-radius: 50%; background: conic-gradient(var(--cyan) 0 var(--cpu-usage), transparent var(--cpu-usage) 100%);
             -webkit-mask: radial-gradient(transparent 68%, black 69%); mask: radial-gradient(transparent 68%, black 69%);
             filter: drop-shadow(0 0 5px var(--cyan));
+            transition: background 0.45s ease;
         }
         .cpu-widget h2 { color: #fff; font-size: 1.5rem; font-family: var(--font-head); z-index: 2; line-height: 1;}
         .cpu-widget p { color: var(--cyan); font-size: 0.55rem; z-index: 2;}
@@ -253,6 +255,10 @@
             content: ''; position: absolute; width: 90px; height: 90px; border-radius: 50%; top: -10px; left: -10px;
             border: 2px dotted var(--cyan); animation: spin 10s linear infinite;
         }
+        .orb-wrapper.is-listening .orb-core { filter: drop-shadow(0 0 18px var(--cyan)); animation: orb-pulse 1.4s ease-in-out infinite; }
+        .orb-wrapper.is-thinking .orb-core { animation: orb-pulse 0.7s ease-in-out infinite; }
+        .back-btn.is-listening { box-shadow: 0 0 14px var(--cyan), inset 0 0 10px rgba(0,229,255,.35); }
+        @keyframes orb-pulse { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.13); opacity: 1; } }
 
         /* App List */
         .app-list {
@@ -308,9 +314,9 @@
             border-left: 1px solid var(--dim-border); border-bottom: 1px solid var(--dim-border);
             display: flex; align-items: flex-end; gap: 2px; padding: 2px;
         }
-        .mtg-bar { width: 100%; background: var(--dark-cyan); height: 30%; }
-        .mtg-bar:nth-child(2n) { height: 60%; background: var(--cyan); }
-        .mtg-bar:nth-child(3n) { height: 90%; }
+        .mtg-bar { flex: 1 1 0; min-width: 2px; background: var(--dark-cyan); height: 0%; transition: height 0.45s ease; }
+        .mtg-bar:nth-child(2n) { background: var(--cyan); }
+        .mini-top-graph.is-unavailable .mtg-bar { opacity: 0.28; }
 
         .temp-widget { position: absolute; top: 25px; right: 30px; display: flex; align-items: flex-start; gap: 15px; text-align: right; z-index: 10;}
         .temp-text h4 { font-size: 0.85rem; color: var(--cyan); }
@@ -924,7 +930,7 @@
             }
             if (target.matches(".back-btn")) {
                 const api = bridge();
-                if (api && api.close_window) api.close_window();
+                if (api && api.toggle_voice) api.toggle_voice();
                 return;
             }
             if (target.matches(".app-row, .m-icon")) {
@@ -1011,7 +1017,13 @@
                 const batteryWidget = document.querySelector(".battery-widget h2");
                 if (batteryWidget && data.battery) batteryWidget.textContent = data.battery;
                 const cpu = document.querySelector(".cpu-widget h2");
+                const cpuWidget = document.querySelector(".cpu-widget");
+                const cpuValue = Number.parseFloat(data.cpu);
                 if (cpu && data.cpu) cpu.textContent = data.cpu;
+                if (cpuWidget && Number.isFinite(cpuValue)) {
+                    cpuWidget.style.setProperty("--cpu-usage", Math.max(0, Math.min(100, cpuValue)) + "%");
+                    cpuWidget.setAttribute("aria-label", "CPU usage " + Math.round(cpuValue) + " percent");
+                }
                 const storageRows = document.querySelectorAll(".storage-widget .storage-row span");
                 if (storageRows[0]) storageRows[0].lastChild.textContent = " Full Capacity: " + (data.disk_total || "N/A");
                 if (storageRows[1]) storageRows[1].lastChild.textContent = " Free Capacity: " + (data.disk_free || "N/A");
@@ -1023,17 +1035,59 @@
                 if (architecture) architecture.textContent = "System: " + (data.architecture || "N/A");
                 const temperature = document.querySelector(".temp-widget .temp-text p");
                 const temperatureCircle = document.querySelector(".temp-circle");
+                const tempGraph = document.querySelector(".mini-top-graph");
                 if (temperature) temperature.textContent = data.temperature || "N/A";
-                if (temperatureCircle) temperatureCircle.textContent = data.temperature_value != null ? data.temperature_value + "°" : "N/A";
+                if (temperatureCircle) temperatureCircle.textContent = data.temperature_value != null ? Math.round(data.temperature_value) + "°" : "N/A";
+                if (tempGraph) {
+                    const bars = [...tempGraph.querySelectorAll(".mtg-bar")];
+                    const hasTemperature = Number.isFinite(Number(data.temperature_value));
+                    const graphValue = hasTemperature ? Number(data.temperature_value) : cpuValue;
+                    tempGraph.classList.toggle("is-unavailable", !Number.isFinite(graphValue));
+                    tempGraph.title = hasTemperature ? "Live CPU temperature" : "CPU temperature sensor unavailable; showing CPU load";
+                    bars.forEach((bar, index) => {
+                        const wave = [0.62, 0.84, 0.48, 0.73, 0.92, 0.56];
+                        const value = Number.isFinite(graphValue) ? Math.max(3, Math.min(100, graphValue * wave[index % wave.length])) : 0;
+                        bar.style.height = value + "%";
+                    });
+                }
                 const status = document.querySelector(".jarvis-header h3");
                 if (status && data.status) status.title = data.status;
             } catch (error) {
                 console.warn("JARVIS dashboard refresh failed", error);
             }
         }
+        async function refreshRuntimeState() {
+            const api = bridge();
+            if (!api || !api.get_runtime_state) return;
+            try {
+                const state = await api.get_runtime_state();
+                const orb = document.querySelector(".orb-wrapper");
+                const arrow = document.querySelector(".back-btn");
+                const listening = Boolean(state.listening);
+                const busy = Boolean(state.busy);
+                if (orb) {
+                    orb.classList.toggle("is-listening", listening);
+                    orb.classList.toggle("is-thinking", busy);
+                    orb.title = listening ? "JARVIS microphone listener active" : busy ? "JARVIS is processing a request" : "Click to send a command";
+                }
+                if (arrow) {
+                    arrow.classList.toggle("is-listening", listening);
+                    arrow.title = listening ? "Stop JARVIS voice listening" : "Start JARVIS voice listening";
+                    arrow.setAttribute("aria-label", arrow.title);
+                }
+                document.querySelectorAll(".app-row").forEach((row) => {
+                    row.setAttribute("role", "link");
+                    row.setAttribute("tabindex", "0");
+                });
+            } catch (error) {
+                console.warn("JARVIS runtime state refresh failed", error);
+            }
+        }
         window.addEventListener("pywebviewready", () => {
             refreshDashboard();
-            window.setInterval(refreshDashboard, 15000);
+            refreshRuntimeState();
+            window.setInterval(refreshDashboard, 5000);
+            window.setInterval(refreshRuntimeState, 1000);
         });
     })();
     </script>
