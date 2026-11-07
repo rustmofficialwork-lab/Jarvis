@@ -91,6 +91,10 @@ class MemoryStoreTests(unittest.TestCase):
             self.store.context(query="मेरे विंडोज प्रोजेक्ट में मदद करो"),
             ["User works on Windows desktop projects"],
         )
+        self.assertEqual(
+            self.store.context(query="मेरा डेस्कटॉप कंप्यूटर प्रोजेक्ट"),
+            ["User works on Windows desktop projects"],
+        )
 
     def test_context_with_no_matching_terms_does_not_leak_unrelated_memories(self):
         self.store.add("User prefers Hindi replies")

@@ -59,12 +59,32 @@ _MEMORY_STOP_WORDS = frozenset({
 })
 
 
+_MEMORY_TERM_ALIASES = {
+    # Common Hindi spellings of English technical terms used in saved memories.
+    "विंडोज": "windows",
+    "विंडोज़": "windows",
+    "प्रोजेक्ट": "project",
+    "परियोजना": "project",
+    "डेस्कटॉप": "desktop",
+    "कंप्यूटर": "computer",
+    "कम्प्यूटर": "computer",
+    "फाइल": "file",
+    "फ़ाइल": "file",
+    "दस्तावेज": "document",
+    "दस्तावेज़": "document",
+}
+
+
 def _query_terms(query: str) -> list[str]:
-    """Extract a small set of meaningful English/Hinglish terms for local retrieval."""
-    return [
-        term for term in _TOKEN_PATTERN.findall(str(query).casefold())
-        if len(term) > 1 and term not in _MEMORY_STOP_WORDS
-    ][:12]
+    """Extract meaningful terms and normalize common Hindi technical vocabulary."""
+    terms = []
+    for term in _TOKEN_PATTERN.findall(str(query).casefold()):
+        if len(term) <= 1 or term in _MEMORY_STOP_WORDS:
+            continue
+        normalized = _MEMORY_TERM_ALIASES.get(term, term)
+        if normalized not in terms:
+            terms.append(normalized)
+    return terms[:12]
 
 
 
