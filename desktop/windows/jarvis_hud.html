@@ -951,7 +951,17 @@
             }
             if (target.matches(".hex-btn")) {
                 const index = [...target.parentElement.children].indexOf(target);
-                command(["system status", "find file", "open settings", "show reminders"][index] || "system status");
+                if (index === 1) {
+                    const query = window.prompt("Which file should JARVIS find?");
+                    if (query && query.trim()) command("find file " + query.trim());
+                } else if (index === 2) {
+                    const api = bridge();
+                    if (api && api.open_settings) api.open_settings();
+                } else if (index === 3) {
+                    command("show reminders");
+                } else {
+                    command("system status");
+                }
                 return;
             }
         });
@@ -960,6 +970,10 @@
                 event.preventDefault();
                 const prompt = window.prompt("Enter a JARVIS command");
                 if (prompt && prompt.trim()) command(prompt.trim());
+            }
+            if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "v") {
+                event.preventDefault();
+                const api = bridge(); if (api && api.toggle_voice) api.toggle_voice();
             }
             if (event.key === "Escape") {
                 const api = bridge(); if (api && api.stop_speech) api.stop_speech();
@@ -976,21 +990,41 @@
                     if (!value || !label) return;
                     const section = row.closest(".stat-box")?.querySelector("h4")?.textContent.trim().toLowerCase() || "";
                     const fields = {
-                        cpu: section.includes("system") ? data.cpuName : data.cpu,
+                        cpu: section.includes("system information") ? data.cpuName : data.cpu,
                         ram: data.ram,
                         os: data.os,
                         uptime: data.uptime,
+                        gpu: data.gpu,
+                        temp: data.temperature,
                         battery: data.battery,
+                        isp: data.isp,
                         ip: data.ip,
-                        disk: data.disk,
+                        download: data.download,
+                        upload: data.upload,
+                        disk: data.disk_percent,
                         network: data.network
                     };
-                    if (fields[label]) value.textContent = fields[label];
+                    if (Object.prototype.hasOwnProperty.call(fields, label)) {
+                        value.textContent = fields[label] ?? "N/A";
+                    }
                 });
                 const batteryWidget = document.querySelector(".battery-widget h2");
                 if (batteryWidget && data.battery) batteryWidget.textContent = data.battery;
                 const cpu = document.querySelector(".cpu-widget h2");
                 if (cpu && data.cpu) cpu.textContent = data.cpu;
+                const storageRows = document.querySelectorAll(".storage-widget .storage-row span");
+                if (storageRows[0]) storageRows[0].lastChild.textContent = " Full Capacity: " + (data.disk_total || "N/A");
+                if (storageRows[1]) storageRows[1].lastChild.textContent = " Free Capacity: " + (data.disk_free || "N/A");
+                const storageFill = document.querySelector(".storage-fill");
+                if (storageFill && Number.isFinite(data.disk_percent_value)) storageFill.style.width = data.disk_percent_value + "%";
+                const wireless = document.querySelector(".wifi-widget div:nth-child(2)");
+                if (wireless) wireless.textContent = data.network || "N/A";
+                const architecture = document.querySelector(".wifi-widget div:nth-child(3)");
+                if (architecture) architecture.textContent = "System: " + (data.architecture || "N/A");
+                const temperature = document.querySelector(".temp-widget .temp-text p");
+                const temperatureCircle = document.querySelector(".temp-circle");
+                if (temperature) temperature.textContent = data.temperature || "N/A";
+                if (temperatureCircle) temperatureCircle.textContent = data.temperature_value != null ? data.temperature_value + "°" : "N/A";
                 const status = document.querySelector(".jarvis-header h3");
                 if (status && data.status) status.title = data.status;
             } catch (error) {
