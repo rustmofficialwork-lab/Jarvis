@@ -2659,110 +2659,111 @@ class JarvisWebBridge:
         """Read hardware sensors; called only by the background dashboard worker."""
         import time
 
-            def safe_read(callback, fallback=None):
-                try:
-                    return callback()
-                except Exception:
-                    return fallback
+        now = time.monotonic()
 
-            result = {"status": "J.A.R.V.I.S. ONLINE"}
+        def safe_read(callback, fallback=None):
             try:
-                import platform
-                import psutil
-                import socket
+                return callback()
             except Exception:
-                result["status"] = "System readings unavailable"
-                self._dashboard_cache = dict(result)
-                self._dashboard_cache_at = now
-                return result
+                return fallback
 
-            cpu = safe_read(lambda: psutil.cpu_percent(interval=None))
-            memory = safe_read(psutil.virtual_memory)
-            disk = safe_read(lambda: psutil.disk_usage(str(Path.home().anchor or "/")))
-            battery = safe_read(psutil.sensors_battery, "unavailable")
-            interfaces = safe_read(psutil.net_if_stats)
-            addresses = safe_read(psutil.net_if_addrs, {})
-            counters = safe_read(lambda: psutil.net_io_counters())
-            network_connected = (
-                any(item.isup for name, item in interfaces.items()
-                    if name.casefold() not in {"lo", "loopback"})
-                if interfaces is not None else None
-            )
-            ip_address = safe_read(
-                lambda: next(
-                    (address.address for items in addresses.values()
-                     for address in items
-                     if address.family == socket.AF_INET
-                     and address.address != "127.0.0.1"),
-                    "Unavailable",
-                ),
-                "Unavailable",
-            )
-            download_rate = upload_rate = None
-            if counters is not None:
-                previous = getattr(self, "_network_sample", None)
-                if previous is not None:
-                    previous_at, previous_sent, previous_recv = previous
-                    elapsed = now - previous_at
-                    if elapsed > 0 and counters.bytes_sent >= previous_sent and counters.bytes_recv >= previous_recv:
-                        upload_rate = (counters.bytes_sent - previous_sent) * 8 / elapsed / 1_000_000
-                        download_rate = (counters.bytes_recv - previous_recv) * 8 / elapsed / 1_000_000
-                self._network_sample = (now, counters.bytes_sent, counters.bytes_recv)
-
-            disk_percent = safe_read(lambda: float(disk.percent)) if disk is not None else None
-            temperature_value = None
-            try:
-                from system_monitor import collect_system_metrics
-                temperature_value = collect_system_metrics()["cpu_temperature"]
-            except Exception:
-                pass
-            result.update({
-                "cpu": f"{cpu:.0f}%" if cpu is not None else "N/A",
-                "memory": f"{memory.percent:.0f}%" if memory is not None else "N/A",
-                "ram": (
-                    f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB"
-                    if memory is not None else "N/A"
-                ),
-                "disk": (
-                    f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB"
-                    if disk is not None else "N/A"
-                ),
-                "disk_percent": f"{disk_percent:.0f}%" if disk_percent is not None else "N/A",
-                "disk_percent_value": disk_percent,
-                "disk_total": f"{disk.total / (1024**3):.0f} GB" if disk is not None else "N/A",
-                "disk_free": f"{disk.free / (1024**3):.0f} GB" if disk is not None else "N/A",
-                "os": safe_read(lambda: f"{platform.system()} {platform.release()}", "Unavailable"),
-                "architecture": safe_read(platform.machine, "Unavailable"),
-                "cpuName": safe_read(
-                    lambda: platform.processor() or f"{os.cpu_count()} logical cores",
-                    "Unavailable",
-                ),
-                "uptime": safe_read(
-                    lambda: str(__import__("datetime").timedelta(
-                        seconds=int(time.time() - psutil.boot_time())
-                    )),
-                    "Unavailable",
-                ),
-                "battery": (
-                    "Unavailable" if battery == "unavailable" else
-                    f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC"
-                ),
-                "network": (
-                    "Unavailable" if network_connected is None else
-                    "Connected" if network_connected else "Offline"
-                ),
-                "ip": ip_address,
-                "isp": "N/A",
-                "download": f"{download_rate:.1f} Mbps" if download_rate is not None else "Measuring…",
-                "upload": f"{upload_rate:.1f} Mbps" if upload_rate is not None else "Measuring…",
-                "gpu": "N/A",
-                "temperature": f"CPU {temperature_value:.0f}°C" if temperature_value is not None else "N/A",
-                "temperature_value": float(temperature_value) if temperature_value is not None else None,
-            })
-            if cpu is None or memory is None or disk is None:
-                result["status"] = "Some system readings unavailable"
+        result = {"status": "J.A.R.V.I.S. ONLINE"}
+        try:
+            import platform
+            import psutil
+            import socket
+        except Exception:
+            result["status"] = "System readings unavailable"
             return result
-        def close_window(self):
+
+        cpu = safe_read(lambda: psutil.cpu_percent(interval=None))
+        memory = safe_read(psutil.virtual_memory)
+        disk = safe_read(lambda: psutil.disk_usage(str(Path.home().anchor or "/")))
+        battery = safe_read(psutil.sensors_battery, "unavailable")
+        interfaces = safe_read(psutil.net_if_stats)
+        addresses = safe_read(psutil.net_if_addrs, {})
+        counters = safe_read(lambda: psutil.net_io_counters())
+        network_connected = (
+            any(item.isup for name, item in interfaces.items()
+                if name.casefold() not in {"lo", "loopback"})
+            if interfaces is not None else None
+        )
+        ip_address = safe_read(
+            lambda: next(
+                (address.address for items in addresses.values()
+                 for address in items
+                 if address.family == socket.AF_INET
+                 and address.address != "127.0.0.1"),
+                "Unavailable",
+            ),
+            "Unavailable",
+        )
+        download_rate = upload_rate = None
+        if counters is not None:
+            previous = getattr(self, "_network_sample", None)
+            if previous is not None:
+                previous_at, previous_sent, previous_recv = previous
+                elapsed = now - previous_at
+                if elapsed > 0 and counters.bytes_sent >= previous_sent and counters.bytes_recv >= previous_recv:
+                    upload_rate = (counters.bytes_sent - previous_sent) * 8 / elapsed / 1_000_000
+                    download_rate = (counters.bytes_recv - previous_recv) * 8 / elapsed / 1_000_000
+            self._network_sample = (now, counters.bytes_sent, counters.bytes_recv)
+
+        disk_percent = safe_read(lambda: float(disk.percent)) if disk is not None else None
+        temperature_value = None
+        try:
+            from system_monitor import collect_system_metrics
+            temperature_value = collect_system_metrics()["cpu_temperature"]
+        except Exception:
+            pass
+        result.update({
+            "cpu": f"{cpu:.0f}%" if cpu is not None else "N/A",
+            "memory": f"{memory.percent:.0f}%" if memory is not None else "N/A",
+            "ram": (
+                f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB"
+                if memory is not None else "N/A"
+            ),
+            "disk": (
+                f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB"
+                if disk is not None else "N/A"
+            ),
+            "disk_percent": f"{disk_percent:.0f}%" if disk_percent is not None else "N/A",
+            "disk_percent_value": disk_percent,
+            "disk_total": f"{disk.total / (1024**3):.0f} GB" if disk is not None else "N/A",
+            "disk_free": f"{disk.free / (1024**3):.0f} GB" if disk is not None else "N/A",
+            "os": safe_read(lambda: f"{platform.system()} {platform.release()}", "Unavailable"),
+            "architecture": safe_read(platform.machine, "Unavailable"),
+            "cpuName": safe_read(
+                lambda: platform.processor() or f"{os.cpu_count()} logical cores",
+                "Unavailable",
+            ),
+            "uptime": safe_read(
+                lambda: str(__import__("datetime").timedelta(
+                    seconds=int(time.time() - psutil.boot_time())
+                )),
+                "Unavailable",
+            ),
+            "battery": (
+                "Unavailable" if battery == "unavailable" else
+                f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC"
+            ),
+            "network": (
+                "Unavailable" if network_connected is None else
+                "Connected" if network_connected else "Offline"
+            ),
+            "ip": ip_address,
+            "isp": "N/A",
+            "download": f"{download_rate:.1f} Mbps" if download_rate is not None else "Measuring…",
+            "upload": f"{upload_rate:.1f} Mbps" if upload_rate is not None else "Measuring…",
+            "gpu": "N/A",
+            "temperature": f"CPU {temperature_value:.0f}°C" if temperature_value is not None else "N/A",
+            "temperature_value": float(temperature_value) if temperature_value is not None else None,
+        })
+        if cpu is None or memory is None or disk is None:
+            result["status"] = "Some system readings unavailable"
+        return result
+
+    def close_window(self):
         try:
             if self.window is not None:
                 self.window.destroy()
