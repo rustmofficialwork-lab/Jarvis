@@ -62,6 +62,29 @@ class OfflineSpeechTests(unittest.TestCase):
         audio.get_raw_data.assert_called_once_with(convert_rate=16000, convert_width=2)
         self.assertEqual(fake_vosk.KaldiRecognizer.call_args.args[1], 16000)
 
+    def test_transcription_reuses_loaded_model_for_repeated_fallbacks(self):
+        class FakeRecognizer:
+            def __init__(self, _model, _rate):
+                pass
+            def AcceptWaveform(self, _raw):
+                pass
+            def FinalResult(self):
+                return json.dumps({"text": "hello jarvis"})
+
+        fake_vosk = Mock()
+        fake_vosk.KaldiRecognizer.side_effect = FakeRecognizer
+        fake_vosk.Model.return_value = object()
+        audio = Mock()
+        audio.get_raw_data.return_value = b"pcm"
+        with tempfile.TemporaryDirectory() as temp:
+            model_path_for_language("hi-IN", Path(temp)).mkdir()
+            first = transcribe_offline_vosk(audio, "hi-IN", Path(temp), fake_vosk)
+            second = transcribe_offline_vosk(audio, "hi-IN", Path(temp), fake_vosk)
+        self.assertEqual(first, "hello jarvis")
+        self.assertEqual(second, "hello jarvis")
+        fake_vosk.Model.assert_called_once()
+        self.assertEqual(fake_vosk.KaldiRecognizer.call_count, 2)
+
     def test_installer_extracts_model_to_requested_directory(self):
         with tempfile.TemporaryDirectory() as temp:
             archive_bytes = io.BytesIO()

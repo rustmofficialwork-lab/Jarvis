@@ -6,6 +6,7 @@ import os
 import shutil
 import stat
 import tempfile
+import threading
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -53,6 +54,25 @@ class OfflineModelUnavailable(RuntimeError):
     """Raised when the selected offline speech model has not been installed."""
 
 
+_VOSK_MODEL_CACHE_LOCK = threading.Lock()
+_VOSK_MODEL_CACHE = None
+
+
+def _get_cached_vosk_model(model_path: Path, vosk_module):
+    """Reuse one loaded local model so fallback transcription avoids repeated disk loads."""
+    global _VOSK_MODEL_CACHE
+    cache_key = str(model_path.resolve())
+    with _VOSK_MODEL_CACHE_LOCK:
+        if (_VOSK_MODEL_CACHE is not None
+                and _VOSK_MODEL_CACHE[0] == cache_key
+                and _VOSK_MODEL_CACHE[1] is vosk_module):
+            return _VOSK_MODEL_CACHE[2]
+        model = vosk_module.Model(str(model_path))
+        # Keep only one language model resident to bound JARVIS memory usage.
+        _VOSK_MODEL_CACHE = (cache_key, vosk_module, model)
+        return model
+
+
 def model_path_for_language(language: str, model_dir: Path = DEFAULT_MODEL_DIR) -> Path:
     try:
         model_name, _url = MODEL_CATALOG[language]
@@ -75,7 +95,7 @@ def transcribe_offline_vosk(audio, language: str, model_dir: Path = DEFAULT_MODE
         except ImportError as exc:
             raise OfflineModelUnavailable("Install the Vosk speech package to enable offline voice.") from exc
     raw_audio = audio.get_raw_data(convert_rate=16000, convert_width=2)
-    model = vosk_module.Model(str(model_path))
+    model = _get_cached_vosk_model(model_path, vosk_module)
     recognizer = vosk_module.KaldiRecognizer(model, 16000)
     recognizer.AcceptWaveform(raw_audio)
     result = json.loads(recognizer.FinalResult())
