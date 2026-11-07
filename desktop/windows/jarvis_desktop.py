@@ -2534,12 +2534,6 @@ class JarvisWebBridge:
             return False
         return self._dispatch(app.toggle_listening)
 
-    def open_settings(self):
-        app = self.app_state.get("app")
-        if app is None:
-            return False
-        return self._dispatch(app.open_settings)
-
     def stop_speech(self):
         app = self.app_state.get("app")
         if app is not None:
