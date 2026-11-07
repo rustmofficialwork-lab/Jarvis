@@ -1708,6 +1708,33 @@ class DeviceTokenCacheTests(unittest.TestCase):
 
         register.assert_called_once_with(app.device_id)
 
+    def test_chat_renews_device_token_once_after_authentication_failure(self):
+        import threading
+        import time
+
+        cached = self._token(int(time.time()) + 3600)
+        renewed = self._token(int(time.time()) + 7200)
+        app = self._make_app(cached)
+        app.history = []
+        app.memory_store = None
+
+        with (
+            patch.object(jarvis_desktop, "handle_online_command", return_value=None),
+            patch.object(
+                jarvis_desktop,
+                "chat_completion",
+                side_effect=[RuntimeError("AI endpoint returned HTTP 401"), "Recovered"],
+            ) as completion,
+            patch.object(jarvis_desktop, "register_device", return_value=renewed) as register,
+        ):
+            result = app._get_online_reply("hello")
+
+        self.assertEqual(result, "Recovered")
+        register.assert_called_once_with(app.device_id)
+        self.assertEqual(completion.call_count, 2)
+        self.assertEqual(completion.call_args.args[2], renewed)
+        self.assertEqual(app.device_token, renewed)
+
     def test_malformed_and_near_expiry_tokens_are_not_reused(self):
         self.assertFalse(jarvis_desktop.device_token_is_usable("not-a-token", now=1000))
         self.assertFalse(jarvis_desktop.device_token_is_usable("jdt1.é.signature", now=1000))
