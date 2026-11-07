@@ -54,6 +54,37 @@ class AdvancedAutomationConfirmationTests(unittest.TestCase):
         store.add_automation.assert_not_called()
         self.assertIn("cancelled", app.history[-1]["content"])
 
+class AdvancedAutomationDeletionConfirmationTests(unittest.TestCase):
+    def _make_app(self, store):
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.advanced_store = store
+        app.root = object()
+        app.history = []
+        app._append = lambda *args, **kwargs: None
+        app._set_status = lambda *args, **kwargs: None
+        return app
+
+    def test_deleting_recurring_automation_requires_confirmation(self):
+        from unittest.mock import Mock
+        store = Mock()
+        store.delete_automation.return_value = True
+        app = self._make_app(store)
+        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=True) as confirm, patch.object(jarvis_desktop, "save_chat_history"):
+            self.assertTrue(app._handle_advanced_command("delete automation 12"))
+        confirm.assert_called_once()
+        store.delete_automation.assert_called_once_with(12)
+        self.assertIn("Automation deleted", app.history[-1]["content"])
+
+    def test_declined_automation_deletion_preserves_schedule(self):
+        from unittest.mock import Mock
+        store = Mock()
+        app = self._make_app(store)
+        with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=False) as confirm, patch.object(jarvis_desktop, "save_chat_history"):
+            self.assertTrue(app._handle_advanced_command("remove automation 12"))
+        confirm.assert_called_once()
+        store.delete_automation.assert_not_called()
+        self.assertIn("cancelled", app.history[-1]["content"])
+
 class InterruptibleSpeechTests(unittest.TestCase):
     def test_speech_finishes_when_engine_becomes_idle(self):
         class FakeEngine:

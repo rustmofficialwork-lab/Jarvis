@@ -1349,7 +1349,16 @@ class JarvisDesktop:
                              f"#{item['id']} — {WORKFLOWS[item['workflow']][0]} every {item['interval_minutes']} min"
                              for item in items))
             elif action == "automation_delete":
-                reply = "Automation deleted." if self.advanced_store.delete_automation(value) else "Automation ID nahi mila."
+                confirmed = messagebox.askyesno(
+                    "Confirm recurring automation removal",
+                    f"Delete recurring automation #{value}?\\n\\n"
+                    "This will stop its future scheduled runs. This cannot be undone.",
+                    parent=self.root,
+                )
+                if not confirmed:
+                    reply = f"Deletion of automation #{value} cancelled; it remains scheduled."
+                else:
+                    reply = "Automation deleted." if self.advanced_store.delete_automation(value) else "Automation ID nahi mila."
             else:
                 return False
         except (ValueError, OSError, RuntimeError) as exc:
