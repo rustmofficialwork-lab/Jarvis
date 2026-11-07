@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ _TEMP_DB.close()
 os.environ["DATABASE_PATH"] = _TEMP_DB.name
 os.environ["JARVIS_CLIENT_TOKEN"] = "test-token-that-is-long-enough-123456"
 os.environ["OPENROUTER_API_KEY"] = "test-upstream-key"
+os.environ["JARVIS_DEVICE_TOKEN_SECRET"] = "test-device-token-secret-that-is-long-enough-123"
 
 from app.main import UPSTREAM_URL, app  # noqa: E402
 
@@ -75,6 +77,73 @@ class BackendApiTests(unittest.TestCase):
             with self.subTest(headers=headers):
                 response = self.client.post("/v1/chat/completions", headers=headers, json=payload)
                 self.assertEqual(response.status_code, 401)
+
+    def test_device_registration_issues_signed_short_lived_token(self) -> None:
+        device_id = str(uuid.uuid4())
+        response = self.client.post("/v1/devices/register", json={"device_id": device_id})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers.get("cache-control"), "no-store")
+        body = response.json()
+        self.assertEqual(body["token_type"], "Bearer")
+        self.assertEqual(body["expires_in"], 30 * 24 * 60 * 60)
+        self.assertGreater(body["expires_at"], 0)
+        token = body["access_token"]
+        self.assertTrue(token.startswith("jdt1."))
+        self.assertEqual(len(token.split(".")), 3)
+
+    def test_device_registration_rejects_invalid_installation_ids(self) -> None:
+        for device_id in ("", "not-a-uuid", str(uuid.uuid4()).upper(), 123, None):
+            with self.subTest(device_id=device_id):
+                response = self.client.post(
+                    "/v1/devices/register", json={"device_id": device_id}
+                )
+                self.assertEqual(response.status_code, 422, response.text)
+
+    def test_registered_device_token_authenticates_chat_request(self) -> None:
+        device_id = str(uuid.uuid4())
+        registration = self.client.post(
+            "/v1/devices/register", json={"device_id": device_id}
+        )
+        self.assertEqual(registration.status_code, 200, registration.text)
+        token = registration.json()["access_token"]
+        _FakeAsyncClient.status_code = 200
+        _FakeAsyncClient.response_body = (
+            b'{"choices":[{"message":{"role":"assistant","content":"Device authenticated"}}]}'
+        )
+        with patch("app.main.httpx.AsyncClient", _FakeAsyncClient):
+            response = self.client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "model": "openrouter/free",
+                    "messages": [{"role": "user", "content": "Hello"}],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(
+            response.json()["choices"][0]["message"]["content"],
+            "Device authenticated",
+        )
+
+    def test_tampered_device_token_is_rejected(self) -> None:
+        device_id = str(uuid.uuid4())
+        registration = self.client.post(
+            "/v1/devices/register", json={"device_id": device_id}
+        )
+        self.assertEqual(registration.status_code, 200, registration.text)
+        token = registration.json()["access_token"]
+        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+        response = self.client.post(
+            "/v1/chat/completions",
+            headers={"Authorization": f"Bearer {tampered}"},
+            json={
+                "model": "openrouter/free",
+                "messages": [{"role": "user", "content": "Hello"}],
+            },
+        )
+        self.assertEqual(response.status_code, 401)
 
     def test_shared_memory_api_is_not_exposed(self) -> None:
         response = self.client.get("/v1/memory", headers=self.headers)
