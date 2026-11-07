@@ -1680,6 +1680,7 @@ class DeviceTokenCacheTests(unittest.TestCase):
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.ai_api_key = ""
+        app.device_id = "test-device-id"
         app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT}
         app.device_token = token
         app.device_auth_lock = threading.Lock()
