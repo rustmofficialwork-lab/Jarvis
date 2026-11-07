@@ -1795,7 +1795,8 @@ class HudRuntimeStateTests(unittest.TestCase):
 
         class FakeApp:
             def __init__(self):
-                self.wake_thread = threading.Thread(target=lambda: None)
+                self.release_listener = threading.Event()
+                self.wake_thread = threading.Thread(target=self.release_listener.wait)
                 self.wake_thread.start()
                 self.stop_event = threading.Event()
                 self.busy = True
@@ -1811,6 +1812,7 @@ class HudRuntimeStateTests(unittest.TestCase):
                 {"listening": False, "busy": True},
             )
         finally:
+            app.release_listener.set()
             app.wake_thread.join(timeout=1)
 
     def test_runtime_state_is_safe_when_desktop_app_is_not_ready(self):
