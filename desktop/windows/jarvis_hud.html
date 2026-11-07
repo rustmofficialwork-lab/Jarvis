@@ -972,6 +972,12 @@
             }
         });
         document.addEventListener("keydown", (event) => {
+            if ((event.key === "Enter" || event.key === " ") && event.target.matches(".app-row")) {
+                event.preventDefault();
+                const name = event.target.textContent.trim().toLowerCase().split(/\\s+/)[0];
+                openApp(name);
+                return;
+            }
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
                 event.preventDefault();
                 const prompt = window.prompt("Enter a JARVIS command");
