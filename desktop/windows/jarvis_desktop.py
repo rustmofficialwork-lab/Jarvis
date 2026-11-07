@@ -2647,6 +2647,7 @@ class JarvisWebBridge:
                         download_rate = (counters.bytes_recv - previous_recv) * 8 / elapsed / 1_000_000
                 self._network_sample = (now, counters.bytes_sent, counters.bytes_recv)
 
+            disk_percent = safe_read(lambda: float(disk.percent)) if disk is not None else None
             temperature_value = None
             try:
                 from system_monitor import collect_system_metrics
@@ -2664,8 +2665,8 @@ class JarvisWebBridge:
                     f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB"
                     if disk is not None else "N/A"
                 ),
-                "disk_percent": f"{disk.percent:.0f}%" if disk is not None else "N/A",
-                "disk_percent_value": float(disk.percent) if disk is not None else None,
+                "disk_percent": f"{disk_percent:.0f}%" if disk_percent is not None else "N/A",
+                "disk_percent_value": disk_percent,
                 "disk_total": f"{disk.total / (1024**3):.0f} GB" if disk is not None else "N/A",
                 "disk_free": f"{disk.free / (1024**3):.0f} GB" if disk is not None else "N/A",
                 "os": safe_read(lambda: f"{platform.system()} {platform.release()}", "Unavailable"),
