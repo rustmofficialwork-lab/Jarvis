@@ -872,6 +872,7 @@ class ServiceStatusTests(unittest.TestCase):
     def test_managed_backend_is_ready_after_automatic_device_registration(self):
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.ai_api_key = ""
+        app.device_id = "test-device-id"
         app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT}
         app.device_token = "jdt1.test-device-token"
         app.picovoice_access_key = ""
@@ -1702,7 +1703,7 @@ class DeviceTokenCacheTests(unittest.TestCase):
         with patch.object(jarvis_desktop, "register_device", return_value=renewed) as register:
             self.assertEqual(app._ensure_device_token(), renewed)
 
-        register.assert_called_once_with(app.device_id) if hasattr(app, "device_id") else register.assert_called_once()
+        register.assert_called_once_with(app.device_id)
 
     def test_malformed_and_near_expiry_tokens_are_not_reused(self):
         self.assertFalse(jarvis_desktop.device_token_is_usable("not-a-token", now=1000))
