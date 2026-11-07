@@ -167,7 +167,7 @@ def normalize_local_command(command: str) -> str:
     normalized = " ".join(str(command).casefold().split())
     normalized = normalized.strip(" \t\r\n,;:.!?।॥")
     # Speech recognizers often include the wake word and conversational courtesy words.
-    prefix = re.compile(r"^(?:(?:hey\s+)?jarvis|please|zara|can you|could you)\b")
+    prefix = re.compile(r"^(?:(?:hey\s+)?jarvis|(?:हे|अरे)\s+जार्विस|जार्विस|please|कृपया|zara|जरा|can you|could you)(?=\s|$)")
     while prefix.match(normalized):
         normalized = prefix.sub("", normalized, count=1).strip(" \t\r\n,;:.!?।॥")
     suffix = re.compile(r"(?:please|now|zara)$")
