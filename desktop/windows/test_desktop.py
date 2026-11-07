@@ -1663,3 +1663,47 @@ class DashboardIsolationTests(unittest.TestCase):
         self.assertEqual(result["network"], "Connected")
         self.assertEqual(result["battery"], "Unavailable")
 
+
+
+class DeviceTokenCacheTests(unittest.TestCase):
+    @staticmethod
+    def _token(expires_at):
+        import base64
+
+        payload = json.dumps({"sub": "test-device", "exp": expires_at}).encode("utf-8")
+        encoded = base64.urlsafe_b64encode(payload).rstrip(b"=").decode("ascii")
+        return f"jdt1.{encoded}.test-signature"
+
+    def _make_app(self, token):
+        import threading
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.ai_api_key = ""
+        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT}
+        app.device_token = token
+        app.device_auth_lock = threading.Lock()
+        app.keyring = None
+        return app
+
+    def test_cached_device_token_is_reused_until_near_expiry(self):
+        token = self._token(5000)
+        self.assertTrue(jarvis_desktop.device_token_is_usable(token, now=1000))
+        app = self._make_app(token)
+
+        with patch.object(jarvis_desktop, "register_device") as register:
+            self.assertEqual(app._ensure_device_token(), token)
+
+        register.assert_not_called()
+
+    def test_expired_device_token_is_automatically_renewed(self):
+        app = self._make_app(self._token(1000))
+        renewed = self._token(9000)
+
+        with patch.object(jarvis_desktop, "register_device", return_value=renewed) as register:
+            self.assertEqual(app._ensure_device_token(), renewed)
+
+        register.assert_called_once_with(app.device_id) if hasattr(app, "device_id") else register.assert_called_once()
+
+    def test_malformed_and_near_expiry_tokens_are_not_reused(self):
+        self.assertFalse(jarvis_desktop.device_token_is_usable("not-a-token", now=1000))
+        self.assertFalse(jarvis_desktop.device_token_is_usable(self._token(1200), now=1000))
