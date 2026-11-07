@@ -1786,3 +1786,36 @@ class DeviceTokenCacheTests(unittest.TestCase):
         self.assertFalse(jarvis_desktop.device_token_is_usable("not-a-token", now=1000))
         self.assertFalse(jarvis_desktop.device_token_is_usable("jdt1.é.signature", now=1000))
         self.assertFalse(jarvis_desktop.device_token_is_usable(self._token(1200), now=1000))
+
+
+
+class HudRuntimeStateTests(unittest.TestCase):
+    def test_runtime_state_reports_listener_and_busy_flags(self):
+        import threading
+
+        class FakeApp:
+            def __init__(self):
+                self.wake_thread = threading.Thread(target=lambda: None)
+                self.wake_thread.start()
+                self.stop_event = threading.Event()
+                self.busy = True
+
+        app = FakeApp()
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": app})
+        try:
+            state = bridge.get_runtime_state()
+            self.assertEqual(state, {"listening": True, "busy": True})
+            app.stop_event.set()
+            self.assertEqual(
+                bridge.get_runtime_state(),
+                {"listening": False, "busy": True},
+            )
+        finally:
+            app.wake_thread.join(timeout=1)
+
+    def test_runtime_state_is_safe_when_desktop_app_is_not_ready(self):
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
+        self.assertEqual(
+            bridge.get_runtime_state(),
+            {"listening": False, "busy": False},
+        )
