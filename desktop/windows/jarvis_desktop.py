@@ -2575,6 +2575,22 @@ class JarvisWebBridge:
         app = self.app_state.get("app")
         return bool(app and app.wake_thread and app.wake_thread.is_alive())
 
+    def get_runtime_state(self):
+        """Expose lightweight, read-only runtime flags to animate the HUD."""
+        app = self.app_state.get("app")
+        if app is None:
+            return {"listening": False, "busy": False}
+        wake_thread = getattr(app, "wake_thread", None)
+        stop_event = getattr(app, "stop_event", None)
+        listening = bool(
+            wake_thread and wake_thread.is_alive()
+            and stop_event is not None and not stop_event.is_set()
+        )
+        return {
+            "listening": listening,
+            "busy": bool(getattr(app, "busy", False)),
+        }
+
     def open_folder(self, folder):
         allowed = {"Documents", "Downloads", "Pictures", "Music", "Videos", "This PC", "Network", "Recycle Bin"}
         folder = str(folder or "")
