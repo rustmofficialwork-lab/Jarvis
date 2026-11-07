@@ -602,7 +602,7 @@ def device_token_is_usable(token: str, now: int | None = None) -> bool:
             return False
         current = int(time.time()) if now is None else int(now)
         return expires_at > current + 300
-    except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError):
+    except (ValueError, TypeError, UnicodeError, json.JSONDecodeError):
         return False
 
 
