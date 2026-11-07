@@ -1688,7 +1688,9 @@ class DeviceTokenCacheTests(unittest.TestCase):
         return app
 
     def test_cached_device_token_is_reused_until_near_expiry(self):
-        token = self._token(5000)
+        import time
+
+        token = self._token(int(time.time()) + 3600)
         self.assertTrue(jarvis_desktop.device_token_is_usable(token, now=1000))
         app = self._make_app(token)
 
