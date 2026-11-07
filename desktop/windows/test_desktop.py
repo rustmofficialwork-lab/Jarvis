@@ -72,6 +72,7 @@ class AdvancedAutomationDeletionConfirmationTests(unittest.TestCase):
         with patch.object(jarvis_desktop.messagebox, "askyesno", return_value=True) as confirm, patch.object(jarvis_desktop, "save_chat_history"):
             self.assertTrue(app._handle_advanced_command("delete automation 12"))
         confirm.assert_called_once()
+        self.assertIn("\n\n", confirm.call_args.args[1])
         store.delete_automation.assert_called_once_with(12)
         self.assertIn("Automation deleted", app.history[-1]["content"])
 

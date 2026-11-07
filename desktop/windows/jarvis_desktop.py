@@ -1351,7 +1351,7 @@ class JarvisDesktop:
             elif action == "automation_delete":
                 confirmed = messagebox.askyesno(
                     "Confirm recurring automation removal",
-                    f"Delete recurring automation #{value}?\\n\\n"
+                    f"Delete recurring automation #{value}?\n\n"
                     "This will stop its future scheduled runs. This cannot be undone.",
                     parent=self.root,
                 )
