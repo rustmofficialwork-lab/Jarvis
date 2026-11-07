@@ -1707,4 +1707,5 @@ class DeviceTokenCacheTests(unittest.TestCase):
 
     def test_malformed_and_near_expiry_tokens_are_not_reused(self):
         self.assertFalse(jarvis_desktop.device_token_is_usable("not-a-token", now=1000))
+        self.assertFalse(jarvis_desktop.device_token_is_usable("jdt1.é.signature", now=1000))
         self.assertFalse(jarvis_desktop.device_token_is_usable(self._token(1200), now=1000))
