@@ -65,6 +65,14 @@ class ReminderStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_all(self) -> list[dict]:
+        """Return every saved reminder for startup repair and uninstall cleanup."""
+        with _connection(self.path) as db:
+            rows = db.execute(
+                "SELECT * FROM reminders ORDER BY julianday(due_at), id"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def due(self, now: datetime | None = None) -> list[dict]:
         now = (now or datetime.now().astimezone()).astimezone().isoformat(timespec="seconds")
         with _connection(self.path) as db:

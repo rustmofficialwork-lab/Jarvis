@@ -79,6 +79,13 @@ class ReminderStoreTests(unittest.TestCase):
             [],
         )
 
+    def test_list_all_returns_reminders_beyond_default_page(self):
+        due = datetime.now(timezone.utc) + timedelta(days=1)
+        for index in range(125):
+            self.store.add(f"reminder {index}", due + timedelta(seconds=index))
+        self.assertEqual(len(self.store.list()), 100)
+        self.assertEqual(len(self.store.list_all()), 125)
+
     def test_delete_reminder(self):
         item = self.store.add("test", datetime.now(timezone.utc) + timedelta(minutes=1))
         self.assertTrue(self.store.delete(item["id"]))

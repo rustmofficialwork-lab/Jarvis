@@ -25,6 +25,9 @@ class FakeStore:
         return due
 
     def list(self):
+        return self.items[:100]
+
+    def list_all(self):
         return self.items
 
     def release_claims(self, reminder_ids):
@@ -171,6 +174,39 @@ class ReminderSchedulerTests(unittest.TestCase):
         self.assertEqual(count, 2)
         self.assertEqual(errors, [])
         self.assertEqual(removed, [7, 8])
+
+    def test_uninstall_cleanup_removes_more_than_default_list_limit(self):
+        items = [{**self.item, "id": index} for index in range(1, 126)]
+        store = FakeStore(items)
+        removed = []
+        import reminder_scheduler
+        original = reminder_scheduler.unregister_reminder_task
+        reminder_scheduler.unregister_reminder_task = (
+            lambda reminder_id, **kwargs: removed.append(reminder_id) or True
+        )
+        try:
+            count, errors = remove_all_reminder_tasks(store, platform_name="nt")
+        finally:
+            reminder_scheduler.unregister_reminder_task = original
+        self.assertEqual(count, 125)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(removed), 125)
+
+    def test_startup_sync_repairs_more_than_default_list_limit(self):
+        items = [{**self.item, "id": index, "notified": 0} for index in range(1, 126)]
+        store = FakeStore(items)
+        calls = []
+
+        def runner(command, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        created, errors = sync_pending_reminder_tasks(
+            store, platform_name="nt", runner=runner, frozen=True, now=self.now
+        )
+        self.assertEqual(created, 125)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(calls), 125)
 
     def test_startup_sync_repairs_only_pending_reminders(self):
         items = [self.item, {**self.item, "id": 8, "notified": 1}]

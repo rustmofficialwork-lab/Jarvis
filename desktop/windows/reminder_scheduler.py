@@ -115,6 +115,12 @@ def notify_due_reminders(store=None, notifier=None, platform_name=None) -> int:
     return len(due_items)
 
 
+def _list_all_reminders(store) -> list[dict]:
+    """Prefer the unbounded store API; retain compatibility with simple test doubles."""
+    list_all = getattr(store, "list_all", None)
+    return list_all() if callable(list_all) else store.list()
+
+
 def sync_pending_reminder_tasks(store=None, **kwargs) -> tuple[int, list[str]]:
     """Repair missing one-shot tasks on app startup without failing app launch."""
     if store is None:
@@ -122,7 +128,7 @@ def sync_pending_reminder_tasks(store=None, **kwargs) -> tuple[int, list[str]]:
         store = ReminderStore()
     created = 0
     errors = []
-    for item in store.list():
+    for item in _list_all_reminders(store):
         if item.get("notified"):
             continue
         try:
