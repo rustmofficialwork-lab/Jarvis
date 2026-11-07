@@ -59,7 +59,7 @@ Type or say `find file budget`, `look for file budget`, `file dhundo notes`, `fi
 
 ## Read local documents offline
 
-Type `read file` (or `document kholo`) in the JARVIS command bar and choose a file. JARVIS extracts text locally from PDF, Word DOCX, TXT, Markdown, CSV, JSON, common code and other text files. The selected document is not uploaded. After reading, you can ask JARVIS to summarize or explain it; that separate AI request uses your configured online AI service and sends the relevant conversation text. PDF extraction supports selectable text, not scanned-image OCR. Reads are limited to 15 MB, 100 PDF pages, and 40,000 extracted characters; the chat preview is capped at 12,000 characters.
+Type `read file` (or `document kholo`) in the JARVIS command bar and choose a file. JARVIS extracts text locally from PDF, Word DOCX, TXT, Markdown, CSV, JSON, common code and other text files. The selected document is not uploaded. For AI help, type `summarize document` or `ask document what is the invoice date` (also `document se pucho invoice date kya hai`) and select the file. JARVIS explains the destination and asks permission before sending extracted text to your configured online AI service. If you decline, the file stays local. Document text and AI answers are not persisted in chat history. PDF extraction supports selectable text, not scanned-image OCR. Reads are limited to 15 MB, 100 PDF pages, and 40,000 extracted characters; the chat preview is capped at 12,000 characters.
 
 ## Updates
 
