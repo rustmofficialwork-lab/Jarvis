@@ -4,11 +4,13 @@ Keys are stored in Windows Credential Manager via keyring, never in the settings
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import queue
 import sys
 import threading
+import time
 import uuid
 import urllib.error
 import urllib.request
@@ -579,6 +581,29 @@ def filter_memory_history(history: list[dict]) -> list[dict]:
             skip_reply = False
         filtered.append(item)
     return filtered
+
+
+def device_token_is_usable(token: str, now: int | None = None) -> bool:
+    """Check the cached device token's expiry before deciding to register again.
+
+    The backend remains responsible for signature verification. This local check only
+    avoids needless registrations and refreshes tokens shortly before expiry.
+    """
+    if not isinstance(token, str) or len(token) > 4096:
+        return False
+    try:
+        prefix, payload_part, signature = token.split(".", 2)
+        if prefix != "jdt1" or not payload_part or not signature:
+            return False
+        padded = payload_part + "=" * (-len(payload_part) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        expires_at = payload.get("exp") if isinstance(payload, dict) else None
+        if isinstance(expires_at, bool) or not isinstance(expires_at, int):
+            return False
+        current = int(time.time()) if now is None else int(now)
+        return expires_at > current + 300
+    except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
 
 
 def register_device(device_id: str, timeout: float = 12.0) -> str:
@@ -1725,7 +1750,7 @@ class JarvisDesktop:
         if endpoint != DEFAULT_ENDPOINT:
             raise ValueError("A custom AI endpoint requires its own API token in Settings.")
         with self.device_auth_lock:
-            if self.device_token and not force:
+            if self.device_token and not force and device_token_is_usable(self.device_token):
                 return self.device_token
             token = register_device(self.device_id)
             self.device_token = token
@@ -1741,7 +1766,7 @@ class JarvisDesktop:
         delay = 5
         while not self.device_auth_stop_event.is_set():
             try:
-                self._ensure_device_token(force=True)
+                self._ensure_device_token()
                 return
             except Exception:
                 self.device_auth_stop_event.wait(delay)
