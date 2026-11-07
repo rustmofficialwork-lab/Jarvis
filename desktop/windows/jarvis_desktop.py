@@ -1910,6 +1910,16 @@ class JarvisDesktop:
                 return
             if self._handle_memory_command(prompt, from_voice=True):
                 return
+            normalized_document_command = " ".join(
+                str(prompt).casefold().strip().rstrip(" .!?।॥").split()
+            )
+            if parse_document_ai_command(prompt) is not None or normalized_document_command in {
+                "read file", "open file", "read document", "open document",
+                "document kholo", "file kholo", "pdf kholo",
+            }:
+                # The picker is a Tk UI operation; let the main-thread event loop open it.
+                self.events.put(("document_voice_request", prompt))
+                return
             from file_search import parse_file_search_query, parse_open_result_index
             if parse_open_result_index(prompt) is not None:
                 self.events.put(("open_file_request", prompt))
@@ -2227,6 +2237,8 @@ class JarvisDesktop:
                     self._try_file_search_command(value)
                 elif kind == "open_file_request":
                     self._try_open_file_result_command(value)
+                elif kind == "document_voice_request":
+                    self._try_document_command(value)
                 elif kind == "file_search_result":
                     prompt = value["prompt"]
                     paths = value["results"]

@@ -254,6 +254,26 @@ class InterruptibleSpeechTests(unittest.TestCase):
         local.assert_not_called()
         app.request_lock.release()
 
+    def test_voice_document_command_is_dispatched_to_main_thread_picker(self):
+        import queue
+        import threading
+        from unittest.mock import patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        app.history = []
+        app.request_lock = threading.Lock()
+        app.speech_stop_event = threading.Event()
+        with (
+            patch.object(app, "_handle_voice_reminder_command", return_value=False),
+            patch.object(app, "_handle_memory_command", return_value=False),
+        ):
+            app._answer_voice("summarize document")
+
+        self.assertEqual(app.events.get_nowait(), ("voice_command", "summarize document"))
+        self.assertEqual(app.events.get_nowait(), ("document_voice_request", "summarize document"))
+        self.assertFalse(app.request_lock.locked())
+
     def test_voice_reply_uses_interruptible_speech(self):
         from unittest.mock import patch
         import queue
