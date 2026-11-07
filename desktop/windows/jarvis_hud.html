@@ -985,6 +985,7 @@
                 const api = bridge(); if (api && api.stop_speech) api.stop_speech();
             }
         });
+        const metricHistory = [];
         async function refreshDashboard() {
             const api = bridge();
             if (!api || !api.get_dashboard) return;
@@ -1040,13 +1041,19 @@
                 if (temperatureCircle) temperatureCircle.textContent = data.temperature_value != null ? Math.round(data.temperature_value) + "°" : "N/A";
                 if (tempGraph) {
                     const bars = [...tempGraph.querySelectorAll(".mtg-bar")];
-                    const hasTemperature = Number.isFinite(Number(data.temperature_value));
+                    const hasTemperature = data.temperature_value != null && Number.isFinite(Number(data.temperature_value));
                     const graphValue = hasTemperature ? Number(data.temperature_value) : cpuValue;
                     tempGraph.classList.toggle("is-unavailable", !Number.isFinite(graphValue));
-                    tempGraph.title = hasTemperature ? "Live CPU temperature" : "CPU temperature sensor unavailable; showing CPU load";
+                    tempGraph.title = hasTemperature ? "Recent CPU temperature readings" : "CPU temperature sensor unavailable; showing recent CPU load";
+                    if (Number.isFinite(graphValue)) {
+                        metricHistory.push({ value: graphValue, temperature: hasTemperature });
+                        if (metricHistory.length > bars.length) metricHistory.shift();
+                    }
                     bars.forEach((bar, index) => {
-                        const wave = [0.62, 0.84, 0.48, 0.73, 0.92, 0.56];
-                        const value = Number.isFinite(graphValue) ? Math.max(3, Math.min(100, graphValue * wave[index % wave.length])) : 0;
+                        const sample = metricHistory[index];
+                        const value = sample
+                            ? Math.max(2, Math.min(100, sample.value * (sample.temperature ? 1 : 1)))
+                            : 0;
                         bar.style.height = value + "%";
                     });
                 }
