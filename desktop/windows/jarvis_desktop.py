@@ -2534,6 +2534,12 @@ class JarvisWebBridge:
             return False
         return self._dispatch(app.toggle_listening)
 
+    def open_settings(self):
+        app = self.app_state.get("app")
+        if app is None:
+            return False
+        return self._dispatch(app.open_settings)
+
     def stop_speech(self):
         app = self.app_state.get("app")
         if app is not None:
@@ -2620,6 +2626,7 @@ class JarvisWebBridge:
             battery = safe_read(psutil.sensors_battery, "unavailable")
             interfaces = safe_read(psutil.net_if_stats)
             addresses = safe_read(psutil.net_if_addrs, {})
+            counters = safe_read(psutil.net_io_counters)
             network_connected = (
                 any(item.isup for name, item in interfaces.items()
                     if name.casefold() not in {"lo", "loopback"})
@@ -2635,6 +2642,23 @@ class JarvisWebBridge:
                 ),
                 "Unavailable",
             )
+            download_rate = upload_rate = None
+            if counters is not None:
+                previous = getattr(self, "_network_sample", None)
+                if previous is not None:
+                    previous_at, previous_sent, previous_recv = previous
+                    elapsed = now - previous_at
+                    if elapsed > 0 and counters.bytes_sent >= previous_sent and counters.bytes_recv >= previous_recv:
+                        upload_rate = (counters.bytes_sent - previous_sent) * 8 / elapsed / 1_000_000
+                        download_rate = (counters.bytes_recv - previous_recv) * 8 / elapsed / 1_000_000
+                self._network_sample = (now, counters.bytes_sent, counters.bytes_recv)
+
+            temperature_value = None
+            try:
+                from system_monitor import collect_system_metrics
+                temperature_value = collect_system_metrics()["cpu_temperature"]
+            except Exception:
+                pass
             result.update({
                 "cpu": f"{cpu:.0f}%" if cpu is not None else "N/A",
                 "memory": f"{memory.percent:.0f}%" if memory is not None else "N/A",
@@ -2646,7 +2670,12 @@ class JarvisWebBridge:
                     f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB"
                     if disk is not None else "N/A"
                 ),
+                "disk_percent": f"{disk.percent:.0f}%" if disk is not None else "N/A",
+                "disk_percent_value": float(disk.percent) if disk is not None else None,
+                "disk_total": f"{disk.total / (1024**3):.0f} GB" if disk is not None else "N/A",
+                "disk_free": f"{disk.free / (1024**3):.0f} GB" if disk is not None else "N/A",
                 "os": safe_read(lambda: f"{platform.system()} {platform.release()}", "Unavailable"),
+                "architecture": safe_read(platform.machine, "Unavailable"),
                 "cpuName": safe_read(
                     lambda: platform.processor() or f"{os.cpu_count()} logical cores",
                     "Unavailable",
@@ -2666,6 +2695,12 @@ class JarvisWebBridge:
                     "Connected" if network_connected else "Offline"
                 ),
                 "ip": ip_address,
+                "isp": "N/A",
+                "download": f"{download_rate:.1f} Mbps" if download_rate is not None else "Measuring…",
+                "upload": f"{upload_rate:.1f} Mbps" if upload_rate is not None else "Measuring…",
+                "gpu": "N/A",
+                "temperature": f"CPU {temperature_value:.0f}°C" if temperature_value is not None else "N/A",
+                "temperature_value": float(temperature_value) if temperature_value is not None else None,
             })
             if cpu is None or memory is None or disk is None:
                 result["status"] = "Some system readings unavailable"
