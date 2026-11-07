@@ -222,10 +222,7 @@
         /* Center Orb */
         .orb-wrapper { position: absolute; top: 120px; left: 570px; width: 350px; height: 350px; display: flex; justify-content: center; align-items: center; z-index: 5;}
         
-        .orb-outer-ring {
-            position: absolute; width: 100%; height: 100%; border-radius: 50%;
-            border: 2px dotted rgba(0, 229, 255, 0.4); animation: spin 40s linear infinite;
-        }
+        .orb-outer-ring { display: none; }
         .orb-mid-ring {
             position: absolute; width: 88%; height: 88%; border-radius: 50%;
             border: 8px solid #021a28; box-shadow: inset 0 0 20px rgba(0, 229, 255, 0.2), 0 0 30px rgba(0,0,0,0.8);
@@ -251,10 +248,7 @@
             background: radial-gradient(circle, #fff 10%, var(--bright-cyan) 40%, var(--cyan) 70%, transparent 100%);
             position: relative;
         }
-        .orb-core::after {
-            content: ''; position: absolute; width: 90px; height: 90px; border-radius: 50%; top: -10px; left: -10px;
-            border: 2px dotted var(--cyan); animation: spin 10s linear infinite;
-        }
+        .orb-core::after { content: none; }
         .orb-wrapper.is-listening .orb-core { filter: drop-shadow(0 0 18px var(--cyan)); animation: orb-pulse 1.4s ease-in-out infinite; }
         .orb-wrapper.is-thinking .orb-core { animation: orb-pulse 0.7s ease-in-out infinite; }
         .back-btn.is-listening { box-shadow: 0 0 14px var(--cyan), inset 0 0 10px rgba(0,229,255,.35); }
@@ -588,26 +582,7 @@
             
             <div class="hex-bg"></div>
 
-            <!-- Complex Connecting Lines Overlay -->
-            <svg class="bg-lines" viewBox="0 0 1400 800">
-                <path d="M 260 150 L 380 150 L 430 200 L 500 200" />
-                <path d="M 260 350 L 380 350 L 430 300 L 500 300" />
-                <path d="M 260 550 L 380 550 L 430 480 L 500 480" />
-                <path d="M 260 650 L 380 650 L 430 600 L 500 600" />
-                <circle cx="380" cy="150" r="3" />
-                <circle cx="380" cy="350" r="3" />
-                <circle cx="380" cy="550" r="3" />
-                <circle cx="380" cy="650" r="3" />
-                <path d="M 430 400 L 500 400" class="thin-line" />
-
-                <path d="M 900 200 L 1050 200 L 1100 150 L 1200 150" />
-                <path d="M 900 300 L 1050 300 L 1100 280 L 1200 280" />
-                <circle cx="1050" cy="200" r="3" />
-                <circle cx="1050" cy="300" r="3" />
-                
-                <path d="M 745 470 L 745 530 L 800 530" />
-                <circle cx="745" cy="530" r="3" />
-            </svg>
+            <!-- Connecting line overlay removed for a cleaner HUD -->
 
             <!-- ================= LEFT PANEL ================= -->
             <div class="date-widget">
