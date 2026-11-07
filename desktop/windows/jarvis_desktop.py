@@ -2535,6 +2535,8 @@ class JarvisWebBridge:
         self._dashboard_cache = None
         self._dashboard_cache_at = 0.0
         self._dashboard_lock = threading.Lock()
+        self._dashboard_refreshing = False
+        self._dashboard_worker = None
 
     def _dispatch(self, callback):
         root, app = self.app_state.get("root"), self.app_state.get("app")
@@ -2615,12 +2617,47 @@ class JarvisWebBridge:
         return True
 
     def get_dashboard(self):
-        """Return cached hardware readings; one unavailable sensor must not hide other metrics."""
-        import time
+        """Return immediately with cached data while hardware reads refresh off-thread."""
         now = time.monotonic()
         with self._dashboard_lock:
-            if self._dashboard_cache is not None and now - self._dashboard_cache_at < 12:
-                return dict(self._dashboard_cache)
+            cached = self._dashboard_cache
+            if cached is not None and now - self._dashboard_cache_at < 12:
+                return dict(cached)
+            if not self._dashboard_refreshing:
+                self._dashboard_refreshing = True
+                worker = threading.Thread(
+                    target=self._refresh_dashboard,
+                    name="JARVIS-dashboard-sensors",
+                    daemon=True,
+                )
+                self._dashboard_worker = worker
+                worker.start()
+            # Never make the WebView/UI wait for WMI, disk, network, or sensor APIs.
+            return dict(cached) if cached is not None else {
+                "status": "Reading system sensors…",
+                "cpu": "N/A", "memory": "N/A", "ram": "N/A",
+                "disk": "N/A", "disk_percent": "N/A", "disk_percent_value": None,
+                "disk_total": "N/A", "disk_free": "N/A", "os": "N/A",
+                "architecture": "N/A", "cpuName": "N/A", "uptime": "N/A",
+                "battery": "N/A", "network": "N/A", "ip": "N/A", "isp": "N/A",
+                "download": "Measuring…", "upload": "Measuring…",
+                "gpu": "N/A", "temperature": "N/A", "temperature_value": None,
+            }
+
+    def _refresh_dashboard(self):
+        """Collect slow hardware readings on a daemon worker and publish a snapshot."""
+        try:
+            result = self._collect_dashboard()
+        except Exception:
+            result = {"status": "System readings temporarily unavailable"}
+        with self._dashboard_lock:
+            self._dashboard_cache = dict(result)
+            self._dashboard_cache_at = time.monotonic()
+            self._dashboard_refreshing = False
+
+    def _collect_dashboard(self):
+        """Read hardware sensors; called only by the background dashboard worker."""
+        import time
 
             def safe_read(callback, fallback=None):
                 try:
@@ -2724,11 +2761,8 @@ class JarvisWebBridge:
             })
             if cpu is None or memory is None or disk is None:
                 result["status"] = "Some system readings unavailable"
-            self._dashboard_cache = dict(result)
-            self._dashboard_cache_at = now
             return result
-
-    def close_window(self):
+        def close_window(self):
         try:
             if self.window is not None:
                 self.window.destroy()
