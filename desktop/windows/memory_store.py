@@ -50,6 +50,12 @@ _MEMORY_STOP_WORDS = frozenset({
     "your", "hai", "hain", "ho", "ka", "ki", "ko", "kya", "ke", "liye",
     "mein", "mera", "meri", "mere", "mujhe", "mujh", "par", "se", "aur",
     "kaise", "kab", "karo", "batao", "jarvis",
+    # Common Devanagari Hindi stop words for multilingual memory retrieval.
+    "और", "का", "की", "के", "को", "से", "में", "पर", "है", "हैं",
+    "था", "थी", "थे", "यह", "वह", "ये", "वे", "इस", "उस", "एक",
+    "मेरा", "मेरी", "मेरे", "मुझे", "आप", "आपका", "अपनी", "अपने",
+    "क्या", "कैसे", "कब", "कहाँ", "क्यों", "बताओ", "करो", "करना",
+    "मदद", "चाहिए", "लिए", "भी", "तो", "ही", "नहीं", "अब", "तक",
 })
 
 

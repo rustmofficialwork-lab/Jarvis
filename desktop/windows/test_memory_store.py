@@ -82,6 +82,16 @@ class MemoryStoreTests(unittest.TestCase):
             ["User prefers concise Hinglish replies"],
         )
 
+    def test_context_ranks_memories_for_devanagari_hindi_queries(self):
+        self.store.add("User works on Windows desktop projects", "project")
+        self.store.add("User prefers concise Hinglish replies", "preference")
+        self.store.add("User likes dark blue interface themes", "preference")
+
+        self.assertEqual(
+            self.store.context(query="मेरे विंडोज प्रोजेक्ट में मदद करो"),
+            ["User works on Windows desktop projects"],
+        )
+
     def test_context_with_no_matching_terms_does_not_leak_unrelated_memories(self):
         self.store.add("User prefers Hindi replies")
         self.store.add("User works on Windows")
