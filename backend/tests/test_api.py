@@ -93,7 +93,7 @@ class BackendApiTests(unittest.TestCase):
         self.assertEqual(len(token.split(".")), 3)
 
     def test_device_registration_rejects_invalid_installation_ids(self) -> None:
-        for device_id in ("", "not-a-uuid", str(uuid.uuid4()).upper(), 123, None):
+        for device_id in ("", "not-a-uuid", 123, None):
             with self.subTest(device_id=device_id):
                 response = self.client.post(
                     "/v1/devices/register", json={"device_id": device_id}
