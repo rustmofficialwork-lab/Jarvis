@@ -1709,7 +1709,6 @@ class DeviceTokenCacheTests(unittest.TestCase):
         register.assert_called_once_with(app.device_id)
 
     def test_chat_renews_device_token_once_after_authentication_failure(self):
-        import threading
         import time
 
         cached = self._token(int(time.time()) + 3600)
