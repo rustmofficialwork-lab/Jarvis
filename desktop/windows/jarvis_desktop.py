@@ -1619,7 +1619,7 @@ class JarvisDesktop:
             self._set_status("Windows could not open the selected file.")
         return True
 
-    def _try_document_command(self, prompt: str) -> bool:
+    def _try_document_command(self, prompt: str, from_voice: bool = False) -> bool:
         """Open a user-selected local document and extract it on a worker thread."""
         normalized = " ".join(prompt.casefold().strip().rstrip(" .!?।॥").split())
         commands = {"read file", "open file", "read document", "open document",
@@ -1649,7 +1649,8 @@ class JarvisDesktop:
             self._set_status("JARVIS is busy; try reading the document again shortly.")
             return True
         self.busy = True
-        self._append("YOU", prompt)
+        if not from_voice:
+            self._append("YOU", prompt)
         self._set_status("Reading document locally…")
         try:
             threading.Thread(
@@ -2238,7 +2239,7 @@ class JarvisDesktop:
                 elif kind == "open_file_request":
                     self._try_open_file_result_command(value)
                 elif kind == "document_voice_request":
-                    self._try_document_command(value)
+                    self._try_document_command(value, from_voice=True)
                 elif kind == "file_search_result":
                     prompt = value["prompt"]
                     paths = value["results"]

@@ -274,6 +274,26 @@ class InterruptibleSpeechTests(unittest.TestCase):
         self.assertEqual(app.events.get_nowait(), ("document_voice_request", "summarize document"))
         self.assertFalse(app.request_lock.locked())
 
+    def test_voice_document_picker_does_not_duplicate_voice_transcript(self):
+        import queue
+        import threading
+        from unittest.mock import patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.root = object()
+        app.request_lock = threading.Lock()
+        app.busy = False
+        app._append = patcher = __import__("unittest").mock.Mock()
+        app._set_status = __import__("unittest").mock.Mock()
+        with (
+            patch("tkinter.filedialog.askopenfilename", return_value="notes.txt"),
+            patch("threading.Thread") as worker,
+        ):
+            self.assertTrue(app._try_document_command("summarize document", from_voice=True))
+            app._append.assert_not_called()
+            worker.return_value.start.assert_called_once()
+        app.request_lock.release()
+
     def test_voice_reply_uses_interruptible_speech(self):
         from unittest.mock import patch
         import queue
