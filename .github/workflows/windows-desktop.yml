@@ -132,6 +132,14 @@ jobs:
           }
           $lines | Out-File -FilePath SHA256SUMS.txt -Encoding ascii
 
+      - name: Point rolling release tag at this build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh api --method PATCH "repos/$env:GITHUB_REPOSITORY/git/refs/tags/jarvis-latest" -f sha="$env:GITHUB_SHA" -F force=true
+
       - name: Publish latest Windows downloads
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v3
