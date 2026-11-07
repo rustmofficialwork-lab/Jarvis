@@ -147,7 +147,7 @@ def remove_all_reminder_tasks(store=None, platform_name=None) -> tuple[int, list
         store = ReminderStore()
     removed = 0
     errors = []
-    for item in store.list():
+    for item in _list_all_reminders(store):
         try:
             if unregister_reminder_task(item["id"], platform_name=platform_name):
                 removed += 1
