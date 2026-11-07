@@ -2620,7 +2620,7 @@ class JarvisWebBridge:
             battery = safe_read(psutil.sensors_battery, "unavailable")
             interfaces = safe_read(psutil.net_if_stats)
             addresses = safe_read(psutil.net_if_addrs, {})
-            counters = safe_read(psutil.net_io_counters)
+            counters = safe_read(lambda: psutil.net_io_counters())
             network_connected = (
                 any(item.isup for name, item in interfaces.items()
                     if name.casefold() not in {"lo", "loopback"})
