@@ -1678,6 +1678,28 @@ class DashboardIsolationTests(unittest.TestCase):
                 release.wait(timeout=2)
                 return 19.0
 
+            def virtual_memory(self):
+                return SimpleNamespace(percent=35.0, used=3 * 1024**3, total=8 * 1024**3)
+
+            def disk_usage(self, path):
+                return SimpleNamespace(percent=20.0, free=80 * 1024**3, total=100 * 1024**3)
+
+            def sensors_battery(self):
+                return None
+
+            def net_if_stats(self):
+                return {"Ethernet": SimpleNamespace(isup=True)}
+
+            def net_if_addrs(self):
+                return {}
+
+            def net_io_counters(self):
+                return SimpleNamespace(bytes_sent=100, bytes_recv=200)
+
+            def boot_time(self):
+                return 1000
+
+        from types import SimpleNamespace
         bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
         with patch.dict(sys.modules, {"psutil": SlowPsutil()}):
             result = bridge.get_dashboard()
