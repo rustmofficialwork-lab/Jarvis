@@ -2017,5 +2017,47 @@ class SettingsDurabilityTests(unittest.TestCase):
         self.assertFalse(path.with_suffix(".json.tmp").exists())
 
 
+class HudKnownFolderNavigationTests(unittest.TestCase):
+    def test_hud_uses_windows_shell_aliases_for_known_folders(self):
+        expected = {
+            "Documents": "shell:Personal",
+            "Downloads": "shell:Downloads",
+            "Pictures": "shell:MyPictures",
+            "Music": "shell:MyMusic",
+            "Videos": "shell:MyVideo",
+            "This PC": "shell:MyComputerFolder",
+            "Network": "shell:NetworkPlacesFolder",
+            "Recycle Bin": "shell:RecycleBinFolder",
+        }
+        for folder, shell_target in expected.items():
+            with self.subTest(folder=folder):
+                calls = []
+                opened = jarvis_desktop.JarvisDesktop.__new__(
+                    jarvis_desktop.JarvisDesktop
+                )._open_hud_folder(
+                    folder,
+                    platform_name="nt",
+                    popen=lambda args, **kwargs: calls.append((args, kwargs)),
+                )
+                self.assertTrue(opened)
+                self.assertEqual(
+                    calls,
+                    [(["explorer.exe", shell_target], {"shell": False})],
+                )
+
+    def test_hud_refuses_unknown_folders_and_non_windows_platforms(self):
+        calls = []
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        self.assertFalse(app._open_hud_folder(
+            "C:/", platform_name="nt",
+            popen=lambda *args, **kwargs: calls.append((args, kwargs)),
+        ))
+        self.assertFalse(app._open_hud_folder(
+            "Downloads", platform_name="posix",
+            popen=lambda *args, **kwargs: calls.append((args, kwargs)),
+        ))
+        self.assertEqual(calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()
