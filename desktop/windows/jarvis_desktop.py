@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
+import logging.handlers
 import os
 import queue
 import sys
@@ -41,9 +43,35 @@ KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 HISTORY_FILE = SETTINGS_DIR / "chat_history.json"
+STARTUP_LOG_FILE = SETTINGS_DIR / "startup.log"
 DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
 DEVICE_REGISTER_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/devices/register"
 DEFAULT_MODEL = "openrouter/free"
+
+
+def configure_startup_logging(log_path: Path = STARTUP_LOG_FILE):
+    """Create a bounded, local startup log without recording chat or credentials."""
+    logger = logging.getLogger("jarvis")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    target = str(Path(log_path).expanduser().resolve())
+    if any(getattr(handler, "baseFilename", None) == target for handler in logger.handlers):
+        return logger
+    try:
+        Path(target).parent.mkdir(parents=True, exist_ok=True)
+        handler = logging.handlers.RotatingFileHandler(
+            target, maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+        )
+        handler.setFormatter(logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(threadName)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        ))
+        logger.addHandler(handler)
+    except OSError:
+        # Logging must never prevent the desktop app from starting.
+        if not logger.handlers:
+            logger.addHandler(logging.NullHandler())
+    return logger
 SYSTEM_PROMPT = (
     'You are J.A.R.V.I.S., a calm, capable personal AI assistant with subtle dry wit. '
     'Support Hindi, English, and Hinglish. Match the language and script used by the user. '
@@ -2798,16 +2826,23 @@ def run_web_hud():
     errors = []
 
     def start_backend():
+        logger = logging.getLogger("jarvis")
+        logger.info("Starting hidden desktop backend thread")
         try:
             root = tk.Tk()
             root.withdraw()
             app = JarvisDesktop(root)
             state["root"], state["app"] = root, app
             root.withdraw()
+            logger.info("Desktop backend initialized")
             root.mainloop()
+            logger.info("Desktop backend event loop stopped")
         except Exception as exc:
+            logger.exception("Desktop backend thread failed")
             errors.append(exc)
 
+    logger = logging.getLogger("jarvis")
+    logger.info("Starting JARVIS desktop HUD")
     backend = threading.Thread(target=start_backend, name="JARVIS-backend", daemon=True)
     backend.start()
     for _ in range(200):
@@ -2818,12 +2853,14 @@ def run_web_hud():
         raise RuntimeError(f"JARVIS backend failed to initialize: {errors[0]}")
     if state["app"] is None:
         raise RuntimeError("JARVIS backend did not initialize in time")
+    logger.info("Desktop backend is ready")
 
     hud_path = Path(__file__).with_name("jarvis_hud.html")
     if not hud_path.exists() and getattr(sys, "frozen", False):
         hud_path = Path(sys._MEIPASS) / "jarvis_hud.html"
     if not hud_path.exists():
         raise FileNotFoundError(f"JARVIS HUD file not found: {hud_path}")
+    logger.info("HUD HTML located")
     window = webview.create_window(
         "J.A.R.V.I.S. | Circular HUD", hud_path.resolve().as_uri(),
         js_api=bridge, width=1920, height=1080, fullscreen=True,
@@ -2831,7 +2868,9 @@ def run_web_hud():
     )
     bridge.window = window
     state["app"].web_bridge = bridge
+    logger.info("HUD window created; entering webview event loop")
     webview.start(debug=False)
+    logger.info("HUD window closed normally")
     app = state.get("app")
     if app is not None:
         try:
@@ -2881,8 +2920,11 @@ def enable_windows_dpi_awareness():
 
 
 def main(argv=None):
+    logger = configure_startup_logging()
+    logger.info("JARVIS process started")
     args = list(sys.argv[1:] if argv is None else argv)
     if args == ["--reminder-check"]:
+        logger.info("Running scheduled reminder check")
         # Task Scheduler starts a short-lived helper instead of opening the full UI.
         try:
             notify_due_reminders()
@@ -2890,6 +2932,7 @@ def main(argv=None):
         except Exception:
             return 1
     if args == ["--cleanup-uninstall"]:
+        logger.info("Running uninstall cleanup")
         # Inno Setup runs this before deleting the executable.
         try:
             _removed, errors = remove_all_reminder_tasks()
@@ -2900,20 +2943,26 @@ def main(argv=None):
     # Must run before Tk creates its first native window to avoid Windows
     # bitmap-scaling the interface and making the UI appear blurry.
     enable_windows_dpi_awareness()
+    logger.info("Windows DPI awareness configured")
     if not acquire_single_instance():
+        logger.info("Another JARVIS instance is already running; exiting")
         return 0
     try:
+        logger.info("Single-instance check passed")
         run_web_hud()
+        logger.info("JARVIS exited normally")
         return 0
     except Exception as exc:
-        # PyInstaller --windowed builds have no console; persist startup errors.
+        # Keep a direct-write fallback in case the logging handler itself could not open.
+        logger.exception("JARVIS startup failed")
         try:
-            SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-            from datetime import datetime
-            import traceback
-            with (SETTINGS_DIR / "startup.log").open("a", encoding="utf-8") as log_file:
-                log_file.write(f"\n[{datetime.now().isoformat(timespec='seconds')}] JARVIS startup failed\n")
-                traceback.print_exc(file=log_file)
+            if not STARTUP_LOG_FILE.exists():
+                SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+                from datetime import datetime
+                import traceback
+                with STARTUP_LOG_FILE.open("a", encoding="utf-8") as log_file:
+                    log_file.write(f"\n[{datetime.now().isoformat(timespec='seconds')}] JARVIS startup failed\n")
+                    traceback.print_exc(file=log_file)
         except Exception:
             pass
         try:
