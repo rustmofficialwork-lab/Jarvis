@@ -363,6 +363,12 @@ setInterval(updateClock,1000);updateClock();
   ['resize','orientationchange','fullscreenchange'].forEach(e=>window.addEventListener(e,schedule,{passive:true}));
   window.addEventListener('load',schedule,{once:true});
   if(window.visualViewport)window.visualViewport.addEventListener('resize',schedule,{passive:true});
+  // Re-fit when the actual WebView/container bounds change, even if the window
+  // itself does not emit a resize event (for example, when desktop chrome changes).
+  if('ResizeObserver' in window){
+    const observer=new ResizeObserver(schedule);
+    observer.observe(container);
+  }
 })();
 
 /* ---------- buttons, bridge, dashboard ---------- */
