@@ -596,24 +596,25 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Proportional Auto-Fit Scaling Logic
+        // Exact viewport fit: fill every screen pixel without leaving side gutters.
         (() => {
-            const hud = document.getElementById('hud');
             const design = document.querySelector('.hud-inner');
             const DESIGN_WIDTH = 1400;
             const DESIGN_HEIGHT = 800;
             let resizeFrame = 0;
 
             function scaleHUD() {
-                if (!hud || !design) return;
-                const width = window.innerWidth;
-                const height = window.innerHeight;
+                if (!design) return;
+                const width = document.documentElement.clientWidth || window.innerWidth;
+                const height = document.documentElement.clientHeight || window.innerHeight;
                 if (!(width > 0) || !(height > 0)) return;
 
-                // Use Math.min to maintain perfect aspect ratio without stretching
-                const scale = Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
-                
-                design.style.transform = `scale(${scale})`;
+                // The source canvas is 1400x800 (1.75:1); the target is usually 16:9.
+                // Independent X/Y scaling removes the visible side gutters with only
+                // a ~1.6% horizontal/vertical ratio adjustment and no cropped content.
+                const scaleX = width / DESIGN_WIDTH;
+                const scaleY = height / DESIGN_HEIGHT;
+                design.style.transform = `scale(${scaleX}, ${scaleY})`;
             }
 
             function scheduleScale() {
@@ -627,7 +628,7 @@
             scaleHUD();
             window.addEventListener('resize', scheduleScale, { passive: true });
             window.addEventListener('orientationchange', scheduleScale, { passive: true });
-            window.addEventListener('fullscreenchange', scheduleScale, { passive: true });
+            document.addEventListener('fullscreenchange', scheduleScale, { passive: true });
             window.addEventListener('load', scheduleScale, { once: true });
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', scheduleScale, { passive: true });
