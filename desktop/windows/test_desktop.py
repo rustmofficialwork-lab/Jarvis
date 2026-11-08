@@ -643,6 +643,32 @@ class MicrophoneConsentDialogTests(unittest.TestCase):
         self.assertEqual(user32.args[3] & 0x00040000, 0x00040000)  # MB_TOPMOST
         self.assertEqual(user32.args[3] & 0x00010000, 0x00010000)  # MB_SETFOREGROUND
 
+    def test_windows_consent_dialog_configures_unicode_api_signature(self):
+        class FakeFunction:
+            def __init__(self):
+                self.argtypes = None
+                self.restype = None
+                self.args = None
+
+            def __call__(self, *args):
+                self.args = args
+                return 6
+
+        class FakeUser32:
+            def __init__(self):
+                self.MessageBoxW = FakeFunction()
+
+        user32 = FakeUser32()
+        self.assertTrue(jarvis_desktop.ask_microphone_consent(
+            platform_name="nt", user32=user32,
+        ))
+        import ctypes.wintypes as wintypes
+        self.assertEqual(
+            user32.MessageBoxW.argtypes,
+            [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT],
+        )
+        self.assertIs(user32.MessageBoxW.restype, wintypes.INT)
+
     def test_windows_consent_dialog_only_accepts_yes(self):
         class FakeUser32:
             def MessageBoxW(self, *_args):
