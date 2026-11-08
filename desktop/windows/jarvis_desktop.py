@@ -144,6 +144,28 @@ def record_microphone_consent(settings: dict, accepted: bool) -> None:
     settings["microphone_consent_granted"] = bool(accepted)
 
 
+def ask_microphone_consent(parent=None, platform_name=None, user32=None,
+                           messagebox_module=messagebox) -> bool:
+    """Show consent above the fullscreen HUD instead of behind its hidden Tk owner."""
+    platform_name = os.name if platform_name is None else platform_name
+    title = "JARVIS microphone permission"
+    message = (
+        "JARVIS would like permission to check microphone access for voice commands "
+        "and the optional “Jarvis” wake word.\n\n"
+        "The microphone is not continuously used during startup. Listening starts "
+        "only when you activate voice listening.\n\n"
+        "Allow JARVIS to check microphone access?"
+    )
+    if platform_name == "nt":
+        if user32 is None:
+            import ctypes
+            user32 = ctypes.windll.user32
+        # MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND.
+        flags = 0x00000004 | 0x00000020 | 0x00040000 | 0x00010000
+        return user32.MessageBoxW(None, message, title, flags) == 6  # IDYES
+    return bool(messagebox_module.askyesno(title, message, parent=parent))
+
+
 def save_settings(data: dict, path: Path = SETTINGS_FILE) -> None:
     """Durably persist non-secret preferences; credentials belong in Credential Manager."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1011,15 +1033,21 @@ class JarvisDesktop:
     def _first_launch_permission_setup(self):
         if not microphone_consent_required(self.settings):
             return
-        accepted = messagebox.askyesno(
-            "JARVIS microphone permission",
-            "JARVIS would like permission to check microphone access for voice commands "
-            "and the optional “Jarvis” wake word.\n\n"
-            "The microphone is not continuously used during startup. Listening starts "
-            "only when you activate voice listening.\n\n"
-            "Allow JARVIS to check microphone access?",
-            parent=self.root,
-        )
+        try:
+            accepted = ask_microphone_consent(parent=self.root)
+        except Exception:
+            logging.getLogger("jarvis").exception(
+                "Native microphone consent dialog failed; using Tk fallback"
+            )
+            accepted = messagebox.askyesno(
+                "JARVIS microphone permission",
+                "JARVIS would like permission to check microphone access for voice commands "
+                "and the optional “Jarvis” wake word.\n\n"
+                "The microphone is not continuously used during startup. Listening starts "
+                "only when you activate voice listening.\n\n"
+                "Allow JARVIS to check microphone access?",
+                parent=self.root,
+            )
         record_microphone_consent(self.settings, accepted)
         try:
             save_settings(self.settings)
