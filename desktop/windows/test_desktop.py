@@ -1866,3 +1866,24 @@ class HudRuntimeStateTests(unittest.TestCase):
             bridge.get_runtime_state(),
             {"listening": False, "busy": False},
         )
+
+
+class SettingsDurabilityTests(unittest.TestCase):
+    def test_settings_save_is_valid_json_and_uses_utf8(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "settings.json"
+        jarvis_desktop.save_settings({"language": "hi-IN", "label": "JARVIS"}, path)
+        self.assertEqual(json.loads(path.read_text(encoding="utf-8")),
+                         {"language": "hi-IN", "label": "JARVIS"})
+        self.assertFalse(path.with_suffix(".json.tmp").exists())
+
+    def test_failed_settings_replace_preserves_previous_file_and_cleans_temp(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "settings.json"
+        path.write_text('{"language": "en-IN"}', encoding="utf-8")
+        with patch.object(Path, "replace", side_effect=OSError("disk unavailable")):
+            with self.assertRaises(OSError):
+                jarvis_desktop.save_settings({"language": "hi-IN"}, path)
+        self.assertEqual(json.loads(path.read_text(encoding="utf-8")),
+                         {"language": "en-IN"})
+        self.assertFalse(path.with_suffix(".json.tmp").exists())
