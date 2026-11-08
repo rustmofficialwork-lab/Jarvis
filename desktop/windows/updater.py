@@ -142,9 +142,14 @@ def check_for_update(current_version: str, opener=None) -> dict:
 
 def download_verified_installer(installer_url: str, checksums_url: str,
                                 destination_dir: str | Path, opener=None) -> Path:
-    """Download the release installer only after matching its published SHA-256."""
+    """Stream the installer to a temporary file and publish it only after SHA-256 verification."""
     installer_url = _safe_github_url(installer_url)
     checksums_url = _safe_github_url(checksums_url)
+    destination = Path(destination_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    final_path = destination / INSTALLER_NAME
+    temporary = destination / (INSTALLER_NAME + ".download")
+
     try:
         with _open(checksums_url, timeout=20, opener=opener) as response:
             checksum_text = _read_limited(response, MAX_CHECKSUM_BYTES).decode("utf-8", errors="strict")
@@ -155,27 +160,32 @@ def download_verified_installer(installer_url: str, checksums_url: str,
         if not match:
             raise ValueError("The release checksum file does not contain the expected installer hash.")
         expected = match.group(1).lower()
-        with _open(installer_url, timeout=60, opener=opener) as response:
-            installer_bytes = _read_limited(response, MAX_INSTALLER_BYTES)
+
+        digest = hashlib.sha256()
+        total = 0
+        try:
+            with _open(installer_url, timeout=60, opener=opener) as response, temporary.open("wb") as output:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_INSTALLER_BYTES:
+                        raise ValueError("The update installer exceeded the 200 MB safety limit.")
+                    digest.update(chunk)
+                    output.write(chunk)
+
+            if digest.hexdigest() != expected:
+                raise ValueError("The installer SHA-256 check failed. The downloaded file was not kept.")
+            temporary.replace(final_path)
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"Could not download the JARVIS update: {exc}") from exc
     except UnicodeDecodeError as exc:
         raise ValueError("The release checksum file is not valid UTF-8.") from exc
 
-    actual = hashlib.sha256(installer_bytes).hexdigest()
-    if actual != expected:
-        raise ValueError("The installer SHA-256 check failed. The downloaded file was not kept.")
-
-    destination = Path(destination_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-    final_path = destination / INSTALLER_NAME
-    temporary = destination / (INSTALLER_NAME + ".download")
-    try:
-        temporary.write_bytes(installer_bytes)
-        temporary.replace(final_path)
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
     return final_path

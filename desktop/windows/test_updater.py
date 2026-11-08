@@ -3,6 +3,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from updater import API_URL, CHECKSUM_NAME, INSTALLER_NAME, check_for_update, download_verified_installer
@@ -107,6 +108,34 @@ class UpdaterTests(unittest.TestCase):
                     folder, FakeOpener([checksum, b"tampered"]),
                 )
             self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_streaming_download_enforces_size_limit_and_cleans_partial_file(self):
+        import updater
+        installer = b"12345"
+        checksum = (hashlib.sha256(installer).hexdigest() + "  " + INSTALLER_NAME + "\\n").encode()
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(updater, "MAX_INSTALLER_BYTES", 4):
+                with self.assertRaisesRegex(ValueError, "200 MB safety limit"):
+                    download_verified_installer(
+                        "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
+                        "https://github.com/org/repo/releases/download/v1/" + CHECKSUM_NAME,
+                        folder, FakeOpener([checksum, installer]),
+                    )
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_failed_verification_preserves_previous_installer(self):
+        checksum = ("0" * 64 + "  " + INSTALLER_NAME + "\\n").encode()
+        with tempfile.TemporaryDirectory() as folder:
+            existing = Path(folder) / INSTALLER_NAME
+            existing.write_bytes(b"known-good installer")
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                download_verified_installer(
+                    "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
+                    "https://github.com/org/repo/releases/download/v1/" + CHECKSUM_NAME,
+                    folder, FakeOpener([checksum, b"tampered"]),
+                )
+            self.assertEqual(existing.read_bytes(), b"known-good installer")
+            self.assertEqual([p.name for p in Path(folder).iterdir()], [INSTALLER_NAME])
 
     def test_redirect_allowlist_rejects_unapproved_hosts_and_nonstandard_ports(self):
         from updater import _is_allowed_redirect_url
