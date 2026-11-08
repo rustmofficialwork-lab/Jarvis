@@ -5,6 +5,7 @@ import unittest
 import uuid
 from unittest.mock import patch
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 _TEMP_DB = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
@@ -14,7 +15,7 @@ os.environ["JARVIS_CLIENT_TOKEN"] = "test-token-that-is-long-enough-123456"
 os.environ["OPENROUTER_API_KEY"] = "test-upstream-key"
 os.environ["JARVIS_DEVICE_TOKEN_SECRET"] = "test-device-token-secret-that-is-long-enough-123"
 
-from app.main import UPSTREAM_URL, app  # noqa: E402
+from app.main import UPSTREAM_URL, _read_request_body_limited, app  # noqa: E402
 
 
 class _FakeUpstreamResponse:
@@ -55,6 +56,39 @@ class _FakeAsyncClient:
             "payload": json,
         })
         return _FakeUpstreamResponse(type(self).status_code, type(self).response_body)
+
+
+class _ChunkedRequest:
+    def __init__(self, chunks):
+        self.chunks = list(chunks)
+        self.consumed = 0
+
+    async def stream(self):
+        for chunk in self.chunks:
+            self.consumed += 1
+            yield chunk
+
+
+class RequestBodyLimitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_streamed_body_within_limit_is_returned(self):
+        request = _ChunkedRequest([b"hello", b" ", b"world"])
+        body = await _read_request_body_limited(request, 11, detail="too large")
+        self.assertEqual(body, b"hello world")
+        self.assertEqual(request.consumed, 3)
+
+    async def test_streamed_body_without_content_length_is_rejected_early(self):
+        request = _ChunkedRequest([b"123", b"456", b"must-not-be-read"])
+        with self.assertRaises(HTTPException) as raised:
+            await _read_request_body_limited(request, 5, detail="too large")
+        self.assertEqual(raised.exception.status_code, 413)
+        self.assertEqual(raised.exception.detail, "too large")
+        self.assertEqual(request.consumed, 2)
+
+    async def test_empty_stream_is_allowed_by_body_reader(self):
+        request = _ChunkedRequest([])
+        body = await _read_request_body_limited(request, 5, detail="too large")
+        self.assertEqual(body, b"")
+        self.assertEqual(request.consumed, 0)
 
 
 class BackendApiTests(unittest.TestCase):
