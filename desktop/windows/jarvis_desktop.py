@@ -157,12 +157,20 @@ def ask_microphone_consent(parent=None, platform_name=None, user32=None,
         "Allow JARVIS to check microphone access?"
     )
     if platform_name == "nt":
+        import ctypes
+        from ctypes import wintypes
         if user32 is None:
-            import ctypes
-            user32 = ctypes.windll.user32
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+        message_box = user32.MessageBoxW
+        # Explicit signatures are required for reliable Unicode and HWND marshalling.
+        if hasattr(message_box, "argtypes"):
+            message_box.argtypes = [
+                wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT,
+            ]
+            message_box.restype = wintypes.INT
         # MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND.
         flags = 0x00000004 | 0x00000020 | 0x00040000 | 0x00010000
-        return user32.MessageBoxW(None, message, title, flags) == 6  # IDYES
+        return message_box(None, message, title, flags) == 6  # IDYES
     return bool(messagebox_module.askyesno(title, message, parent=parent))
 
 
