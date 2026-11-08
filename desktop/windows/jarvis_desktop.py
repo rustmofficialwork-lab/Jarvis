@@ -122,11 +122,22 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
 
 
 def save_settings(data: dict, path: Path = SETTINGS_FILE) -> None:
-    """Atomically persist non-secret preferences; credentials belong in Credential Manager."""
+    """Durably persist non-secret preferences; credentials belong in Credential Manager."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    try:
+        with temporary.open("w", encoding="utf-8", newline="\\n") as output:
+            json.dump(data, output, ensure_ascii=False, indent=2)
+            output.write("\\n")
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(path)
+    finally:
+        # A failed write must not leave a stale temp file that blocks later saves.
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def load_chat_history(path: Path = HISTORY_FILE) -> list[dict]:
@@ -1939,6 +1950,7 @@ class JarvisDesktop:
                     recorder = None
                     self.stop_event.wait(2)
         except Exception as exc:
+            logging.getLogger("jarvis").exception("Wake-word listener stopped unexpectedly")
             self.events.put(("error", f"Wake listener could not start: {exc}"))
         finally:
             release_wake_recorder(recorder)
@@ -2219,6 +2231,48 @@ class JarvisDesktop:
         ttk.Button(actions, text="Check microphone access", command=self._request_microphone_access).pack(side="left")
         ttk.Button(actions, text="Check for updates", command=self._check_for_updates).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Save settings", command=save).pack(side="right")
+
+        privacy = tk.LabelFrame(
+            content, text="Privacy & local data", bg="#07111b", fg="#d7f4ff",
+            padx=10, pady=8,
+        )
+        privacy.grid(row=11, column=0, columnspan=2, sticky="ew", padx=14, pady=(0, 14))
+        tk.Label(
+            privacy,
+            text="Chat history and saved memories stay on this PC unless you explicitly enable memory sharing.",
+            bg="#07111b", fg="#7897aa", font=("Segoe UI", 9),
+            wraplength=max(280, dialog_w - 120), justify="left",
+        ).pack(anchor="w", pady=(0, 8))
+
+        def open_mic_privacy():
+            if self._open_microphone_privacy_settings():
+                self._set_status("Opened Windows microphone privacy settings.")
+            else:
+                messagebox.showwarning(
+                    "Microphone privacy settings",
+                    "Windows microphone privacy settings could not be opened automatically.",
+                    parent=window,
+                )
+
+        def clear_local_chat():
+            if not messagebox.askyesno(
+                "Clear local chat history?",
+                "This permanently clears JARVIS chat history stored on this PC. Saved memories are not affected.",
+                parent=window,
+            ):
+                return
+            self.clear_chat()
+
+        privacy_actions = tk.Frame(privacy, bg="#07111b")
+        privacy_actions.pack(fill="x")
+        ttk.Button(
+            privacy_actions, text="Open Windows microphone privacy",
+            command=open_mic_privacy,
+        ).pack(side="left")
+        ttk.Button(
+            privacy_actions, text="Clear local chat history",
+            command=clear_local_chat,
+        ).pack(side="left", padx=(8, 0))
         content.grid_columnconfigure(1, weight=1)
 
     def _check_for_updates(self, silent: bool = False):
