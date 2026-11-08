@@ -1821,3 +1821,27 @@ class HudRuntimeStateTests(unittest.TestCase):
             bridge.get_runtime_state(),
             {"listening": False, "busy": False},
         )
+
+
+
+class StartupLoggingTests(unittest.TestCase):
+    def test_configure_startup_logging_creates_log_and_writes_event(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as folder:
+            log_path = Path(folder) / "startup.log"
+            logger = jarvis_desktop.configure_startup_logging(log_path)
+            handlers = [
+                handler for handler in logger.handlers
+                if getattr(handler, "baseFilename", None) == str(log_path.resolve())
+            ]
+            try:
+                self.assertEqual(len(handlers), 1)
+                logger.info("startup logging test event")
+                handlers[0].flush()
+                self.assertTrue(log_path.is_file())
+                self.assertIn("startup logging test event", log_path.read_text(encoding="utf-8"))
+            finally:
+                for handler in handlers:
+                    logger.removeHandler(handler)
+                    handler.close()
