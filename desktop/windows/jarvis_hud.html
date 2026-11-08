@@ -359,23 +359,6 @@
         .mg-bar:nth-child(odd) { background: var(--cyan); height: 50%; }
         .mg-bar:nth-child(3n) { height: 80%; }
 
-        .tools-widget {
-            position: absolute; top: 470px; right: 10px; width: 280px; height: 110px;
-            border: 1px solid var(--dim-border); padding: 8px; z-index: 10;
-        }
-        .tools-widget h4 { margin-bottom: 7px; font-size: 0.72rem; letter-spacing: 1px;}
-        .tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .hex-btn {
-            height: 34px; background: rgba(0, 229, 255, 0.05); border: 1px solid var(--cyan);
-            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-            display: flex; justify-content: center; align-items: center;
-            font-size: 1.3rem; color: var(--cyan); transition: 0.3s;
-            box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.2);
-            cursor: pointer;
-        }
-        .hex-btn:hover { background: rgba(0,229,255,0.2); box-shadow: 0 0 15px var(--cyan);}
-        .hex-btn i { filter: drop-shadow(0 0 5px var(--cyan)); }
-
         .mid-right-icons, .desktop-icons { display: none; }
 
         /* ============ ANIMATIONS ============ */
@@ -549,16 +532,6 @@
                 <div class="mg-bar"></div><div class="mg-bar"></div><div class="mg-bar"></div><div class="mg-bar"></div>
             </div>
 
-            <div class="tools-widget">
-                <h4>SYSTEM TOOLS</h4>
-                <div class="tools-grid">
-                    <div class="hex-btn"><i class="fa-solid fa-wrench"></i></div>
-                    <div class="hex-btn"><i class="fa-regular fa-file-lines"></i></div>
-                    <div class="hex-btn"><i class="fa-solid fa-gears"></i></div>
-                    <div class="hex-btn"><i class="fa-solid fa-shield-halved"></i></div>
-                </div>
-            </div>
-
         </div>
     </div>
 
@@ -693,7 +666,7 @@
             if (api && api.open_url && apps[name]) api.open_url(apps[name]);
         };
         document.addEventListener("click", (event) => {
-            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .orb-wrapper, .data-row");
+            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .power-controls i, .back-btn, .desktop-icons > div, .orb-wrapper, .data-row");
             if (!target) return;
             const label = target.textContent.trim().toLowerCase().replace(/\s+/g, " ");
             if (target.matches(".orb-wrapper")) {
@@ -731,21 +704,6 @@
                 else if (label.includes("task manager")) api.open_system_tool("task_manager");
                 else if (label.includes("settings")) api.open_settings();
                 else if (label.includes("run")) api.open_system_tool("run");
-                return;
-            }
-            if (target.matches(".hex-btn")) {
-                const index = [...target.parentElement.children].indexOf(target);
-                if (index === 1) {
-                    const query = window.prompt("Which file should JARVIS find?");
-                    if (query && query.trim()) command("find file " + query.trim());
-                } else if (index === 2) {
-                    const api = bridge();
-                    if (api && api.open_settings) api.open_settings();
-                } else if (index === 3) {
-                    command("show reminders");
-                } else {
-                    command("system status");
-                }
                 return;
             }
         });
