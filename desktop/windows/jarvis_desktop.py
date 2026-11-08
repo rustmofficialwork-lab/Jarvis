@@ -1099,18 +1099,28 @@ class JarvisDesktop:
         import webbrowser
         webbrowser.open(url)
 
-    def _open_hud_folder(self, folder):
+    def _open_hud_folder(self, folder, platform_name=None, popen=None):
+        """Open Windows known folders through their shell aliases, including redirected folders."""
         import subprocess
-        from pathlib import Path
+
+        platform_name = os.name if platform_name is None else platform_name
+        if platform_name != "nt":
+            return False
         special_locations = {
-            "Recycle Bin": "shell:RecycleBinFolder",
+            "Documents": "shell:Personal",
+            "Downloads": "shell:Downloads",
+            "Pictures": "shell:MyPictures",
+            "Music": "shell:MyMusic",
+            "Videos": "shell:MyVideo",
+            "This PC": "shell:MyComputerFolder",
             "Network": "shell:NetworkPlacesFolder",
+            "Recycle Bin": "shell:RecycleBinFolder",
         }
-        target = special_locations.get(folder)
+        target = special_locations.get(str(folder or ""))
         if target is None:
-            target = Path.home() / folder if folder != "This PC" else Path.home()
-        if os.name == "nt":
-            subprocess.Popen(["explorer.exe", str(target)], shell=False)
+            return False
+        (popen or subprocess.Popen)(["explorer.exe", target], shell=False)
+        return True
 
     def _send_hud_command(self, command):
         self.prompt_var.set(command)
