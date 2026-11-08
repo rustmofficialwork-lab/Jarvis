@@ -119,6 +119,25 @@ def _verify_device_token(token: str, now: int | None = None) -> str | None:
         return None
 
 
+async def _read_request_body_limited(
+    request: Request, maximum: int, *, detail: str
+) -> bytes:
+    """Read a request incrementally and stop as soon as its body exceeds the limit.
+
+    Do not use Request.body() here: it buffers the complete body before the
+    caller can enforce a limit, which is unsafe for requests without a
+    trustworthy Content-Length header (for example, chunked uploads).
+    """
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > maximum:
+            raise HTTPException(status_code=413, detail=detail)
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def _prune_rate_buckets(
     buckets: dict[str, deque[float]], *, now: float, window: int, maximum_keys: int = 10_000
 ) -> None:
@@ -157,9 +176,9 @@ async def register_device(request: Request) -> Response:
                 raise HTTPException(status_code=413, detail="Registration request is too large.")
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid Content-Length.")
-    raw_body = await request.body()
-    if len(raw_body) > 512:
-        raise HTTPException(status_code=413, detail="Registration request is too large.")
+    raw_body = await _read_request_body_limited(
+        request, 512, detail="Registration request is too large."
+    )
     try:
         payload = json.loads(raw_body)
     except (ValueError, UnicodeDecodeError):
@@ -255,9 +274,9 @@ async def chat_completions(
                 raise HTTPException(status_code=413, detail="Request is too large.")
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid Content-Length.")
-    raw = await request.body()
-    if len(raw) > MAX_REQUEST_BYTES:
-        raise HTTPException(status_code=413, detail="Request is too large.")
+    raw = await _read_request_body_limited(
+        request, MAX_REQUEST_BYTES, detail="Request is too large."
+    )
     try:
         payload: dict[str, Any] = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError):
