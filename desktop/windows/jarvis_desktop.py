@@ -2930,6 +2930,7 @@ def main(argv=None):
             notify_due_reminders()
             return 0
         except Exception:
+            logger.exception("Scheduled reminder check failed")
             return 1
     if args == ["--cleanup-uninstall"]:
         logger.info("Running uninstall cleanup")
@@ -2939,6 +2940,7 @@ def main(argv=None):
             set_windows_startup(False)
             return 1 if errors else 0
         except Exception:
+            logger.exception("Uninstall cleanup failed")
             return 1
     # Must run before Tk creates its first native window to avoid Windows
     # bitmap-scaling the interface and making the UI appear blurry.
@@ -2956,7 +2958,12 @@ def main(argv=None):
         # Keep a direct-write fallback in case the logging handler itself could not open.
         logger.exception("JARVIS startup failed")
         try:
-            if not STARTUP_LOG_FILE.exists():
+            has_file_handler = any(
+                isinstance(handler, logging.FileHandler)
+                and Path(handler.baseFilename) == STARTUP_LOG_FILE.resolve()
+                for handler in logger.handlers
+            )
+            if not has_file_handler:
                 SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
                 from datetime import datetime
                 import traceback
