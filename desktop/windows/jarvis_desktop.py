@@ -91,7 +91,7 @@ SYSTEM_PROMPT = (
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> dict:
-    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN", "device_id": ""}
+    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN", "device_id": "", "microphone_consent_version": 0, "microphone_consent_granted": False}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
@@ -103,7 +103,16 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
             "language": data.get("language") if isinstance(data.get("language"), str) and data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
             "start_with_windows": data.get("start_with_windows") is True,
             "share_memory_with_ai": data.get("share_memory_with_ai") is True,
-            "microphone_setup_completed": data.get("microphone_setup_completed") is True,
+            # Consent is versioned so legacy installs are asked once again.
+            # The old setup flag was set even when users declined, so it cannot
+            # be trusted as evidence of explicit consent.
+            "microphone_consent_version": (
+                data.get("microphone_consent_version")
+                if isinstance(data.get("microphone_consent_version"), int)
+                and not isinstance(data.get("microphone_consent_version"), bool)
+                else 0
+            ),
+            "microphone_consent_granted": data.get("microphone_consent_granted") is True,
         }
         # Keep the per-install ID optional for older settings files. The desktop
         # app creates and persists it during startup when it is missing.
@@ -119,6 +128,20 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         return settings
     except (OSError, ValueError):
         return defaults
+
+
+MICROPHONE_CONSENT_VERSION = 1
+
+
+def microphone_consent_required(settings: dict) -> bool:
+    """Ask once for each consent version; legacy completion flags are not consent."""
+    return settings.get("microphone_consent_version") != MICROPHONE_CONSENT_VERSION
+
+
+def record_microphone_consent(settings: dict, accepted: bool) -> None:
+    """Persist the user's explicit choice without implying Windows granted access."""
+    settings["microphone_consent_version"] = MICROPHONE_CONSENT_VERSION
+    settings["microphone_consent_granted"] = bool(accepted)
 
 
 def save_settings(data: dict, path: Path = SETTINGS_FILE) -> None:
@@ -982,29 +1005,32 @@ class JarvisDesktop:
         self.root.after(30000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
         # Ask once at first launch; Windows itself controls the actual microphone grant.
-        if not self.settings.get("microphone_setup_completed", False):
+        if microphone_consent_required(self.settings):
             self.root.after(1800, self._first_launch_permission_setup)
 
     def _first_launch_permission_setup(self):
-        if self.settings.get("microphone_setup_completed", False):
+        if not microphone_consent_required(self.settings):
             return
         accepted = messagebox.askyesno(
-            "JARVIS microphone setup",
-            "JARVIS can use your microphone for voice commands and the “Jarvis” wake word.\n\n"
-            "The microphone is used only when you activate voice listening. "
-            "Windows may show its own permission prompt.\n\n"
-            "Allow JARVIS to check microphone access now?",
+            "JARVIS microphone permission",
+            "JARVIS would like permission to check microphone access for voice commands "
+            "and the optional “Jarvis” wake word.\n\n"
+            "The microphone is not continuously used during startup. Listening starts "
+            "only when you activate voice listening.\n\n"
+            "Allow JARVIS to check microphone access?",
             parent=self.root,
         )
-        self.settings["microphone_setup_completed"] = True
+        record_microphone_consent(self.settings, accepted)
         try:
             save_settings(self.settings)
-        except OSError:
-            pass
+        except OSError as exc:
+            logging.getLogger("jarvis").warning(
+                "Could not save microphone consent choice: %s", exc
+            )
         if accepted:
             self._request_microphone_access()
         else:
-            self._set_status("Microphone setup skipped. Chat and HUD remain available.")
+            self._set_status("Microphone permission declined. Chat and HUD remain available.")
 
     def _request_microphone_access(self):
         """Open and immediately release the default input device after user consent."""
