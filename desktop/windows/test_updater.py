@@ -112,7 +112,7 @@ class UpdaterTests(unittest.TestCase):
     def test_streaming_download_enforces_size_limit_and_cleans_partial_file(self):
         import updater
         installer = b"12345"
-        checksum = (hashlib.sha256(installer).hexdigest() + "  " + INSTALLER_NAME + "\\n").encode()
+        checksum = (hashlib.sha256(installer).hexdigest() + "  " + INSTALLER_NAME + "\n").encode()
         with tempfile.TemporaryDirectory() as folder:
             with patch.object(updater, "MAX_INSTALLER_BYTES", 4):
                 with self.assertRaisesRegex(ValueError, "200 MB safety limit"):
@@ -124,7 +124,7 @@ class UpdaterTests(unittest.TestCase):
             self.assertEqual(list(Path(folder).iterdir()), [])
 
     def test_failed_verification_preserves_previous_installer(self):
-        checksum = ("0" * 64 + "  " + INSTALLER_NAME + "\\n").encode()
+        checksum = ("0" * 64 + "  " + INSTALLER_NAME + "\n").encode()
         with tempfile.TemporaryDirectory() as folder:
             existing = Path(folder) / INSTALLER_NAME
             existing.write_bytes(b"known-good installer")
