@@ -348,15 +348,19 @@ function updateClock(){
 }
 setInterval(updateClock,1000);updateClock();
 
-/* ---------- auto-fit scaling ---------- */
+/* ---------- responsive full-viewport fitting ---------- */
 (()=>{
   const container=document.querySelector('.hud-container');
   const design=document.querySelector('.hud-inner');let frame=0;
+  const DESIGN_WIDTH=1600, DESIGN_HEIGHT=851;
   const scaleHUD=()=>{
     const w=container.clientWidth,h=container.clientHeight;
     if(!(w>0)||!(h>0))return;
-    const scale=Math.min((w-16)/1600,(h-16)/851);
-    design.style.transform='translate(-50%, -50%) scale('+scale+')';
+    // Fill the available app viewport in both axes. Independent axis scaling
+    // prevents letterboxing while keeping every fixed-position HUD element visible.
+    const scaleX=w/DESIGN_WIDTH;
+    const scaleY=h/DESIGN_HEIGHT;
+    design.style.transform='translate(-50%, -50%) scale('+scaleX+','+scaleY+')';
   };
   const schedule=()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;scaleHUD();});};
   scaleHUD();
