@@ -2530,7 +2530,19 @@ class JarvisDesktop:
                     message = "Reminder: {}".format(value["message"])
                     self._append("JARVIS REMINDER", message)
                     self._set_status("Reminder due.")
-                    messagebox.showinfo("JARVIS Reminder", message, parent=self.root)
+                    try:
+                        messagebox.showinfo("JARVIS Reminder", message, parent=self.root)
+                        logging.getLogger("jarvis").info(
+                            "Reminder notification displayed (id=%s)", value.get("id", "unknown")
+                        )
+                    except Exception:
+                        # The reminder store marks due items as claimed before they
+                        # reach Tk. Release the claim if the notification cannot show.
+                        self.reminder_store.release_claims([value["id"]])
+                        logging.getLogger("jarvis").exception(
+                            "Reminder notification failed (id=%s)", value.get("id", "unknown")
+                        )
+                        self._set_status("Reminder notification failed; it will be retried.")
                 elif kind == "listener_stopped":
                     self._set_status("Wake listener stopped.")
         except queue.Empty:
