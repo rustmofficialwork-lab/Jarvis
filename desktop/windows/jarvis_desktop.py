@@ -2411,7 +2411,9 @@ class JarvisDesktop:
                             self.busy = False
                             self.request_lock.release()
                     else:
-                        self.history.extend(build_document_history_entries(prompt, value))
+                        # The prompt is carried in the consent event payload; there is
+                        # no local prompt variable in this UI event handler.
+                        self.history.extend(build_document_history_entries(value["prompt"], value))
                         try:
                             save_chat_history(self.history)
                         except OSError:
