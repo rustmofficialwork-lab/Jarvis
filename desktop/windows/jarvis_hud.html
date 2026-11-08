@@ -151,22 +151,6 @@
         .wifi-widget i { color: var(--cyan); font-size: 0.9rem; border: 1px solid var(--cyan); border-radius: 50%; padding: 2px;}
         .win-logo { position: absolute; top: 550px; left: 290px; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; border: 2px solid var(--cyan); border-radius: 50%; font-size: 1.5rem; color: var(--cyan); filter: drop-shadow(0 0 8px var(--cyan)); opacity: 0.8;}
 
-        .cpu-widget {
-            position: absolute; top: 610px; left: 290px;
-            width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--dark-cyan);
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            --cpu-usage: 0%;
-        }
-        .cpu-widget::before {
-            content: ''; position: absolute; top: -3px; left: -3px; right: -3px; bottom: -3px;
-            border-radius: 50%; background: conic-gradient(var(--cyan) 0 var(--cpu-usage), transparent var(--cpu-usage) 100%);
-            -webkit-mask: radial-gradient(transparent 68%, black 69%); mask: radial-gradient(transparent 68%, black 69%);
-            filter: drop-shadow(0 0 5px var(--cyan));
-            transition: background 0.45s ease;
-        }
-        .cpu-widget h2 { color: #fff; font-size: 1.2rem; font-family: var(--font-head); z-index: 2; line-height: 1;}
-        .cpu-widget p { color: var(--cyan); font-size: 0.55rem; z-index: 2;}
-
         .file-widget { position: absolute; bottom: 20px; left: 40px; width: 220px; font-size: 0.8rem;}
         .file-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; color: #fff; transition: 0.3s;}
         .file-row:hover { color: var(--cyan); text-shadow: var(--glow); cursor: pointer;}
@@ -197,46 +181,6 @@
             border: 1px solid var(--cyan); border-radius: 50%;
             font-size: 0.8rem;
         }
-
-        .orb-wrapper { position: absolute; top: 120px; left: 570px; width: 350px; height: 350px; display: flex; justify-content: center; align-items: center; z-index: 5;}
-        .orb-outer-ring {
-            position: absolute; width: 100%; height: 100%; border-radius: 50%;
-            border: 2px dotted rgba(0, 229, 255, 0.4); animation: spin 40s linear infinite;
-        }
-        .orb-mid-ring {
-            position: absolute; width: 88%; height: 88%; border-radius: 50%;
-            border: 8px solid #021a28; box-shadow: inset 0 0 20px rgba(0, 229, 255, 0.2), 0 0 30px rgba(0,0,0,0.8);
-            display: flex; justify-content: center; align-items: center;
-        }
-        .orb-segments-1 {
-            position: absolute; width: 96%; height: 96%; border-radius: 50%;
-            border: 4px solid transparent; border-top-color: var(--cyan); border-bottom-color: var(--cyan);
-            transform: rotate(45deg); animation: spin-reverse 15s linear infinite;
-            filter: drop-shadow(0 0 10px var(--cyan));
-        }
-        .orb-segments-2 {
-            position: absolute; width: 90%; height: 90%; border-radius: 50%;
-            border: 2px dashed transparent; border-left-color: var(--bright-cyan); border-right-color: var(--bright-cyan);
-            transform: rotate(-30deg); animation: spin 20s linear infinite;
-        }
-        .orb-inner-detail {
-            position: absolute; width: 65%; height: 65%; border-radius: 50%;
-            border: 2px solid var(--dark-cyan); display: flex; justify-content: center; align-items: center;
-        }
-        .orb-core {
-            width: 70px; height: 70px; border-radius: 50%;
-            background: radial-gradient(circle, #fff 10%, var(--bright-cyan) 40%, var(--cyan) 70%, transparent 100%);
-            position: relative;
-            animation: pulseGlow 2s infinite alternate;
-        }
-        .orb-core::after {
-            content: ''; position: absolute; width: 90px; height: 90px; border-radius: 50%; top: -10px; left: -10px;
-            border: 2px dotted var(--cyan); animation: spin 10s linear infinite;
-        }
-        .orb-wrapper.is-listening .orb-core { filter: drop-shadow(0 0 18px var(--cyan)); animation: orb-pulse 1.4s ease-in-out infinite; }
-        .orb-wrapper.is-thinking .orb-core { animation: orb-pulse 0.7s ease-in-out infinite; }
-        .back-btn.is-listening { box-shadow: 0 0 14px var(--cyan), inset 0 0 10px rgba(0,229,255,.35); }
-        @keyframes orb-pulse { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.13); opacity: 1; } }
 
         /* ============ APP LIST ============ */
         .app-list {
@@ -371,31 +315,6 @@
             transform: rotate(-45deg); filter: drop-shadow(0 0 8px var(--cyan));
         }
 
-        .jarvis-widget {
-            position: absolute; top: 270px; right: 30px; width: 200px;
-            z-index: 11; pointer-events: none;
-        }
-        .jarvis-header {
-            display: flex; justify-content: space-between; align-items: flex-end;
-            border-bottom: 1px solid var(--dim-border); padding-bottom: 5px; margin-bottom: 9px;
-        }
-        .jarvis-header h3 { font-size: 1.1rem; letter-spacing: 1px; }
-        .waveform { display: flex; align-items: flex-end; gap: 2px; height: 15px; }
-        .wbar { width: 2px; background: var(--cyan); height: 40%; }
-        .wbar:nth-child(2n) { height: 80%; }
-        .wbar:nth-child(4n) { height: 100%; }
-
-        .jarvis-status {
-            border-left: 1px solid var(--dim-border);
-            padding: 5px 8px;
-            color: var(--cyan);
-            font-size: 0.62rem;
-            letter-spacing: 0.7px;
-            line-height: 1.35;
-            white-space: nowrap;
-            background: rgba(2, 11, 20, 0.72);
-        }
-
         .mid-graph-box {
             position: absolute; top: 370px; right: 30px; width: 280px; height: 60px;
             border: 1px solid var(--dim-border); display: flex; align-items: flex-end; gap: 3px; padding: 5px; z-index: 10;
@@ -451,12 +370,8 @@
             <svg class="bg-lines" viewBox="0 0 1400 800">
                 <path d="M 260 150 L 380 150 L 430 200 L 500 200" />
                 <path d="M 260 350 L 380 350 L 430 300 L 500 300" />
-                <path d="M 260 550 L 380 550 L 430 480 L 500 480" />
-                <path d="M 260 650 L 380 650 L 430 600 L 500 600" />
                 <circle cx="380" cy="150" r="3" />
                 <circle cx="380" cy="350" r="3" />
-                <circle cx="380" cy="550" r="3" />
-                <circle cx="380" cy="650" r="3" />
                 <path d="M 430 400 L 500 400" class="thin-line" />
                 <path d="M 900 200 L 1050 200 L 1100 150 L 1200 150" />
                 <path d="M 900 300 L 1050 300 L 1100 280 L 1200 280" />
@@ -500,11 +415,6 @@
             </div>
             <div class="win-logo"><i class="fa-brands fa-windows"></i></div>
 
-            <div class="cpu-widget">
-                <h2>--</h2>
-                <p>CPU</p>
-            </div>
-
             <div class="file-widget">
                 <div class="file-row"><span><i class="fa-regular fa-circle-xmark"></i> Documents</span> <i class="fa-solid fa-caret-right"></i></div>
                 <div class="file-row"><span><i class="fa-regular fa-circle-xmark"></i> Pictures</span> <i class="fa-solid fa-caret-right"></i></div>
@@ -529,17 +439,6 @@
                 <div class="f-label"><i class="fa-solid fa-desktop"></i> This PC</div>
                 <div class="f-label"><i class="fa-solid fa-network-wired"></i> Network</div>
                 <div class="f-label"><i class="fa-regular fa-trash-can"></i> Recycle Bin</div>
-            </div>
-
-            <div class="orb-wrapper">
-                <div class="orb-outer-ring"></div>
-                <div class="orb-mid-ring">
-                    <div class="orb-segments-1"></div>
-                    <div class="orb-segments-2"></div>
-                    <div class="orb-inner-detail">
-                        <div class="orb-core"></div>
-                    </div>
-                </div>
             </div>
 
             <div class="app-list">
@@ -606,18 +505,6 @@
                     <p>Hardware<br>Sensor</p>
                 </div>
                 <div class="temp-circle">N/A</div>
-            </div>
-
-            <div class="jarvis-widget">
-                <div class="jarvis-header">
-                    <h3>Jarvis</h3>
-                    <div class="waveform">
-                        <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
-                        <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
-                        <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
-                    </div>
-                </div>
-                <div class="jarvis-status">PERSONAL AI SYSTEM · ONLINE</div>
             </div>
 
             <div class="mid-graph-box">
@@ -771,17 +658,12 @@
             if (api && api.open_url && apps[name]) api.open_url(apps[name]);
         };
         document.addEventListener("click", (event) => {
-            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .orb-wrapper, .data-row");
+            const target = event.target.closest(".file-row, .center-nav-left > div, .f-label, .app-row, .m-icon, .hex-btn, .power-controls i, .back-btn, .desktop-icons > div, .data-row");
             if (!target) return;
             const label = target.textContent.trim().toLowerCase().replace(/\s+/g, " ");
             if (target.matches(".power-controls i")) {
                 const index = [...target.parentElement.children].indexOf(target);
                 command(index === 2 ? "next track" : "play pause");
-                return;
-            }
-            if (target.matches(".orb-wrapper")) {
-                const prompt = window.prompt("What should JARVIS do?");
-                if (prompt && prompt.trim()) command(prompt.trim());
                 return;
             }
             if (target.matches(".back-btn")) {
@@ -879,14 +761,6 @@
                 });
                 const batteryWidget = document.querySelector(".battery-widget h2");
                 if (batteryWidget && data.battery) batteryWidget.textContent = data.battery;
-                const cpu = document.querySelector(".cpu-widget h2");
-                const cpuWidget = document.querySelector(".cpu-widget");
-                const cpuValue = Number.parseFloat(data.cpu);
-                if (cpu && data.cpu) cpu.textContent = data.cpu;
-                if (cpuWidget && Number.isFinite(cpuValue)) {
-                    cpuWidget.style.setProperty("--cpu-usage", Math.max(0, Math.min(100, cpuValue)) + "%");
-                    cpuWidget.setAttribute("aria-label", "CPU usage " + Math.round(cpuValue) + " percent");
-                }
                 const storageRows = document.querySelectorAll(".storage-widget .storage-row span");
                 if (storageRows[0]) storageRows[0].lastChild.textContent = " Full Capacity: " + (data.disk_total || "N/A");
                 if (storageRows[1]) storageRows[1].lastChild.textContent = " Free Capacity: " + (data.disk_free || "N/A");
@@ -928,15 +802,8 @@
             if (!api || !api.get_runtime_state) return;
             try {
                 const state = await api.get_runtime_state();
-                const orb = document.querySelector(".orb-wrapper");
                 const arrow = document.querySelector(".back-btn");
                 const listening = Boolean(state.listening);
-                const busy = Boolean(state.busy);
-                if (orb) {
-                    orb.classList.toggle("is-listening", listening);
-                    orb.classList.toggle("is-thinking", busy);
-                    orb.title = listening ? "JARVIS microphone listener active" : busy ? "JARVIS is processing a request" : "Click to send a command";
-                }
                 if (arrow) {
                     arrow.classList.toggle("is-listening", listening);
                     arrow.title = listening ? "Stop JARVIS voice listening" : "Start JARVIS voice listening";
