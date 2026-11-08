@@ -1655,10 +1655,46 @@ class StartupHelperErrorLoggingTests(unittest.TestCase):
             self.assertEqual(jarvis_desktop.main(["--cleanup-uninstall"]), 1)
         logger.exception.assert_called_once_with("Uninstall cleanup failed")
 
+
+
+class DocumentConsentDeclineFlowTests(unittest.TestCase):
+    def test_declining_document_share_saves_metadata_and_releases_request(self):
+        import queue
+        from unittest.mock import Mock, patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        app.events.put(("document_consent_required", {
+            "prompt": "summarize this document",
+            "name": "private-notes.txt",
+            "characters": 42,
+            "pages": None,
+            "text": "PRIVATE DOCUMENT BODY",
+        }))
+        app.root = Mock()
+        app.settings = {"endpoint": "https://example.test/v1/chat/completions"}
+        app.history = []
+        app.request_lock = Mock()
+        app._append = Mock()
+        app._set_status = Mock()
+
+        with (
+            patch.object(jarvis_desktop.messagebox, "askyesno", return_value=False),
+            patch.object(jarvis_desktop, "save_chat_history") as save_history,
+        ):
+            app._poll_events()
+
+        self.assertEqual(app.history[0], {
+            "role": "user", "content": "summarize this document"
+        })
+        self.assertNotIn("PRIVATE DOCUMENT BODY", json.dumps(app.history))
+        save_history.assert_called_once_with(app.history)
+        app.request_lock.release.assert_called_once_with()
+        app.root.after.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
-
-
 class SingleInstanceTests(unittest.TestCase):
     def test_non_windows_runs_without_mutex(self):
         with patch.object(jarvis_desktop.os, "name", "posix"):
