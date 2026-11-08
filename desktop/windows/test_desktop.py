@@ -1693,8 +1693,7 @@ class DocumentConsentDeclineFlowTests(unittest.TestCase):
         app.root.after.assert_called_once()
 
 
-if __name__ == "__main__":
-    unittest.main()
+
 class SingleInstanceTests(unittest.TestCase):
     def test_non_windows_runs_without_mutex(self):
         with patch.object(jarvis_desktop.os, "name", "posix"):
@@ -1923,3 +1922,7 @@ class SettingsDurabilityTests(unittest.TestCase):
         self.assertEqual(json.loads(path.read_text(encoding="utf-8")),
                          {"language": "en-IN"})
         self.assertFalse(path.with_suffix(".json.tmp").exists())
+
+
+if __name__ == "__main__":
+    unittest.main()
