@@ -622,6 +622,53 @@ class ChatHistoryTests(unittest.TestCase):
         self.assertEqual(loaded[0]["content"], "5")
 
 
+class MicrophoneConsentDialogTests(unittest.TestCase):
+    def test_windows_consent_dialog_is_topmost_and_foreground(self):
+        class FakeUser32:
+            def __init__(self):
+                self.args = None
+
+            def MessageBoxW(self, hwnd, message, title, flags):
+                self.args = (hwnd, message, title, flags)
+                return 6
+
+        user32 = FakeUser32()
+        accepted = jarvis_desktop.ask_microphone_consent(
+            platform_name="nt", user32=user32,
+        )
+        self.assertTrue(accepted)
+        self.assertIsNone(user32.args[0])
+        self.assertIn("Allow JARVIS to check microphone access?", user32.args[1])
+        self.assertEqual(user32.args[2], "JARVIS microphone permission")
+        self.assertEqual(user32.args[3] & 0x00040000, 0x00040000)  # MB_TOPMOST
+        self.assertEqual(user32.args[3] & 0x00010000, 0x00010000)  # MB_SETFOREGROUND
+
+    def test_windows_consent_dialog_only_accepts_yes(self):
+        class FakeUser32:
+            def MessageBoxW(self, *_args):
+                return 7  # IDNO
+
+        self.assertFalse(jarvis_desktop.ask_microphone_consent(
+            platform_name="nt", user32=FakeUser32(),
+        ))
+
+    def test_non_windows_consent_uses_tk_dialog(self):
+        class FakeMessageBox:
+            def __init__(self):
+                self.args = None
+
+            def askyesno(self, *args, **kwargs):
+                self.args = (args, kwargs)
+                return True
+
+        fake = FakeMessageBox()
+        parent = object()
+        self.assertTrue(jarvis_desktop.ask_microphone_consent(
+            parent=parent, platform_name="posix", messagebox_module=fake,
+        ))
+        self.assertIs(fake.args[1]["parent"], parent)
+
+
 class MicrophoneConsentTests(unittest.TestCase):
     def test_legacy_completed_flag_does_not_suppress_explicit_consent_prompt(self):
         # Older builds marked setup complete even when the user declined.
