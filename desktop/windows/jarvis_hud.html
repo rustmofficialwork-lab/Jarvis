@@ -301,6 +301,41 @@
         .bottom-grid > .stat-box:nth-child(3) .data-row { margin-bottom: 1px; line-height: 1.15; }
 
         /* ============ RIGHT PANEL ============ */
+        /* Fullscreen control: browser chrome is hidden only after a user gesture. */
+        :fullscreen, :fullscreen body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg);
+        }
+        :fullscreen .hud-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        .fullscreen-btn {
+            position: absolute;
+            top: 20px;
+            right: 75px;
+            width: 40px;
+            height: 40px;
+            border: 1.5px solid var(--cyan);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--cyan);
+            background: rgba(2, 11, 20, 0.75);
+            box-shadow: var(--glow);
+            font-size: 1rem;
+            z-index: 21;
+            cursor: pointer;
+            transition: .25s ease;
+        }
+        .fullscreen-btn:hover {
+            background: rgba(0, 229, 255, .2);
+            transform: scale(1.06);
+        }
+
         .back-btn {
             position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-radius: 50%;
             border: 2px solid var(--cyan); display: flex; justify-content: center; align-items: center;
@@ -555,6 +590,9 @@
             </div>
 
             <!-- RIGHT PANEL -->
+            <button class="fullscreen-btn" id="fullscreenToggle" type="button" title="Enter full screen" aria-label="Enter full screen">
+                <i class="fa-solid fa-expand"></i>
+            </button>
             <div class="back-btn"><i class="fa-solid fa-arrow-right"></i></div>
             <div class="mini-top-graph">
                 <div class="mtg-bar"></div><div class="mtg-bar"></div><div class="mtg-bar"></div>
@@ -662,6 +700,36 @@
                 window.visualViewport.addEventListener('resize', scheduleScale, { passive: true });
             }
         })();
+    </script>
+
+    <script>
+    (() => {
+        const button = document.getElementById("fullscreenToggle");
+        if (!button) return;
+        const icon = button.querySelector("i");
+        const update = () => {
+            const active = Boolean(document.fullscreenElement);
+            button.title = active ? "Exit full screen" : "Enter full screen";
+            button.setAttribute("aria-label", button.title);
+            if (icon) {
+                icon.classList.toggle("fa-expand", !active);
+                icon.classList.toggle("fa-compress", active);
+            }
+        };
+        button.addEventListener("click", async () => {
+            try {
+                if (document.fullscreenElement) {
+                    await document.exitFullscreen();
+                } else {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch (error) {
+                console.warn("Fullscreen mode is unavailable in this browser.", error);
+            }
+        });
+        document.addEventListener("fullscreenchange", update);
+        update();
+    })();
     </script>
 
     <!-- JARVIS Desktop Bridge -->
