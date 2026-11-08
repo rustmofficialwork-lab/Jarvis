@@ -622,6 +622,25 @@ class ChatHistoryTests(unittest.TestCase):
         self.assertEqual(loaded[0]["content"], "5")
 
 
+class MicrophoneConsentTests(unittest.TestCase):
+    def test_legacy_completed_flag_does_not_suppress_explicit_consent_prompt(self):
+        # Older builds marked setup complete even when the user declined.
+        legacy_settings = {"microphone_setup_completed": True}
+        self.assertTrue(jarvis_desktop.microphone_consent_required(legacy_settings))
+
+    def test_explicit_acceptance_is_remembered_for_this_consent_version(self):
+        settings = {}
+        jarvis_desktop.record_microphone_consent(settings, True)
+        self.assertFalse(jarvis_desktop.microphone_consent_required(settings))
+        self.assertTrue(settings["microphone_consent_granted"])
+
+    def test_explicit_decline_is_remembered_without_granting_microphone_access(self):
+        settings = {}
+        jarvis_desktop.record_microphone_consent(settings, False)
+        self.assertFalse(jarvis_desktop.microphone_consent_required(settings))
+        self.assertFalse(settings["microphone_consent_granted"])
+
+
 class SettingsPersistenceTests(unittest.TestCase):
     def test_settings_are_saved_atomically_and_reloaded(self):
         import tempfile
@@ -632,7 +651,8 @@ class SettingsPersistenceTests(unittest.TestCase):
             "language": "hi-IN",
             "start_with_windows": True,
             "share_memory_with_ai": False,
-            "microphone_setup_completed": False,
+            "microphone_consent_version": 1,
+            "microphone_consent_granted": False,
         }
         jarvis_desktop.save_settings(settings, path)
         self.assertEqual(jarvis_desktop.load_settings(path), settings)
