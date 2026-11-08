@@ -126,9 +126,9 @@ def save_settings(data: dict, path: Path = SETTINGS_FILE) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     try:
-        with temporary.open("w", encoding="utf-8", newline="\\n") as output:
+        with temporary.open("w", encoding="utf-8", newline="") as output:
             json.dump(data, output, ensure_ascii=False, indent=2)
-            output.write("\\n")
+            output.write(chr(10))
             output.flush()
             os.fsync(output.fileno())
         temporary.replace(path)
@@ -138,7 +138,6 @@ def save_settings(data: dict, path: Path = SETTINGS_FILE) -> None:
             temporary.unlink()
         except FileNotFoundError:
             pass
-
 
 def load_chat_history(path: Path = HISTORY_FILE) -> list[dict]:
     """Load a bounded, validated chat history; corrupt files are ignored safely."""
