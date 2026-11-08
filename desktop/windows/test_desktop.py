@@ -1609,6 +1609,51 @@ class SharedOnlineReplyTests(unittest.TestCase):
         self.assertEqual(completion.call_args.args[5], ["User prefers Hindi"])
         self.assertEqual(app.memory_store.query, "hello")
 
+class StartupLoggingTests(unittest.TestCase):
+    def test_configure_startup_logging_creates_log_and_writes_event(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as folder:
+            log_path = Path(folder) / "startup.log"
+            logger = jarvis_desktop.configure_startup_logging(log_path)
+            handlers = [
+                handler for handler in logger.handlers
+                if getattr(handler, "baseFilename", None) == str(log_path.resolve())
+            ]
+            try:
+                self.assertEqual(len(handlers), 1)
+                logger.info("startup logging test event")
+                handlers[0].flush()
+                self.assertTrue(log_path.is_file())
+                self.assertIn("startup logging test event", log_path.read_text(encoding="utf-8"))
+            finally:
+                for handler in handlers:
+                    logger.removeHandler(handler)
+                    handler.close()
+
+
+class StartupHelperErrorLoggingTests(unittest.TestCase):
+    def test_reminder_check_exception_is_logged(self):
+        from unittest.mock import Mock
+
+        logger = Mock()
+        with (
+            patch.object(jarvis_desktop, "configure_startup_logging", return_value=logger),
+            patch.object(jarvis_desktop, "notify_due_reminders", side_effect=RuntimeError("reminder failure")),
+        ):
+            self.assertEqual(jarvis_desktop.main(["--reminder-check"]), 1)
+        logger.exception.assert_called_once_with("Scheduled reminder check failed")
+
+    def test_uninstall_cleanup_exception_is_logged(self):
+        from unittest.mock import Mock
+
+        logger = Mock()
+        with (
+            patch.object(jarvis_desktop, "configure_startup_logging", return_value=logger),
+            patch.object(jarvis_desktop, "remove_all_reminder_tasks", side_effect=RuntimeError("cleanup failure")),
+        ):
+            self.assertEqual(jarvis_desktop.main(["--cleanup-uninstall"]), 1)
+        logger.exception.assert_called_once_with("Uninstall cleanup failed")
 
 if __name__ == "__main__":
     unittest.main()
@@ -1821,27 +1866,3 @@ class HudRuntimeStateTests(unittest.TestCase):
             bridge.get_runtime_state(),
             {"listening": False, "busy": False},
         )
-
-
-
-class StartupLoggingTests(unittest.TestCase):
-    def test_configure_startup_logging_creates_log_and_writes_event(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as folder:
-            log_path = Path(folder) / "startup.log"
-            logger = jarvis_desktop.configure_startup_logging(log_path)
-            handlers = [
-                handler for handler in logger.handlers
-                if getattr(handler, "baseFilename", None) == str(log_path.resolve())
-            ]
-            try:
-                self.assertEqual(len(handlers), 1)
-                logger.info("startup logging test event")
-                handlers[0].flush()
-                self.assertTrue(log_path.is_file())
-                self.assertIn("startup logging test event", log_path.read_text(encoding="utf-8"))
-            finally:
-                for handler in handlers:
-                    logger.removeHandler(handler)
-                    handler.close()
