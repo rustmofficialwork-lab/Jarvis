@@ -353,18 +353,25 @@ setInterval(updateClock,1000);updateClock();
   const container=document.querySelector('.hud-container');
   const design=document.querySelector('.hud-inner');
   let frame=0;
-  // The original fixed-position HUD reaches y=865 at the bottom CPU gauge.
-  // Use that full content bound so the last 14px are not clipped.
+  // The design box is 1600x851, while its lowest fixed-position gauge ends
+  // at y=865. Fit that complete visual bound, not just the CSS box.
   const DESIGN_WIDTH=1600, DESIGN_HEIGHT=865;
   const scaleHUD=()=>{
     if(!container||!design)return;
     const bounds=container.getBoundingClientRect();
     const w=bounds.width,h=bounds.height;
     if(!(w>0)||!(h>0))return;
-    // One uniform scale preserves circles, typography, spacing and every
-    // absolute position. "contain" behaviour keeps the complete HUD visible.
+
+    // Use a top-left transform origin and calculate the offset from the full
+    // 1600x865 visual bounds. This keeps the 14px overflow below the 851px
+    // design box centered and visible instead of clipping the bottom gauge.
     const scale=Math.min(w/DESIGN_WIDTH,h/DESIGN_HEIGHT);
-    design.style.transform='translate(-50%, -50%) scale('+scale+')';
+    const offsetX=(w-DESIGN_WIDTH*scale)/2;
+    const offsetY=(h-DESIGN_HEIGHT*scale)/2;
+    design.style.left='0px';
+    design.style.top='0px';
+    design.style.transformOrigin='top left';
+    design.style.transform='translate('+offsetX+'px, '+offsetY+'px) scale('+scale+')';
   };
   const schedule=()=>{
     if(frame)return;
