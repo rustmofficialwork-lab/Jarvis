@@ -223,7 +223,13 @@ async def register_device(request: Request) -> Response:
 
 
 def require_client_token(authorization: str | None = Header(default=None)) -> str | None:
-    supplied = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else ""
+    # HTTP authentication scheme names are case-insensitive (RFC 9110).
+    parts = authorization.split(None, 1) if authorization else []
+    supplied = (
+        parts[1].strip()
+        if len(parts) == 2 and parts[0].casefold() == "bearer"
+        else ""
+    )
     if not supplied:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
 
