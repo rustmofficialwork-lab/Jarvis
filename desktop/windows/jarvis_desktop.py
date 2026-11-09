@@ -1073,7 +1073,12 @@ class JarvisDesktop:
             self._set_status("Microphone permission declined. Chat and HUD remain available.")
 
     def _request_microphone_access(self):
-        """Open and immediately release the default input device after user consent."""
+        """Check the microphone only after the user has granted JARVIS consent."""
+        if microphone_consent_required(self.settings):
+            self._first_launch_permission_setup()
+        if not self.settings.get("microphone_consent_granted"):
+            self._set_status("Microphone permission was not granted. No microphone check was performed.")
+            return
         self._set_status("Checking Windows microphone access…")
 
         def worker():
