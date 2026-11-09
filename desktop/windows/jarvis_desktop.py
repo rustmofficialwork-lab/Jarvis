@@ -3092,6 +3092,10 @@ def run_web_hud():
             root = tk.Tk()
             root.withdraw()
             app = JarvisDesktop(root)
+            # Publish the bridge on the app before exposing it to HUD callbacks.
+            # The WebView can start before this worker; never dereference state["app"]
+            # from the WebView startup thread while backend initialization is racing.
+            app.web_bridge = bridge
             state["root"], state["app"] = root, app
             root.withdraw()
             logger.info("Desktop backend initialized")
@@ -3121,7 +3125,6 @@ def run_web_hud():
         min_size=(900, 560), background_color="#020b14", text_select=False,
     )
     bridge.window = window
-    state["app"].web_bridge = bridge
     logger.info("HUD window created; entering webview event loop")
     webview.start(debug=False)
     logger.info("HUD window closed normally")
