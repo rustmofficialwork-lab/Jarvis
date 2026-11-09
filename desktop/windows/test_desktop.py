@@ -1295,6 +1295,30 @@ class ApplicationShutdownTests(unittest.TestCase):
 
 
 class WakeRecorderCleanupTests(unittest.TestCase):
+    def test_missing_wake_dependency_reports_error_and_stops_listener_cleanly(self):
+        import builtins
+        import queue
+        import threading
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.events = queue.Queue()
+        app.stop_event = threading.Event()
+        original_import = builtins.__import__
+
+        def fail_numpy(name, *args, **kwargs):
+            if name == "numpy":
+                raise ImportError("numpy native module unavailable")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fail_numpy):
+            app._wake_loop()
+
+        kind, message = app.events.get_nowait()
+        self.assertEqual(kind, "error")
+        self.assertIn("numpy native module unavailable", message)
+        self.assertEqual(app.events.get_nowait(), ("listener_stopped", None))
+        self.assertTrue(app.events.empty())
+
     def test_release_stops_active_recorder_before_deleting_it(self):
         calls = []
 
