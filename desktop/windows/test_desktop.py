@@ -2087,5 +2087,22 @@ class HudShortcutWiringTests(unittest.TestCase):
         )
 
 
+    def test_hud_awaits_actual_bridge_action_results(self):
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        self.assertIn("const call=async(name,...args)=>", hud)
+        self.assertIn("await a[name](...args)", hud)
+        self.assertIn("const command=async v=>{await call('send_command',v)", hud)
+        self.assertIn("voice:async()=>{if(!await call('toggle_voice'))", hud)
+        self.assertIn("const run=async el=>", hud)
+        self.assertIn("else if(!await call('open_system_tool',d.tool))", hud)
+
+    def test_hud_starts_dashboard_refresh_if_bridge_is_already_ready(self):
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        self.assertIn("window.addEventListener('pywebviewready',startBridgeRefresh)", hud)
+        self.assertIn("startBridgeRefresh();", hud)
+        self.assertIn("if(bridgeRefreshStarted||!(window.pywebview&&window.pywebview.api))return;", hud)
+
+
+
 if __name__ == "__main__":
     unittest.main()
