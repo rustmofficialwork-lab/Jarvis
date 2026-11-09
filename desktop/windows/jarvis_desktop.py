@@ -2198,26 +2198,31 @@ class JarvisDesktop:
             if language not in {"en-IN", "hi-IN", "en-US"}:
                 raise ValueError("Choose a supported speech language.")
             startup_enabled = payload.get("start_with_windows") is True
-            set_windows_startup(startup_enabled)
             api_key = str(payload.get("ai_key", "")).strip()
             picovoice_key = str(payload.get("picovoice_key", "")).strip()
+
+            # Empty password fields mean "keep the saved key", never erase it.
+            # Never send stored secrets to the WebView just to prefill a form.
+            if (api_key or picovoice_key) and not self.keyring:
+                raise RuntimeError(
+                    "Secure key storage is unavailable. Install/repair Windows Credential Manager support before adding keys."
+                )
+            if api_key:
+                self.keyring.set_password(KEYRING_SERVICE, "ai_api_key", api_key)
+                self.ai_api_key = api_key
+                self.api_key_var.set(api_key)
+            if picovoice_key:
+                self.keyring.set_password(KEYRING_SERVICE, "picovoice_access_key", picovoice_key)
+                self.picovoice_access_key = picovoice_key
+                self.picovoice_var.set(picovoice_key)
+
+            set_windows_startup(startup_enabled)
             self.settings["endpoint"] = endpoint
             self.settings["model"] = model
             self.settings["language"] = language
             self.settings["start_with_windows"] = startup_enabled
             self.settings["share_memory_with_ai"] = payload.get("share_memory_with_ai") is True
-            self.api_key_var.set(api_key)
-            self.picovoice_var.set(picovoice_key)
-            self.ai_api_key = api_key
-            self.picovoice_access_key = picovoice_key
             save_settings(self.settings)
-            if self.keyring:
-                self.keyring.set_password(KEYRING_SERVICE, "ai_api_key", api_key)
-                self.keyring.set_password(KEYRING_SERVICE, "picovoice_access_key", picovoice_key)
-            elif api_key or picovoice_key:
-                self._set_status("Settings saved, but secure key storage is unavailable on this PC.")
-                self._ensure_offline_model(language)
-                return True
             self._set_status("Settings saved.")
             self._ensure_offline_model(language)
             return True
@@ -2793,8 +2798,8 @@ class JarvisWebBridge:
             "language": app.settings.get("language", "en-IN"),
             "start_with_windows": bool(app.settings.get("start_with_windows", False)),
             "share_memory_with_ai": bool(app.settings.get("share_memory_with_ai", False)),
-            "ai_key": app.api_key_var.get(),
-            "picovoice_key": app.picovoice_var.get(),
+            "has_ai_key": bool(getattr(app, "ai_api_key", "").strip()),
+            "has_picovoice_key": bool(getattr(app, "picovoice_access_key", "").strip()),
         }
 
     def save_settings(self, payload):
@@ -2810,7 +2815,20 @@ class JarvisWebBridge:
             "ai_key": str(payload.get("ai_key", ""))[:4096],
             "picovoice_key": str(payload.get("picovoice_key", ""))[:4096],
         }
-        return self._dispatch(lambda: app.apply_web_settings(clean))
+        completed = threading.Event()
+        outcome = {"saved": False}
+
+        def apply():
+            try:
+                outcome["saved"] = bool(app.apply_web_settings(clean))
+            finally:
+                completed.set()
+
+        if not self._dispatch(apply):
+            return False
+        # Wait for the Tk-thread save result so the HUD never reports success
+        # merely because a callback was queued.
+        return bool(completed.wait(10) and outcome["saved"])
 
     def get_voice_state(self):
         app = self.app_state.get("app")
@@ -3057,17 +3075,11 @@ def run_web_hud():
 
     logger = logging.getLogger("jarvis")
     logger.info("Starting JARVIS desktop HUD")
+    # Show the HUD immediately; backend initialization continues in parallel.
+    # Dashboard sensor reads are independent and the bridge becomes fully active
+    # as soon as the hidden Tk backend publishes its app instance.
     backend = threading.Thread(target=start_backend, name="JARVIS-backend", daemon=True)
     backend.start()
-    for _ in range(200):
-        if state["app"] is not None or errors:
-            break
-        time.sleep(0.05)
-    if errors:
-        raise RuntimeError(f"JARVIS backend failed to initialize: {errors[0]}")
-    if state["app"] is None:
-        raise RuntimeError("JARVIS backend did not initialize in time")
-    logger.info("Desktop backend is ready")
 
     hud_path = Path(__file__).with_name("jarvis_hud.html")
     if not hud_path.exists() and getattr(sys, "frozen", False):
