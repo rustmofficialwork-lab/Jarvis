@@ -428,10 +428,11 @@ setInterval(updateClock,1000);updateClock();
 (()=>{
   const $$=s=>[...document.querySelectorAll(s)];
   const txt=el=>el.textContent.trim().toLowerCase().replace(/\s+/g,' ');
-  const call=(name,...args)=>{
+  const call=async(name,...args)=>{
     const a=window.pywebview&&window.pywebview.api;
-    if(a&&typeof a[name]==='function'){a[name](...args);return true;}
-    return false;
+    if(!a||typeof a[name]!=='function')return false;
+    try{return Boolean(await a[name](...args));}
+    catch(err){console.warn('JARVIS HUD action failed: '+name,err);return false;}
   };
   const OFFLINE='JARVIS desktop bridge is not connected';
   const APPS={gmail:'https://mail.google.com/',whatsapp:'https://web.whatsapp.com/',discord:'https://discord.com/app',twitter:'https://x.com/',facebook:'https://www.facebook.com/',instagram:'https://www.instagram.com/',youtube:'https://www.youtube.com/',steam:'https://store.steampowered.com/',notion:'https://www.notion.so/',spotify:'https://open.spotify.com/',chatgpt:'https://chatgpt.com/'};
@@ -509,32 +510,32 @@ setInterval(updateClock,1000);updateClock();
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!settingsLayer.hidden)closeSettings();});
 
   /* actions */
-  const command=v=>{call('send_command',v)?toast('Sent: '+v):toast(OFFLINE);};
+  const command=async v=>{await call('send_command',v)?toast('Sent: '+v):toast(OFFLINE);};
   const ACTIONS={
     play:()=>command('play pause'),
     next:()=>command('next track'),
     prev:()=>command('previous track'),
-    voice:()=>{if(!call('toggle_voice'))toast('Voice control works only in the JARVIS app');},
+    voice:async()=>{if(!await call('toggle_voice'))toast('Voice control works only in the JARVIS app');},
     command:()=>ask('What should JARVIS do?','e.g. open youtube').then(v=>v&&command(v)),
     status:()=>command('system status'),
     find:()=>ask('Which file should JARVIS find?','file name').then(v=>v&&command('find file '+v)),
     settings:()=>{openSettings();},
     reminders:()=>command('show reminders')
   };
-  const run=el=>{
+  const run=async el=>{
     const d=el.dataset;
     if(d.app){
       toast('Opening '+d.app+'…');
-      if(!call('open_url',APPS[d.app]))window.open(APPS[d.app],'_blank','noopener');
+      if(!await call('open_url',APPS[d.app]))window.open(APPS[d.app],'_blank','noopener');
     }else if(d.folder){
-      call('open_folder',d.folder)?toast('Opening '+d.folder+'…'):toast('Folders open only in the JARVIS desktop app');
+      await call('open_folder',d.folder)?toast('Opening '+d.folder+'…'):toast('Folders open only in the JARVIS desktop app');
     }else if(d.tool){
       if(d.tool==='settings'){
         openSettings();
-      }else if(!call('open_system_tool',d.tool)){
+      }else if(!await call('open_system_tool',d.tool)){
         toast(OFFLINE);
       }
-    }else if(ACTIONS[d.action]){ACTIONS[d.action]();}
+    }else if(ACTIONS[d.action]){await ACTIONS[d.action]();}
   };
 
   /* mark every button */
@@ -570,7 +571,7 @@ setInterval(updateClock,1000);updateClock();
     const k=e.key.toLowerCase();
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&k==='k'){e.preventDefault();ACTIONS.command();return;}
     if((e.ctrlKey||e.metaKey)&&e.shiftKey&&k==='v'){e.preventDefault();ACTIONS.voice();return;}
-    if(e.key==='Escape'){call('stop_speech');return;}
+    if(e.key==='Escape'){void call('stop_speech');return;}
     const el=e.target.closest&&e.target.closest('[data-hud]');
     if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();run(el);}
   });
@@ -649,10 +650,16 @@ setInterval(updateClock,1000);updateClock();
       }
     }catch(err){console.warn('JARVIS runtime state refresh failed',err);}
   }
-  window.addEventListener('pywebviewready',()=>{
+  let bridgeRefreshStarted=false;
+  const startBridgeRefresh=()=>{
+    if(bridgeRefreshStarted||!(window.pywebview&&window.pywebview.api))return;
+    bridgeRefreshStarted=true;
     refreshDashboard();refreshRuntimeState();
     setInterval(refreshDashboard,5000);setInterval(refreshRuntimeState,1000);
-  });
+  };
+  window.addEventListener('pywebviewready',startBridgeRefresh);
+  // The bridge may already be available before this listener is registered.
+  startBridgeRefresh();
 
   if(window.innerWidth<700&&window.innerHeight>window.innerWidth)toast('Rotate to landscape for easier tapping',5000);
 })();
