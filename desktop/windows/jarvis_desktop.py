@@ -42,6 +42,8 @@ MAX_TOOL_ARGUMENT_LENGTH = 4096
 KEYRING_SERVICE = "JARVIS-Desktop"
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
+JARVIS_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "Jarvis_20260313_215039.onnx"
+JARVIS_WAKEWORD_MODEL_PAGE = "https://openwakeword.com/library/422"
 HISTORY_FILE = SETTINGS_DIR / "chat_history.json"
 STARTUP_LOG_FILE = SETTINGS_DIR / "startup.log"
 DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
@@ -1953,7 +1955,7 @@ class JarvisDesktop:
         self.wake_thread.start()
 
     def _wake_loop(self):
-        """Detect 'Hey Jarvis' locally with openWakeWord, then capture one command."""
+        """Detect the single word 'Jarvis' locally, then capture one command."""
         import numpy as np
         import pyaudio
         import openwakeword
@@ -1965,16 +1967,26 @@ class JarvisDesktop:
         detector = None
         chunk_size = 1280  # 80 ms of 16 kHz mono audio
         try:
-            self.events.put(("status", "Preparing the Hey Jarvis wake-word model…"))
-            # The first activation downloads the public model once. Detection itself
-            # runs locally after the model has been cached on this PC.
+            model_path = JARVIS_WAKEWORD_MODEL
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            if not model_path.is_file():
+                raise FileNotFoundError(
+                    "The single-word Jarvis wake model is not installed. "
+                    f"Download the ONNX file from {JARVIS_WAKEWORD_MODEL_PAGE} "
+                    f"and save it as: {model_path}"
+                )
+
+            self.events.put(("status", "Preparing the Jarvis wake-word model…"))
+            # Downloads only openWakeWord's shared feature models if not cached.
+            # The custom Jarvis detector itself is loaded from the local ONNX file.
             openwakeword.utils.download_models()
             detector = Model(
-                wakeword_models=["hey_jarvis"],
+                wakeword_models=[str(model_path)],
                 inference_framework="onnx",
             )
             audio = pyaudio.PyAudio()
-            self.events.put(("status", "Listening locally for “Hey Jarvis”."))
+            self.events.put(("status", "Listening locally for “Jarvis”."))
+            last_activation = 0.0
             while not self.stop_event.is_set():
                 try:
                     if stream is None:
@@ -1990,9 +2002,11 @@ class JarvisDesktop:
                         dtype=np.int16,
                     )
                     scores = detector.predict(frame)
-                    confidence = float(scores.get("hey_jarvis", 0.0))
-                    if confidence < 0.5:
+                    confidence = float(scores.get(model_path.stem, 0.0))
+                    now = time.monotonic()
+                    if confidence < 0.5 or now - last_activation < 2.0:
                         continue
+                    last_activation = now
 
                     # Release the detector stream before SpeechRecognition opens
                     # the same microphone for the user's actual command.
@@ -2001,7 +2015,7 @@ class JarvisDesktop:
                     finally:
                         stream.close()
                         stream = None
-                    self.events.put(("status", "Hey Jarvis detected — speak your command now."))
+                    self.events.put(("status", "Jarvis detected — speak your command now."))
                     recognizer = configure_voice_recognizer(sr.Recognizer())
                     try:
                         with sr.Microphone() as source:
@@ -2015,13 +2029,13 @@ class JarvisDesktop:
                         if self.stop_event.is_set():
                             break
                         if command is None:
-                            self.events.put(("status", "No command heard. Listening for “Hey Jarvis” again."))
+                            self.events.put(("status", "No command heard. Listening for “Jarvis” again."))
                             continue
                         self.events.put(("status", f"Heard: {command}"))
                         self._answer_voice(command)
-                        self.events.put(("status", "Listening locally for “Hey Jarvis”."))
+                        self.events.put(("status", "Listening locally for “Jarvis”."))
                     except sr.WaitTimeoutError:
-                        self.events.put(("status", "No command heard. Listening for “Hey Jarvis” again."))
+                        self.events.put(("status", "No command heard. Listening for “Jarvis” again."))
                     except sr.UnknownValueError:
                         self.events.put(("status", "Sorry, I couldn't understand that. Listening again."))
                     except sr.RequestError as exc:
@@ -2039,7 +2053,7 @@ class JarvisDesktop:
                         stream = None
                     self.stop_event.wait(2)
         except Exception as exc:
-            logging.getLogger("jarvis").exception("openWakeWord listener stopped unexpectedly")
+            logging.getLogger("jarvis").exception("Jarvis wake listener stopped unexpectedly")
             self.events.put(("error", f"Wake listener could not start: {exc}"))
         finally:
             if stream is not None:
