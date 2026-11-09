@@ -516,6 +516,7 @@ setInterval(updateClock,1000);updateClock();
     next:()=>command('next track'),
     prev:()=>command('previous track'),
     voice:async()=>{if(!await call('toggle_voice'))toast('Voice control works only in the JARVIS app');},
+    exit:async()=>{if(!await call('close_window'))toast('Could not close JARVIS');},
     command:()=>ask('What should JARVIS do?','e.g. open youtube').then(v=>v&&command(v)),
     status:()=>command('system status'),
     find:()=>ask('Which file should JARVIS find?','file name').then(v=>v&&command('find file '+v)),
@@ -553,8 +554,10 @@ setInterval(updateClock,1000);updateClock();
     .forEach(([a,n],i)=>{const b=$$('.hex-btn')[i];if(b)mark(b,n,{action:a});});
   [['play','Play / pause'],['play','Play / pause'],['next','Next track'],['prev','Previous track']]
     .forEach(([a,n],i)=>{const b=$$('.power-controls i')[i];if(b)mark(b,n,{action:a});});
+  const gear=document.querySelector('.gear');
+  if(gear)mark(gear,'Open JARVIS settings',{action:'settings'});
   const back=document.querySelector('.back-btn');
-  if(back)mark(back,'Start or stop voice listening',{action:'voice'});
+  if(back)mark(back,'Exit JARVIS',{action:'exit'});
   const orb=document.querySelector('.orb-wrapper');
   if(orb)mark(orb,'Type a command for JARVIS',{action:'command'});
   $$('.quick-item').forEach(row=>{
@@ -644,9 +647,9 @@ setInterval(updateClock,1000);updateClock();
         orb.title=listening?'JARVIS microphone listener active':busy?'JARVIS is processing a request':'Click to send a command';
       }
       if(back){
-        back.classList.toggle('is-listening',listening);
-        back.title=listening?'Stop JARVIS voice listening':'Start JARVIS voice listening';
-        back.setAttribute('aria-label',back.title);
+        back.classList.remove('is-listening');
+        back.title='Exit JARVIS';
+        back.setAttribute('aria-label','Exit JARVIS');
       }
     }catch(err){console.warn('JARVIS runtime state refresh failed',err);}
   }
