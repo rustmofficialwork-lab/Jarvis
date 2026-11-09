@@ -244,7 +244,7 @@ html,body{background:#020b14}
 </div>
 <div class="abs deco" style="left:72px;top:372px;width:350px"></div>
 <div class="abs power-text">Power</div>
-<div class="power-controls"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i><i class="fa-solid fa-forward"></i><i class="fa-solid fa-backward"></i></div>
+<div class="power-controls"><i class="fa-solid fa-play"></i><i class="fa-solid fa-stop"></i><i class="fa-solid fa-forward"></i><i class="fa-solid fa-backward"></i></div>
 <div class="abs gear"><i class="fa-solid fa-gear"></i></div>
 
 <div class="battery-widget"><h2>98%</h2><p>Battery</p></div>
@@ -552,7 +552,7 @@ setInterval(updateClock,1000);updateClock();
   $$('.app-row').forEach(el=>{const n=txt(el).split(' ')[0];if(APPS[n])mark(el,'Open '+n,{app:n});});
   [['status','System status'],['find','Find a file'],['settings','Settings'],['reminders','Show reminders']]
     .forEach(([a,n],i)=>{const b=$$('.hex-btn')[i];if(b)mark(b,n,{action:a});});
-  [['play','Play / pause'],['play','Play / pause'],['next','Next track'],['prev','Previous track']]
+  [['play','Play'],['stop','Stop'],['next','Next track'],['prev','Previous track']]
     .forEach(([a,n],i)=>{const b=$$('.power-controls i')[i];if(b)mark(b,n,{action:a});});
   const gear=document.querySelector('.gear');
   if(gear)mark(gear,'Open JARVIS settings',{action:'settings'});
