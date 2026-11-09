@@ -1144,17 +1144,16 @@ class JarvisDesktop:
         else:
             ai_detail = "ADD API TOKEN"
 
-        voice_key_ready = bool(getattr(self, "picovoice_access_key", "").strip())
         voice_packages = all(
             importlib.util.find_spec(module) is not None
-            for module in ("pvporcupine", "pvrecorder", "speech_recognition", "pyttsx3")
+            for module in ("openwakeword", "pyaudio", "numpy", "speech_recognition", "pyttsx3")
         )
         memory_store = getattr(self, "memory_store", None)
         memory_detail = f"{len(memory_store.list())} SAVED LOCALLY" if memory_store else "LOCAL STORE"
         return [
             ("AI CHAT", ai_ready, ai_detail),
-            ("VOICE ENGINE", voice_key_ready and voice_packages,
-             "CONFIGURED" if voice_key_ready and voice_packages else "SETUP REQUIRED"),
+            ("VOICE ENGINE", voice_packages,
+             "LOCAL WAKE WORD READY" if voice_packages else "INSTALL VOICE PACKAGES"),
             ("MEMORY", True, memory_detail),
             ("SYSTEM CONTROL", os.name == "nt",
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
@@ -1947,10 +1946,6 @@ class JarvisDesktop:
             if microphone_consent_required(self.settings) or not self.settings.get("microphone_consent_granted"):
                 self._set_status("Microphone permission was not granted. Voice listening is off.")
                 return
-        if not self.picovoice_access_key.strip():
-            self.open_settings()
-            self._set_status("Add a Picovoice AccessKey in Settings to enable wake listening.")
-            return
         self._ensure_offline_model(self.settings.get("language", "en-IN"))
         self.stop_event.clear()
         self._set_status("Starting local JARVIS wake-word detector…")
@@ -1958,38 +1953,55 @@ class JarvisDesktop:
         self.wake_thread.start()
 
     def _wake_loop(self):
-        porcupine = None
-        recorder = None
-        try:
-            import pvporcupine
-            from pvrecorder import PvRecorder
-            import speech_recognition as sr
+        """Detect 'Hey Jarvis' locally with openWakeWord, then capture one command."""
+        import numpy as np
+        import pyaudio
+        import openwakeword
+        from openwakeword.model import Model
+        import speech_recognition as sr
 
-            porcupine = pvporcupine.create(
-                access_key=self.picovoice_access_key.strip(), 
-                keywords=["jarvis"],
+        audio = None
+        stream = None
+        detector = None
+        chunk_size = 1280  # 80 ms of 16 kHz mono audio
+        try:
+            self.events.put(("status", "Preparing the Hey Jarvis wake-word model…"))
+            # The first activation downloads the public model once. Detection itself
+            # runs locally after the model has been cached on this PC.
+            openwakeword.utils.download_models()
+            detector = Model(
+                wakeword_models=["hey_jarvis"],
+                inference_framework="onnx",
             )
-            self.events.put(("status", "Listening locally for “Jarvis”. Windows may show its microphone indicator."))
+            audio = pyaudio.PyAudio()
+            self.events.put(("status", "Listening locally for “Hey Jarvis”."))
             while not self.stop_event.is_set():
                 try:
-                    # Release Porcupine's microphone handle before SpeechRecognition opens it.
-                    if recorder is None:
-                        recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
-                    recorder.start()
+                    if stream is None:
+                        stream = audio.open(
+                            format=pyaudio.paInt16,
+                            channels=1,
+                            rate=16000,
+                            input=True,
+                            frames_per_buffer=chunk_size,
+                        )
+                    frame = np.frombuffer(
+                        stream.read(chunk_size, exception_on_overflow=False),
+                        dtype=np.int16,
+                    )
+                    scores = detector.predict(frame)
+                    confidence = float(scores.get("hey_jarvis", 0.0))
+                    if confidence < 0.5:
+                        continue
+
+                    # Release the detector stream before SpeechRecognition opens
+                    # the same microphone for the user's actual command.
                     try:
-                        detected = False
-                        while not self.stop_event.is_set():
-                            if porcupine.process(recorder.read()) >= 0:
-                                detected = True
-                                break
+                        stream.stop_stream()
                     finally:
-                        if recorder is not None and recorder.is_recording:
-                            recorder.stop()
-                    if not detected or self.stop_event.is_set():
-                        break
-                    release_wake_recorder(recorder)
-                    recorder = None
-                    self.events.put(("status", "Wake word detected — speak your command now."))
+                        stream.close()
+                        stream = None
+                    self.events.put(("status", "Hey Jarvis detected — speak your command now."))
                     recognizer = configure_voice_recognizer(sr.Recognizer())
                     try:
                         with sr.Microphone() as source:
@@ -2003,35 +2015,51 @@ class JarvisDesktop:
                         if self.stop_event.is_set():
                             break
                         if command is None:
+                            self.events.put(("status", "No command heard. Listening for “Hey Jarvis” again."))
                             continue
                         self.events.put(("status", f"Heard: {command}"))
                         self._answer_voice(command)
+                        self.events.put(("status", "Listening locally for “Hey Jarvis”."))
                     except sr.WaitTimeoutError:
-                        # Keep polling in short intervals so Stop/Exit is responsive.
-                        continue
+                        self.events.put(("status", "No command heard. Listening for “Hey Jarvis” again."))
                     except sr.UnknownValueError:
                         self.events.put(("status", "Sorry, I couldn't understand that. Listening again."))
                     except sr.RequestError as exc:
-                        self.events.put(("status", f"Speech recognition needs internet; wake-word listening will continue: {exc}"))
+                        self.events.put(("status", f"Speech recognition request failed: {exc}"))
                     except (OSError, RuntimeError) as exc:
-                        self.events.put(("status", f"Microphone unavailable ({exc}). Retrying in 2 seconds…"))
+                        self.events.put(("status", f"Microphone unavailable ({exc}). Retrying…"))
                         self.stop_event.wait(2)
                 except (OSError, RuntimeError) as exc:
-                    # Audio backends may report disconnected or unavailable devices
-                    # as either OSError or RuntimeError. Discard the stale handle
-                    # and reopen the default input device.
-                    self.events.put(("status", f"Wake microphone disconnected ({exc}). Reconnecting in 2 seconds…"))
-                    release_wake_recorder(recorder)
-                    recorder = None
+                    self.events.put(("status", f"Wake microphone disconnected ({exc}). Reconnecting…"))
+                    if stream is not None:
+                        try:
+                            stream.close()
+                        except Exception:
+                            pass
+                        stream = None
                     self.stop_event.wait(2)
         except Exception as exc:
-            logging.getLogger("jarvis").exception("Wake-word listener stopped unexpectedly")
+            logging.getLogger("jarvis").exception("openWakeWord listener stopped unexpectedly")
             self.events.put(("error", f"Wake listener could not start: {exc}"))
         finally:
-            release_wake_recorder(recorder)
-            if porcupine is not None:
+            if stream is not None:
                 try:
-                    porcupine.delete()
+                    if stream.is_active():
+                        stream.stop_stream()
+                except Exception:
+                    pass
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+            if audio is not None:
+                try:
+                    audio.terminate()
+                except Exception:
+                    pass
+            if detector is not None:
+                try:
+                    detector.reset()
                 except Exception:
                     pass
             self.events.put(("listener_stopped", None))
