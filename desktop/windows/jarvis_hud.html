@@ -559,8 +559,6 @@ setInterval(updateClock,1000);updateClock();
   if(gear)mark(gear,'Open JARVIS settings',{action:'settings'});
   const back=document.querySelector('.back-btn');
   if(back)mark(back,'Exit JARVIS',{action:'exit'});
-  const orb=document.querySelector('.orb-wrapper');
-  if(orb)mark(orb,'Type a command for JARVIS',{action:'command'});
   $$('.quick-item').forEach(row=>{
     const k=txt(row).replace(/^[-\s]+/,'');
     if(TOOLS[k])mark(row,'Open '+k,{tool:TOOLS[k]});
@@ -645,7 +643,7 @@ setInterval(updateClock,1000);updateClock();
       if(orb){
         orb.classList.toggle('is-listening',listening);
         orb.classList.toggle('is-thinking',busy);
-        orb.title=listening?'JARVIS microphone listener active':busy?'JARVIS is processing a request':'Click to send a command';
+        orb.title=listening?'JARVIS microphone listener active':busy?'JARVIS is processing a request':'JARVIS visualizer';
       }
       if(back){
         back.classList.remove('is-listening');
