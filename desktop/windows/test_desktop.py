@@ -2080,7 +2080,7 @@ class HudShortcutWiringTests(unittest.TestCase):
     def test_control_panel_shortcut_uses_system_tool_bridge(self):
         hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
         self.assertIn("if(d.tool==='settings'){", hud)
-        self.assertIn("else if(!call('open_system_tool',d.tool)){", hud)
+        self.assertIn("else if(!await call('open_system_tool',d.tool)){", hud)
         self.assertNotIn(
             "d.tool==='settings'||d.tool==='control_panel'",
             hud,
