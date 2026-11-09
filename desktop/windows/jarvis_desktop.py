@@ -1953,17 +1953,20 @@ class JarvisDesktop:
 
     def _wake_loop(self):
         """Detect the single word 'Jarvis' locally, then capture one command."""
-        import numpy as np
-        import pyaudio
-        import openwakeword
-        from openwakeword.model import Model
-        import speech_recognition as sr
-
+        # Keep optional/native audio imports inside the guarded startup path.
+        # A missing wheel or broken native DLL must still reach the UI error
+        # handler and listener cleanup instead of silently killing this thread.
         audio = None
         stream = None
         detector = None
         chunk_size = 1280  # 80 ms of 16 kHz mono audio
         try:
+            import numpy as np
+            import pyaudio
+            import openwakeword
+            from openwakeword.model import Model
+            import speech_recognition as sr
+
             model_path = JARVIS_WAKEWORD_MODEL
             model_path.parent.mkdir(parents=True, exist_ok=True)
             if not model_path.is_file():
