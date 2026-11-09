@@ -313,7 +313,7 @@ async def chat_completions(
         message = str(exc)
         if message == "No AI provider is configured.":
             raise HTTPException(status_code=503, detail="AI provider is not configured.")
-        raise HTTPException(status_code=502, detail=message)
+        raise HTTPException(status_code=exc.status_code, detail=message)
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="AI provider timed out. Please try again.")
     except httpx.RequestError:
