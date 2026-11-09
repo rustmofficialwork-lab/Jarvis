@@ -31,7 +31,9 @@ class ProviderConfigurationError(Exception):
 
 
 class ProviderUnavailable(Exception):
-    pass
+    def __init__(self, message: str, *, status_code: int = 502):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
@@ -81,10 +83,12 @@ async def request_with_failover(
     timeout: int,
     max_response_bytes: int,
     environ: dict[str, str] | None = None,
-    client_factory=httpx.AsyncClient,
+    client_factory=None,
 ) -> bytes:
     """Try configured providers in order and return the first bounded successful body."""
     providers = load_providers(environ)
+    # Resolve at call time so tests and application-level HTTP client overrides work.
+    make_client = client_factory or httpx.AsyncClient
     if not providers:
         raise ProviderUnavailable("No AI provider is configured.")
     failures: list[str] = []
@@ -97,12 +101,18 @@ async def request_with_failover(
         body["model"] = provider.model
         body["stream"] = False
         try:
-            async with client_factory(timeout=timeout) as client:
+            async with make_client(timeout=timeout) as client:
                 async with client.stream("POST", provider.base_url, headers=headers, json=body) as response:
                     status_code = response.status_code
                     if status_code >= 400:
-                        if status_code in RETRYABLE_STATUS_CODES or status_code in (401, 403) or status_code >= 500:
-                            failures.append(f"{provider.name}:upstream-unavailable")
+                        if status_code == 429:
+                            failures.append("rate-limited")
+                            continue
+                        if status_code in (401, 403):
+                            failures.append("auth-rejected")
+                            continue
+                        if status_code in RETRYABLE_STATUS_CODES or status_code >= 500:
+                            failures.append("temporarily-unavailable")
                             continue
                         raise ProviderUnavailable("The AI provider rejected the request.")
                     chunks: list[bytes] = []
@@ -120,4 +130,10 @@ async def request_with_failover(
             failures.append(f"{provider.name}:timeout")
         except httpx.RequestError:
             failures.append(f"{provider.name}:network-error")
+    if failures and all(reason == "rate-limited" for reason in failures):
+        raise ProviderUnavailable("AI provider rate limit reached.", status_code=429)
+    if failures and all(reason == "auth-rejected" for reason in failures):
+        raise ProviderUnavailable("AI provider credentials were rejected.")
+    if failures and all(reason in {"temporarily-unavailable", "timeout", "network-error", "response-too-large"} for reason in failures):
+        raise ProviderUnavailable("AI provider is temporarily unavailable.")
     raise ProviderUnavailable("All configured AI providers are temporarily unavailable.")
