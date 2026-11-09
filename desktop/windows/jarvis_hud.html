@@ -459,6 +459,7 @@ setInterval(updateClock,1000);updateClock();
     if(!api||!api.get_settings){toast(OFFLINE);return;}
     try{
       const s=await api.get_settings();
+      if(!s||!s.ready){toast('JARVIS is still starting. Please try Settings again in a moment.');return;}
       for(const key of ['endpoint','model','language']){
         const field=settingsForm.elements.namedItem(key);
         if(field)field.value=s[key]||'';
