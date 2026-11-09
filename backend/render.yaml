@@ -14,8 +14,6 @@ services:
         sync: false
       - key: OPENROUTER_MODEL
         value: openrouter/free
-      - key: DATABASE_PATH
-        value: /data/jarvis.sqlite3
       - key: MAX_REQUEST_BYTES
         value: "12582912"
       - key: UPSTREAM_TIMEOUT_SECONDS
