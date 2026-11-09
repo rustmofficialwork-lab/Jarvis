@@ -14,6 +14,7 @@ from typing import Any
 from uuid import UUID
 
 import httpx
+from .provider_router import ProviderConfigurationError, ProviderUnavailable, request_with_failover
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 
 UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -298,39 +299,21 @@ async def chat_completions(
     model = payload.get("model") or DEFAULT_MODEL
     if not isinstance(model, str) or not model.strip() or len(model) > 200:
         raise HTTPException(status_code=422, detail="Invalid model name.")
-    # Keep the upstream destination fixed to avoid turning this service into an open proxy.
-    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not api_key:
-        raise HTTPException(status_code=503, detail="AI provider is not configured.")
-    payload["model"] = model
-    payload["stream"] = False
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "https://github.com/rustmofficialwork-lab/Jarvis"),
-        "X-Title": "JARVIS Assistant",
-    }
+    # Provider endpoints are controlled only by backend environment configuration.
+    # The desktop client cannot choose arbitrary upstream URLs or see provider secrets.
     try:
-        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT_SECONDS) as client:
-            async with client.stream(
-                "POST", UPSTREAM_URL, headers=headers, json=payload
-            ) as upstream:
-                if upstream.status_code == 429:
-                    raise HTTPException(status_code=429, detail="AI provider rate limit reached. Try again shortly.")
-                if upstream.status_code in (401, 403):
-                    raise HTTPException(status_code=502, detail="AI provider credentials were rejected.")
-                if upstream.status_code >= 500:
-                    raise HTTPException(status_code=502, detail="AI provider is temporarily unavailable.")
-                if upstream.status_code >= 400:
-                    raise HTTPException(status_code=502, detail="AI provider rejected the request.")
-                chunks = []
-                total_bytes = 0
-                async for chunk in upstream.aiter_bytes():
-                    total_bytes += len(chunk)
-                    if total_bytes > MAX_UPSTREAM_RESPONSE_BYTES:
-                        raise HTTPException(status_code=502, detail="AI provider response exceeded the size limit.")
-                    chunks.append(chunk)
-                response_body = b"".join(chunks)
+        response_body = await request_with_failover(
+            payload,
+            timeout=UPSTREAM_TIMEOUT_SECONDS,
+            max_response_bytes=MAX_UPSTREAM_RESPONSE_BYTES,
+        )
+    except ProviderConfigurationError:
+        raise HTTPException(status_code=503, detail="AI provider configuration is invalid.")
+    except ProviderUnavailable as exc:
+        message = str(exc)
+        if message == "No AI provider is configured.":
+            raise HTTPException(status_code=503, detail="AI provider is not configured.")
+        raise HTTPException(status_code=502, detail=message)
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="AI provider timed out. Please try again.")
     except httpx.RequestError:
