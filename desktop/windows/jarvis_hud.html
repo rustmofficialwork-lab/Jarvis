@@ -171,6 +171,21 @@ h1,h2,h3,h4{font-family:var(--head);font-weight:400;color:var(--hi)}
 .jx-row button{flex:1;min-height:44px;background:rgba(31,209,255,.08);border:1px solid var(--cyan);color:var(--cyan);font:600 15px var(--ui);cursor:pointer}
 .jx-row button:active{background:rgba(31,209,255,.3)}
 
+#jx-settings{position:fixed;inset:0;z-index:350;display:flex;align-items:center;justify-content:center;background:rgba(2,11,20,.88);padding:24px}
+#jx-settings[hidden]{display:none}
+#jx-settings .jx-settings-card{width:min(92vw,760px);max-height:88vh;overflow:auto;background:linear-gradient(145deg,#061a29,#020b14);border:1px solid var(--cyan);box-shadow:0 0 28px rgba(0,229,255,.35);padding:22px;color:#dff8ff}
+#jx-settings h2{font:600 20px var(--head);letter-spacing:2px;margin:0 0 18px;color:var(--hi)}
+#jx-settings .jx-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#jx-settings label{display:block;font:600 12px var(--ui);color:#9eddec;margin:0 0 6px}
+#jx-settings input,#jx-settings select{box-sizing:border-box;width:100%;min-height:40px;padding:8px 10px;background:#02121c;border:1px solid rgba(0,229,255,.35);color:#fff;font:14px var(--ui);outline:none}
+#jx-settings input:focus,#jx-settings select:focus{border-color:var(--cyan);box-shadow:0 0 8px rgba(0,229,255,.25)}
+#jx-settings .jx-settings-check{display:flex;align-items:center;gap:10px;margin-top:14px;font:13px var(--ui);color:#dff8ff}
+#jx-settings .jx-settings-check input{width:17px;min-height:17px}
+#jx-settings .jx-settings-note{font:12px var(--ui);color:#7897aa;margin-top:14px;line-height:1.5}
+#jx-settings .jx-settings-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+#jx-settings button{min-height:40px;padding:0 18px;background:rgba(31,209,255,.08);border:1px solid var(--cyan);color:var(--cyan);font:600 13px var(--ui);cursor:pointer}
+#jx-settings button.primary{background:rgba(0,229,255,.2);color:#fff}
+@media(max-width:700px){#jx-settings .jx-settings-grid{grid-template-columns:1fr}#jx-settings{padding:8px}#jx-settings .jx-settings-card{padding:14px}}
 @keyframes spin{100%{transform:rotate(360deg)}}
 @keyframes spin-reverse{100%{transform:rotate(-360deg)}}
 @keyframes pulseGlow{0%{transform:scale(.95)}100%{transform:scale(1.06)}}
@@ -430,6 +445,50 @@ setInterval(updateClock,1000);updateClock();
   box.querySelector('.jx-cancel').addEventListener('click',()=>close(null));
   box.addEventListener('click',e=>{if(e.target===box)close(null);});
 
+  /* In-HUD settings: keep configuration inside the fullscreen HUD. */
+  const settingsLayer=document.createElement('div');
+  settingsLayer.id='jx-settings';settingsLayer.hidden=true;
+  settingsLayer.innerHTML='<section class="jx-settings-card" role="dialog" aria-modal="true" aria-labelledby="jx-settings-title"><h2 id="jx-settings-title">J.A.R.V.I.S. SETTINGS</h2><form id="jx-settings-form"><div class="jx-settings-grid"><div><label for="jx-endpoint">AI endpoint (HTTPS)</label><input id="jx-endpoint" name="endpoint" type="url" required></div><div><label for="jx-model">Model</label><input id="jx-model" name="model" required></div><div><label for="jx-ai-key">Legacy backend token (optional)</label><input id="jx-ai-key" name="ai_key" type="password" autocomplete="off"></div><div><label for="jx-pv-key">Picovoice AccessKey</label><input id="jx-pv-key" name="picovoice_key" type="password" autocomplete="off"></div><div><label for="jx-language">Speech recognition language</label><select id="jx-language" name="language"><option value="en-IN">English (India)</option><option value="hi-IN">Hindi (India)</option><option value="en-US">English (US)</option></select></div></div><label class="jx-settings-check"><input type="checkbox" name="share_memory_with_ai"> Allow saved memories in online AI chats</label><label class="jx-settings-check"><input type="checkbox" name="start_with_windows"> Start JARVIS when I sign in to Windows</label><p class="jx-settings-note">Offline speech models are prepared in the background when the language changes. Keys are stored in Windows Credential Manager when available.</p><div class="jx-settings-actions"><button type="button" id="jx-settings-close">CLOSE</button><button class="primary" type="submit">SAVE SETTINGS</button></div></form></section>';
+  document.body.appendChild(settingsLayer);
+  const settingsForm=settingsLayer.querySelector('form');
+  const closeSettings=()=>{settingsLayer.hidden=true;};
+  settingsLayer.querySelector('#jx-settings-close').addEventListener('click',closeSettings);
+  settingsLayer.addEventListener('click',e=>{if(e.target===settingsLayer)closeSettings();});
+  async function openSettings(){
+    const api=window.pywebview&&window.pywebview.api;
+    if(!api||!api.get_settings){toast(OFFLINE);return;}
+    try{
+      const s=await api.get_settings();
+      for(const key of ['endpoint','model','ai_key','picovoice_key','language']){
+        const field=settingsForm.elements.namedItem(key);
+        if(field)field.value=s[key]||'';
+      }
+      settingsForm.elements.namedItem('share_memory_with_ai').checked=Boolean(s.share_memory_with_ai);
+      settingsForm.elements.namedItem('start_with_windows').checked=Boolean(s.start_with_windows);
+      settingsLayer.hidden=false;
+      settingsForm.querySelector('input').focus();
+    }catch(err){console.warn('Could not load JARVIS settings',err);toast('Could not load settings');}
+  }
+  settingsForm.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const api=window.pywebview&&window.pywebview.api;
+    if(!api||!api.save_settings){toast(OFFLINE);return;}
+    const payload={
+      endpoint:settingsForm.elements.namedItem('endpoint').value.trim(),
+      model:settingsForm.elements.namedItem('model').value.trim(),
+      ai_key:settingsForm.elements.namedItem('ai_key').value,
+      picovoice_key:settingsForm.elements.namedItem('picovoice_key').value,
+      language:settingsForm.elements.namedItem('language').value,
+      share_memory_with_ai:settingsForm.elements.namedItem('share_memory_with_ai').checked,
+      start_with_windows:settingsForm.elements.namedItem('start_with_windows').checked
+    };
+    try{
+      if(await api.save_settings(payload)){closeSettings();toast('Settings save requested');}
+      else toast('Could not save settings');
+    }catch(err){console.warn('JARVIS settings save failed',err);toast('Could not save settings');}
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!settingsLayer.hidden)closeSettings();});
+
   /* actions */
   const command=v=>{call('send_command',v)?toast('Sent: '+v):toast(OFFLINE);};
   const ACTIONS={
@@ -440,7 +499,7 @@ setInterval(updateClock,1000);updateClock();
     command:()=>ask('What should JARVIS do?','e.g. open youtube').then(v=>v&&command(v)),
     status:()=>command('system status'),
     find:()=>ask('Which file should JARVIS find?','file name').then(v=>v&&command('find file '+v)),
-    settings:()=>{if(!call('open_settings'))toast(OFFLINE);},
+    settings:()=>{openSettings();},
     reminders:()=>command('show reminders')
   };
   const run=el=>{
@@ -510,8 +569,8 @@ setInterval(updateClock,1000);updateClock();
         if(Object.prototype.hasOwnProperty.call(fields,lab))value.textContent=fields[lab]??'N/A';
       });
       const bat=document.querySelector('.battery-widget');
-      const bh=bat.querySelector('h2');
-      if(data.battery){
+      const bh=bat?.querySelector('h2');
+      if(data.battery&&bh){
         bh.textContent=data.battery;
         const bv=parseFloat(data.battery);
         if(Number.isFinite(bv))bat.style.setProperty('--bat',Math.max(0,Math.min(100,bv))+'%');
