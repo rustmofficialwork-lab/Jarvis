@@ -2791,8 +2791,9 @@ class JarvisWebBridge:
     def get_settings(self):
         app = self.app_state.get("app")
         if app is None:
-            return {}
+            return {"ready": False}
         return {
+            "ready": True,
             "endpoint": app.settings.get("endpoint", DEFAULT_ENDPOINT),
             "model": app.settings.get("model", DEFAULT_MODEL),
             "language": app.settings.get("language", "en-IN"),
