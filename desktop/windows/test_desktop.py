@@ -989,7 +989,6 @@ class ServiceStatusTests(unittest.TestCase):
         from unittest.mock import patch
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.ai_api_key = "test-token"
-        app.picovoice_access_key = "test-key"
         with patch("importlib.util.find_spec", return_value=object()):
             statuses = app._get_service_statuses()
         by_name = {name: ready for name, ready, _detail in statuses}
@@ -997,7 +996,7 @@ class ServiceStatusTests(unittest.TestCase):
         self.assertTrue(by_name["VOICE ENGINE"])
         details = {name: detail for name, _ready, detail in statuses}
         self.assertEqual(details["AI CHAT"], "CONFIGURED")
-        self.assertEqual(details["VOICE ENGINE"], "CONFIGURED")
+        self.assertEqual(details["VOICE ENGINE"], "LOCAL WAKE WORD READY")
 
 
 class SystemMetricsTests(unittest.TestCase):
