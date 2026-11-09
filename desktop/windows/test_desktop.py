@@ -1995,6 +1995,24 @@ class HudRuntimeStateTests(unittest.TestCase):
         )
 
 
+class WebBridgeStartupTests(unittest.TestCase):
+    def test_settings_api_is_safe_before_backend_initializes(self):
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
+        self.assertEqual(bridge.get_settings(), {"ready": False})
+
+    def test_settings_api_returns_values_after_backend_initializes(self):
+        from types import SimpleNamespace
+
+        app = SimpleNamespace(
+            settings={"endpoint": "https://example.test", "model": "test-model", "language": "hi-IN"},
+            ai_api_key="",
+        )
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": app})
+        result = bridge.get_settings()
+        self.assertTrue(result["ready"])
+        self.assertEqual(result["language"], "hi-IN")
+
+
 class SettingsDurabilityTests(unittest.TestCase):
     def test_settings_save_is_valid_json_and_uses_utf8(self):
         import tempfile
