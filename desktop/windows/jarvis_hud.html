@@ -459,10 +459,15 @@ setInterval(updateClock,1000);updateClock();
     if(!api||!api.get_settings){toast(OFFLINE);return;}
     try{
       const s=await api.get_settings();
-      for(const key of ['endpoint','model','ai_key','picovoice_key','language']){
+      for(const key of ['endpoint','model','language']){
         const field=settingsForm.elements.namedItem(key);
         if(field)field.value=s[key]||'';
       }
+      const aiField=settingsForm.elements.namedItem('ai_key');
+      const pvField=settingsForm.elements.namedItem('picovoice_key');
+      aiField.value='';pvField.value='';
+      aiField.placeholder=s.has_ai_key?'Saved securely — leave blank to keep':'Enter token (optional)';
+      pvField.placeholder=s.has_picovoice_key?'Saved securely — leave blank to keep':'Enter Picovoice AccessKey';
       settingsForm.elements.namedItem('share_memory_with_ai').checked=Boolean(s.share_memory_with_ai);
       settingsForm.elements.namedItem('start_with_windows').checked=Boolean(s.start_with_windows);
       settingsLayer.hidden=false;
@@ -510,8 +515,11 @@ setInterval(updateClock,1000);updateClock();
     }else if(d.folder){
       call('open_folder',d.folder)?toast('Opening '+d.folder+'…'):toast('Folders open only in the JARVIS desktop app');
     }else if(d.tool){
-      const ok=d.tool==='settings'?call('open_settings'):call('open_system_tool',d.tool);
-      if(!ok)toast(OFFLINE);
+      if(d.tool==='settings'||d.tool==='control_panel'){
+        openSettings();
+      }else if(!call('open_system_tool',d.tool)){
+        toast(OFFLINE);
+      }
     }else if(ACTIONS[d.action]){ACTIONS[d.action]();}
   };
 
