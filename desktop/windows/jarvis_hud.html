@@ -512,7 +512,8 @@ setInterval(updateClock,1000);updateClock();
   /* actions */
   const command=async v=>{await call('send_command',v)?toast('Sent: '+v):toast(OFFLINE);};
   const ACTIONS={
-    play:()=>command('play pause'),
+    play:()=>command('play'),
+    stop:()=>command('stop'),
     next:()=>command('next track'),
     prev:()=>command('previous track'),
     voice:async()=>{if(!await call('toggle_voice'))toast('Voice control works only in the JARVIS app');},
