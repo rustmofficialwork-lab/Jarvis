@@ -2828,7 +2828,6 @@ class JarvisWebBridge:
             "start_with_windows": bool(app.settings.get("start_with_windows", False)),
             "share_memory_with_ai": bool(app.settings.get("share_memory_with_ai", False)),
             "has_ai_key": bool(getattr(app, "ai_api_key", "").strip()),
-            "has_picovoice_key": bool(getattr(app, "picovoice_access_key", "").strip()),
         }
 
     def save_settings(self, payload):
