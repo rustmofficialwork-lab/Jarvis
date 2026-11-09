@@ -1024,7 +1024,6 @@ class JarvisDesktop:
         self._load_secrets()
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
-        self.picovoice_access_key = self.picovoice_var.get()
         self.root.after(350, self._poll_events)
         # Register quietly in the background; failures retry when connectivity returns.
         threading.Thread(target=self._device_auth_worker, daemon=True).start()
@@ -1404,13 +1403,11 @@ class JarvisDesktop:
             try:
                 self.api_key_var = tk.StringVar(value=self.keyring.get_password(KEYRING_SERVICE, "ai_api_key") or "")
                 self.device_token = self.keyring.get_password(KEYRING_SERVICE, "device_token") or ""
-                self.picovoice_var = tk.StringVar(value=self.keyring.get_password(KEYRING_SERVICE, "picovoice_access_key") or os.getenv("PICOVOICE_ACCESS_KEY", ""))
                 return
             except Exception:
                 pass
         self.api_key_var = tk.StringVar(value=os.getenv("JARVIS_AI_API_KEY", ""))
         self.device_token = ""
-        self.picovoice_var = tk.StringVar(value=os.getenv("PICOVOICE_ACCESS_KEY", ""))
 
     def _append(self, who: str, text: str, tag: str | None = None):
         self.transcript.append((who, text, tag))
@@ -2241,11 +2238,10 @@ class JarvisDesktop:
                 raise ValueError("Choose a supported speech language.")
             startup_enabled = payload.get("start_with_windows") is True
             api_key = str(payload.get("ai_key", "")).strip()
-            picovoice_key = str(payload.get("picovoice_key", "")).strip()
 
             # Empty password fields mean "keep the saved key", never erase it.
             # Never send stored secrets to the WebView just to prefill a form.
-            if (api_key or picovoice_key) and not self.keyring:
+            if api_key and not self.keyring:
                 raise RuntimeError(
                     "Secure key storage is unavailable. Install/repair Windows Credential Manager support before adding keys."
                 )
@@ -2253,11 +2249,6 @@ class JarvisDesktop:
                 self.keyring.set_password(KEYRING_SERVICE, "ai_api_key", api_key)
                 self.ai_api_key = api_key
                 self.api_key_var.set(api_key)
-            if picovoice_key:
-                self.keyring.set_password(KEYRING_SERVICE, "picovoice_access_key", picovoice_key)
-                self.picovoice_access_key = picovoice_key
-                self.picovoice_var.set(picovoice_key)
-
             set_windows_startup(startup_enabled)
             self.settings["endpoint"] = endpoint
             self.settings["model"] = model
@@ -2313,7 +2304,6 @@ class JarvisDesktop:
             ("AI endpoint (HTTPS)", "endpoint", self.settings.get("endpoint", DEFAULT_ENDPOINT)),
             ("Model", "model", self.settings.get("model", DEFAULT_MODEL)),
             ("Legacy backend token (optional; auto-connect if blank)", "ai_key", self.api_key_var.get()),
-            ("Picovoice AccessKey", "picovoice_key", self.picovoice_var.get()),
         ]
         entries = {}
         for row, (label, name, value) in enumerate(fields):
@@ -2367,15 +2357,12 @@ class JarvisDesktop:
             self.settings["start_with_windows"] = startup_enabled
             self.settings["share_memory_with_ai"] = share_memory_var.get()
             self.api_key_var.set(entries["ai_key"].get().strip())
-            self.picovoice_var.set(entries["picovoice_key"].get().strip())
             self.ai_api_key = self.api_key_var.get()
-            self.picovoice_access_key = self.picovoice_var.get()
             try:
                 save_settings(self.settings)
                 if self.keyring:
                     self.keyring.set_password(KEYRING_SERVICE, "ai_api_key", self.api_key_var.get())
-                    self.keyring.set_password(KEYRING_SERVICE, "picovoice_access_key", self.picovoice_var.get())
-                elif self.api_key_var.get() or self.picovoice_var.get():
+                elif self.api_key_var.get():
                     messagebox.showwarning(
                         "Secure storage unavailable",
                         "Windows Credential Manager could not be accessed. Keys will only remain in memory for this session.",
@@ -2855,7 +2842,6 @@ class JarvisWebBridge:
             "start_with_windows": payload.get("start_with_windows") is True,
             "share_memory_with_ai": payload.get("share_memory_with_ai") is True,
             "ai_key": str(payload.get("ai_key", ""))[:4096],
-            "picovoice_key": str(payload.get("picovoice_key", ""))[:4096],
         }
         completed = threading.Event()
         outcome = {"saved": False}
