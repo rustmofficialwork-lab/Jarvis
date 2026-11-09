@@ -21,7 +21,7 @@ Windows CI compiles Python source, runs the desktop unit tests, packages the por
 ## Shared backend and limitations
 
 - New desktop installs automatically enroll with the JARVIS backend and receive a unique, short-lived device credential. Existing manually provisioned client tokens remain supported for migration; keep the OpenRouter secret only in the backend environment.
-- Backend SQLite memory may not survive service restarts unless persistent storage is configured. The current backend memory API is a single shared collection per deployment, not per-user accounts.
+- Personal memories are stored locally on each Windows installation; the backend does not expose a memory API or persist chat history.
 - General AI responses require internet, a working backend client token, a valid server-side OpenRouter key, and an available upstream model. The free-model router can have rate limits or model capability differences.
 - Windows wake-word listening requires a configured Picovoice AccessKey; typed chat does not. Speech transcription may require internet and microphone permissions.
 - Test AI chat, memory, audio, and Windows actions on the target PC before relying on them.
