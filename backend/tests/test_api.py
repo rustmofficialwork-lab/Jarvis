@@ -15,7 +15,7 @@ os.environ["JARVIS_CLIENT_TOKEN"] = "test-token-that-is-long-enough-123456"
 os.environ["OPENROUTER_API_KEY"] = "test-upstream-key"
 os.environ["JARVIS_DEVICE_TOKEN_SECRET"] = "test-device-token-secret-that-is-long-enough-123"
 
-from app.main import UPSTREAM_URL, _read_request_body_limited, app  # noqa: E402
+from app.main import UPSTREAM_URL, _read_request_body_limited, app, require_client_token  # noqa: E402
 
 
 class _FakeUpstreamResponse:
@@ -111,6 +111,19 @@ class BackendApiTests(unittest.TestCase):
             with self.subTest(headers=headers):
                 response = self.client.post("/v1/chat/completions", headers=headers, json=payload)
                 self.assertEqual(response.status_code, 401)
+
+    def test_bearer_scheme_is_case_insensitive(self) -> None:
+        token = os.environ["JARVIS_CLIENT_TOKEN"]
+        for scheme in ("Bearer", "bearer", "BEARER", "bEaReR"):
+            with self.subTest(scheme=scheme):
+                self.assertIsNone(require_client_token(f"{scheme} {token}"))
+
+    def test_non_bearer_authentication_scheme_is_rejected(self) -> None:
+        for authorization in ("Basic some-token", "Bearer", "Bearer   "):
+            with self.subTest(authorization=authorization):
+                with self.assertRaises(HTTPException) as raised:
+                    require_client_token(authorization)
+                self.assertEqual(raised.exception.status_code, 401)
 
     def test_device_registration_issues_signed_short_lived_token(self) -> None:
         device_id = str(uuid.uuid4())
