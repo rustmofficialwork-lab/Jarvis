@@ -17,6 +17,21 @@ cp .env.example .env
 
 The app does not automatically load `.env`; export the values in your shell or configure them in your deployment dashboard. Set a random `JARVIS_DEVICE_TOKEN_SECRET` of at least 32 characters, keep `JARVIS_CLIENT_TOKEN` for existing installations, and set a server-side `OPENROUTER_API_KEY`. Never put either server secret in the desktop client or commit real credentials. Render Blueprint deployments generate the device-token signing secret automatically.
 
+### Multiple AI providers and automatic fallback
+
+The gateway supports an ordered list of OpenAI-compatible HTTPS chat-completions endpoints. Configure this only in the backend hosting dashboard (never in the Windows client):
+
+```bash
+JARVIS_AI_PROVIDERS='[
+  {"name":"primary","base_url":"https://api.openai.com/v1/chat/completions","api_key_env":"OPENAI_API_KEY","model":"gpt-4o-mini"},
+  {"name":"backup","base_url":"https://api.groq.com/openai/v1/chat/completions","api_key_env":"GROQ_API_KEY","model":"llama-3.3-70b-versatile"}
+]'
+OPENAI_API_KEY=...
+GROQ_API_KEY=...
+```
+
+The provider array is attempted in order. A provider timeout, network failure, HTTP 408/425/429, authentication rejection, or server-side error causes the gateway to try the next configured provider. A malformed/unsupported request (other 4xx responses) is not retried. If `JARVIS_AI_PROVIDERS` is unset, the existing `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` configuration remains unchanged. Each provider must expose an OpenAI-compatible `/chat/completions` endpoint and use HTTPS. Provider names, endpoint URLs, model IDs, and key environment-variable names are configuration; actual API key values remain server-side secrets. This is sequential failover, not parallel load balancing, and provider/model compatibility and billing are determined by each upstream provider.
+
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
