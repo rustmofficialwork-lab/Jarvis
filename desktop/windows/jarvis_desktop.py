@@ -1034,9 +1034,8 @@ class JarvisDesktop:
         # Defer network activity until the HUD has settled.
         self.root.after(30000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
-        # Ask once at first launch; Windows itself controls the actual microphone grant.
-        if microphone_consent_required(self.settings):
-            self.root.after(1800, self._first_launch_permission_setup)
+        # Microphone consent is requested when the user activates voice listening,
+        # not during startup, so the HUD can finish rendering without a modal dialog.
 
     def _first_launch_permission_setup(self):
         if not microphone_consent_required(self.settings):
@@ -1064,7 +1063,7 @@ class JarvisDesktop:
                 "Could not save microphone consent choice: %s", exc
             )
         if accepted:
-            self._request_microphone_access()
+            self._set_status("Microphone consent saved. Voice listening can now be activated.")
         else:
             self._set_status("Microphone permission declined. Chat and HUD remain available.")
 
@@ -1943,6 +1942,11 @@ class JarvisDesktop:
             self.stop_event.set()
             self._set_status("Stopping microphone listener…")
             return
+        if microphone_consent_required(self.settings):
+            self._first_launch_permission_setup()
+            if microphone_consent_required(self.settings) or not self.settings.get("microphone_consent_granted"):
+                self._set_status("Microphone permission was not granted. Voice listening is off.")
+                return
         if not self.picovoice_access_key.strip():
             self.open_settings()
             self._set_status("Add a Picovoice AccessKey in Settings to enable wake listening.")
@@ -2180,6 +2184,46 @@ class JarvisDesktop:
 
         threading.Thread(target=worker, daemon=True).start()
         return True
+
+    def apply_web_settings(self, payload):
+        """Validate and persist settings submitted by the in-HUD settings panel."""
+        if not isinstance(payload, dict):
+            self._set_status("Invalid settings data.")
+            return False
+        try:
+            endpoint, model = validate_chat_configuration(
+                str(payload.get("endpoint", "")), str(payload.get("model", ""))
+            )
+            language = str(payload.get("language", "en-IN")).strip()
+            if language not in {"en-IN", "hi-IN", "en-US"}:
+                raise ValueError("Choose a supported speech language.")
+            startup_enabled = payload.get("start_with_windows") is True
+            set_windows_startup(startup_enabled)
+            api_key = str(payload.get("ai_key", "")).strip()
+            picovoice_key = str(payload.get("picovoice_key", "")).strip()
+            self.settings["endpoint"] = endpoint
+            self.settings["model"] = model
+            self.settings["language"] = language
+            self.settings["start_with_windows"] = startup_enabled
+            self.settings["share_memory_with_ai"] = payload.get("share_memory_with_ai") is True
+            self.api_key_var.set(api_key)
+            self.picovoice_var.set(picovoice_key)
+            self.ai_api_key = api_key
+            self.picovoice_access_key = picovoice_key
+            save_settings(self.settings)
+            if self.keyring:
+                self.keyring.set_password(KEYRING_SERVICE, "ai_api_key", api_key)
+                self.keyring.set_password(KEYRING_SERVICE, "picovoice_access_key", picovoice_key)
+            elif api_key or picovoice_key:
+                self._set_status("Settings saved, but secure key storage is unavailable on this PC.")
+                self._ensure_offline_model(language)
+                return True
+            self._set_status("Settings saved.")
+            self._ensure_offline_model(language)
+            return True
+        except Exception as exc:
+            self._set_status(f"Could not save settings: {exc}")
+            return False
 
     def open_settings(self):
         window = tk.Toplevel(self.root)
@@ -2736,7 +2780,37 @@ class JarvisWebBridge:
         return False
 
     def open_settings(self):
-        return self._dispatch(self.app_state["app"].open_settings)
+        app = self.app_state.get("app")
+        return bool(app is not None)
+
+    def get_settings(self):
+        app = self.app_state.get("app")
+        if app is None:
+            return {}
+        return {
+            "endpoint": app.settings.get("endpoint", DEFAULT_ENDPOINT),
+            "model": app.settings.get("model", DEFAULT_MODEL),
+            "language": app.settings.get("language", "en-IN"),
+            "start_with_windows": bool(app.settings.get("start_with_windows", False)),
+            "share_memory_with_ai": bool(app.settings.get("share_memory_with_ai", False)),
+            "ai_key": app.api_key_var.get(),
+            "picovoice_key": app.picovoice_var.get(),
+        }
+
+    def save_settings(self, payload):
+        app = self.app_state.get("app")
+        if app is None or not isinstance(payload, dict):
+            return False
+        clean = {
+            "endpoint": str(payload.get("endpoint", ""))[:2048],
+            "model": str(payload.get("model", ""))[:256],
+            "language": str(payload.get("language", "en-IN"))[:8],
+            "start_with_windows": payload.get("start_with_windows") is True,
+            "share_memory_with_ai": payload.get("share_memory_with_ai") is True,
+            "ai_key": str(payload.get("ai_key", ""))[:4096],
+            "picovoice_key": str(payload.get("picovoice_key", ""))[:4096],
+        }
+        return self._dispatch(lambda: app.apply_web_settings(clean))
 
     def get_voice_state(self):
         app = self.app_state.get("app")
@@ -2804,7 +2878,7 @@ class JarvisWebBridge:
         now = time.monotonic()
         with self._dashboard_lock:
             cached = self._dashboard_cache
-            if cached is not None and now - self._dashboard_cache_at < 12:
+            if cached is not None and now - self._dashboard_cache_at < 4:
                 return dict(cached)
             if not self._dashboard_refreshing:
                 self._dashboard_refreshing = True
@@ -2859,6 +2933,7 @@ class JarvisWebBridge:
             result["status"] = "System readings unavailable"
             return result
 
+        # Prime CPU sampling on the first pass; subsequent snapshots remain non-blocking.
         cpu = safe_read(lambda: psutil.cpu_percent(interval=None))
         memory = safe_read(psutil.virtual_memory)
         disk = safe_read(lambda: psutil.disk_usage(str(Path.home().anchor or "/")))
