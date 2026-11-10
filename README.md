@@ -18,14 +18,21 @@ python jarvis_desktop.py
 
 Windows CI compiles Python source, runs the desktop unit tests, packages the portable `desktop/windows/dist/JARVIS/` application folder, builds the Inno Setup installer, uploads both artifacts, and publishes the rolling `jarvis-latest` prerelease on successful pushes to `main`. These checks do not exercise microphone hardware or validate live backend credentials.
 
+## Wake word and voice
+
+- Wake-word detection uses the local openWakeWord runtime and a separate Jarvis ONNX model. It does **not** use a Picovoice AccessKey.
+- The current Jarvis ONNX model is not bundled in the repository. Complete **Set up wake word** in JARVIS and review the model publisher's license before downloading it.
+- The first activation may also download openWakeWord's shared feature models. After the required files are present, wake-word inference runs locally.
+- Speech transcription uses the configured online recognizer with the project's optional local Vosk fallback. Wake-word detection and speech transcription are separate stages.
+- To list microphones and test a specific Windows input device, see [JARVIS_WAKEWORD_SETUP.md](desktop/windows/JARVIS_WAKEWORD_SETUP.md). Hardware behavior must be tested on the target PC; CI cannot verify a real microphone.
+
 ## Shared backend and limitations
 
 - New desktop installs automatically enroll with the JARVIS backend and receive a unique, short-lived device credential. Existing manually provisioned client tokens remain supported for migration; keep the OpenRouter secret only in the backend environment.
 - Personal memories are stored locally on each Windows installation; the backend does not expose a memory API or persist chat history.
 - General AI responses require internet, a working backend client token, a valid server-side OpenRouter key, and an available upstream model. The free-model router can have rate limits or model capability differences.
-- Windows wake-word listening requires a configured Picovoice AccessKey; typed chat does not. Speech transcription may require internet and microphone permissions.
 - Test AI chat, memory, audio, and Windows actions on the target PC before relying on them.
-- Never commit API keys or Picovoice AccessKeys.
+- Never commit API keys or access tokens.
 
 ## Development checks
 
