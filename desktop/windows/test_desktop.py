@@ -11,6 +11,41 @@ SPEC.loader.exec_module(jarvis_desktop)
 
 
 class WakewordSetupTests(unittest.TestCase):
+    def test_openwakeword_assets_use_user_writable_directory_and_selective_download(self):
+        import tempfile
+        from types import SimpleNamespace
+
+        calls = []
+        with tempfile.TemporaryDirectory() as temporary:
+            def fake_download_models(model_names, target_directory):
+                calls.append((model_names, target_directory))
+                root = Path(target_directory)
+                (root / "melspectrogram.onnx").write_bytes(b"mel")
+                (root / "embedding_model.onnx").write_bytes(b"embedding")
+
+            module = SimpleNamespace(utils=SimpleNamespace(download_models=fake_download_models))
+            paths = jarvis_desktop.prepare_openwakeword_assets(
+                module, Path(temporary) / "Jarvis_Custom.onnx", Path(temporary) / "appdata"
+            )
+
+            expected_dir = Path(temporary) / "appdata" / "wakeword_runtime" / "models"
+            self.assertEqual(calls, [(["Jarvis_Custom"], str(expected_dir))])
+            self.assertEqual(paths["melspec_model_path"], str(expected_dir / "melspectrogram.onnx"))
+            self.assertEqual(paths["embedding_model_path"], str(expected_dir / "embedding_model.onnx"))
+
+    def test_openwakeword_asset_setup_fails_clearly_when_feature_files_are_missing(self):
+        import tempfile
+        from types import SimpleNamespace
+
+        with tempfile.TemporaryDirectory() as temporary:
+            module = SimpleNamespace(utils=SimpleNamespace(
+                download_models=lambda **kwargs: None
+            ))
+            with self.assertRaisesRegex(RuntimeError, "melspectrogram.onnx"):
+                jarvis_desktop.prepare_openwakeword_assets(
+                    module, Path("Jarvis_Custom.onnx"), Path(temporary)
+                )
+
     def test_wakeword_requires_two_consecutive_confident_frames(self):
         detect = jarvis_desktop.update_wakeword_activation
         activated, streak = detect(0.91, 0, threshold=0.5, required_frames=2)
