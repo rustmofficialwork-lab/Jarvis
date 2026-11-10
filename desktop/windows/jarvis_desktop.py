@@ -1200,8 +1200,8 @@ class JarvisDesktop:
         self.voice_setup_window = window
         window.title("JARVIS — Voice Setup")
         window.configure(bg="#06121d")
-        window.geometry("600x470")
-        window.minsize(500, 420)
+        window.geometry("620x560")
+        window.minsize(520, 500)
         window.resizable(True, True)
         window.transient(self.root)
         window.protocol("WM_DELETE_WINDOW", lambda: self._close_voice_setup_wizard(window))
@@ -1213,19 +1213,25 @@ class JarvisDesktop:
                  "This setup does not upload microphone recordings.",
                  bg="#06121d", fg="#8fb4c5", wraplength=510, justify="center",
                  font=("Segoe UI", 10)).pack(padx=28, pady=(0, 18))
-        self.voice_setup_status_var = tk.StringVar(value="STEP 1 OF 2 — MICROPHONE")
+        self.voice_setup_status_var = tk.StringVar(value="STEP 1 OF 3 — MICROPHONE")
         tk.Label(window, textvariable=self.voice_setup_status_var, bg="#06121d",
                  fg="#00e5ff", font=("Segoe UI", 10, "bold")).pack(pady=8)
         self.voice_setup_mic_ready = False
+        self.voice_setup_test_passed = False
         self.voice_setup_mic_var = tk.StringVar(value="1. Check Windows microphone access.")
         self.voice_setup_model_var = tk.StringVar(
             value=("2. Wake-word model is installed." if JARVIS_WAKEWORD_MODEL.is_file()
                    else "2. Install the licensed Jarvis wake-word model.")
         )
-        for variable in (self.voice_setup_mic_var, self.voice_setup_model_var):
+        self.voice_setup_test_var = tk.StringVar(
+            value="3. Test detection: say “Jarvis” three times when prompted."
+        )
+        for variable in (
+            self.voice_setup_mic_var, self.voice_setup_model_var, self.voice_setup_test_var
+        ):
             tk.Label(window, textvariable=variable, bg="#0b1d2b", fg="#d7f4ff",
-                     anchor="w", justify="left", wraplength=490, padx=14, pady=14,
-                     font=("Segoe UI", 10)).pack(fill="x", padx=28, pady=6)
+                     anchor="w", justify="left", wraplength=510, padx=14, pady=12,
+                     font=("Segoe UI", 10)).pack(fill="x", padx=28, pady=5)
         actions = tk.Frame(window, bg="#06121d")
         actions.pack(fill="x", padx=28, pady=(16, 8))
         self.voice_setup_mic_button = ttk.Button(
@@ -1234,6 +1240,11 @@ class JarvisDesktop:
         self.voice_setup_mic_button.pack(fill="x", pady=5)
         ttk.Button(actions, text="Set up wake word",
                    command=self._start_voice_setup_model).pack(fill="x", pady=5)
+        self.voice_setup_test_button = ttk.Button(
+            actions, text="Test wake word — say Jarvis",
+            command=self._test_voice_setup_wakeword, state="disabled"
+        )
+        self.voice_setup_test_button.pack(fill="x", pady=5)
         self.voice_setup_finish_button = ttk.Button(
             actions, text="Finish setup", command=lambda: self._finish_voice_setup(window),
             state="disabled"
@@ -1270,7 +1281,9 @@ class JarvisDesktop:
     def _start_voice_setup_model(self):
         if JARVIS_WAKEWORD_MODEL.is_file():
             self.voice_setup_model_var.set("2. Wake-word model is installed and validated.")
-            self.voice_setup_finish_button.configure(state="normal")
+            if self.voice_setup_mic_ready:
+                self.voice_setup_test_button.configure(state="normal")
+                self.voice_setup_status_var.set("STEP 3 OF 3 — SAY JARVIS")
             return
         self.voice_setup_model_var.set(
             "2. Download the licensed ONNX model from the official page. "
@@ -1278,12 +1291,107 @@ class JarvisDesktop:
         )
         self._open_wakeword_setup()
 
+    def _test_voice_setup_wakeword(self):
+        """Run a short, local-only live wake-word check after explicit user action."""
+        if not self.voice_setup_mic_ready:
+            self.voice_setup_status_var.set("Check microphone access before testing the wake word.")
+            return
+        if not JARVIS_WAKEWORD_MODEL.is_file():
+            self.voice_setup_status_var.set("Install the wake-word model before testing.")
+            return
+        if getattr(self, "wakeword_test_running", False):
+            self.voice_setup_status_var.set("Wake-word test is already running.")
+            return
+        wake_thread = getattr(self, "wake_thread", None)
+        if wake_thread is not None and wake_thread.is_alive():
+            self.voice_setup_status_var.set("Stop Voice Listening before running the setup test.")
+            return
+
+        self.wakeword_test_running = True
+        self.voice_setup_test_button.configure(state="disabled")
+        self.voice_setup_status_var.set("TEST RUNNING — SAY “JARVIS” THREE TIMES")
+        self.voice_setup_test_var.set(
+            "3. Listening locally for up to 18 seconds. Say “Jarvis” clearly three times."
+        )
+
+        def worker():
+            audio = None
+            stream = None
+            result = {"ok": False, "activations": 0}
+            try:
+                import numpy as np
+                import pyaudio
+                import openwakeword
+                from openwakeword.model import Model
+
+                model_path = JARVIS_WAKEWORD_MODEL
+                runtime_paths = prepare_openwakeword_assets(openwakeword, model_path)
+                detector = Model(
+                    wakeword_models=[str(model_path)],
+                    inference_framework="onnx",
+                    **runtime_paths,
+                )
+                audio = pyaudio.PyAudio()
+                stream = audio.open(
+                    format=pyaudio.paInt16, channels=1, rate=16000, input=True,
+                    frames_per_buffer=1280,
+                )
+                deadline = time.monotonic() + 18
+                streak = 0
+                last_activation = 0.0
+                while time.monotonic() < deadline and result["activations"] < 3:
+                    raw = stream.read(1280, exception_on_overflow=False)
+                    if len(raw) != 2560:
+                        raise RuntimeError(
+                            "Microphone returned an empty or incomplete audio frame."
+                        )
+                    frame = np.frombuffer(raw, dtype=np.int16)
+                    scores = detector.predict(frame)
+                    confidence = float(scores.get(model_path.stem, 0.0))
+                    activated, streak = update_wakeword_activation(
+                        confidence, streak, threshold=0.5, required_frames=2
+                    )
+                    now = time.monotonic()
+                    if activated and now - last_activation >= 2.0:
+                        result["activations"] += 1
+                        last_activation = now
+                        streak = 0
+                result["ok"] = result["activations"] > 0
+            except Exception as exc:
+                result["error"] = str(exc)
+            finally:
+                try:
+                    if stream is not None:
+                        try:
+                            stream.stop_stream()
+                        finally:
+                            stream.close()
+                except Exception as exc:
+                    result.setdefault("error", f"Microphone cleanup failed: {exc}")
+                    result["ok"] = False
+                finally:
+                    if audio is not None:
+                        try:
+                            audio.terminate()
+                        except Exception as exc:
+                            result.setdefault("error", f"Audio device cleanup failed: {exc}")
+                            result["ok"] = False
+                self.wakeword_test_running = False
+                self.events.put(("voice_setup_wakeword_test_result", result))
+
+        threading.Thread(
+            target=worker, name="JARVIS-voice-setup-wakeword-test", daemon=True
+        ).start()
+
     def _finish_voice_setup(self, window):
         if not self.voice_setup_mic_ready:
             self.voice_setup_status_var.set("Complete the microphone check before finishing setup.")
             return
         if not JARVIS_WAKEWORD_MODEL.is_file():
             self.voice_setup_status_var.set("Wake-word model is missing; setup cannot finish.")
+            return
+        if not self.voice_setup_test_passed:
+            self.voice_setup_status_var.set("Complete the live “Jarvis” microphone test before finishing.")
             return
         self.settings["voice_setup_completed"] = True
         try:
@@ -2987,6 +3095,30 @@ class JarvisDesktop:
                         self._set_status("Update download failed.")
                 elif kind == "memory_clear_confirmation":
                     self._handle_memory_command(value, display_user=False)
+                elif kind == "voice_setup_wakeword_test_result":
+                    if self.voice_setup_window is not None:
+                        try:
+                            activations = int(value.get("activations", 0))
+                            if value.get("ok") and activations > 0:
+                                self.voice_setup_test_passed = True
+                                self.voice_setup_test_var.set(
+                                    f"3. Wake word detected ({activations} activation(s))."
+                                )
+                                self.voice_setup_status_var.set("VOICE TEST PASSED — SETUP READY")
+                                self.voice_setup_finish_button.configure(state="normal")
+                            else:
+                                self.voice_setup_test_passed = False
+                                detail = value.get("error")
+                                message = (
+                                    f"3. Wake word not detected. {detail}"
+                                    if detail else
+                                    "3. No detection yet. Check mic level and try saying “Jarvis” again."
+                                )
+                                self.voice_setup_test_var.set(message)
+                                self.voice_setup_status_var.set("VOICE TEST NEEDS ANOTHER TRY")
+                                self.voice_setup_test_button.configure(state="normal")
+                        except (tk.TclError, TypeError, ValueError):
+                            self.voice_setup_window = None
                 elif kind == "voice_setup_model_ready":
                     if self.voice_setup_window is not None:
                         try:
@@ -3005,7 +3137,8 @@ class JarvisDesktop:
                                 self.voice_setup_status_var.set("MICROPHONE READY — CHECK WAKE WORD")
                                 self.voice_setup_mic_button.configure(state="disabled", text="Microphone ready")
                                 if JARVIS_WAKEWORD_MODEL.is_file():
-                                    self.voice_setup_finish_button.configure(state="normal")
+                                    self.voice_setup_test_button.configure(state="normal")
+                                    self.voice_setup_status_var.set("STEP 3 OF 3 — SAY JARVIS")
                             else:
                                 self.voice_setup_mic_var.set("1. Microphone check failed. Check Windows Privacy settings and your input device.")
                                 self.voice_setup_status_var.set("MICROPHONE CHECK FAILED")
@@ -3019,10 +3152,8 @@ class JarvisDesktop:
                                 "2. Wake-word model installed and validated."
                             )
                             if getattr(self, "voice_setup_mic_ready", False):
-                                self.voice_setup_status_var.set(
-                                    "SETUP READY — YOU CAN FINISH"
-                                )
-                                self.voice_setup_finish_button.configure(state="normal")
+                                self.voice_setup_status_var.set("STEP 3 OF 3 — SAY JARVIS")
+                                self.voice_setup_test_button.configure(state="normal")
                             else:
                                 self.voice_setup_status_var.set(
                                     "WAKE WORD READY — CHECK MICROPHONE"
