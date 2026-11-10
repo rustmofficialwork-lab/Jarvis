@@ -73,3 +73,23 @@ py speaker_enrollment_recorder.py --count 20
 It records prompted 3-second clips at 16 kHz mono PCM into `speaker_dataset/owner`. Record only your own voice, in a quiet environment, and vary natural speaking pace/volume across sessions. The files stay local and are not uploaded. You can cancel with Ctrl+C; already completed clips remain saved.
 
 These samples are not required for ordinary wake-word model training, and they do not yet enable owner-only activation. A compatible speaker-embedding model, local enrollment/profile storage, calibrated match threshold, explicit profile reset, and held-out impostor testing still need to be implemented before the listener can safely use speaker verification.
+## Upstream training and speaker-model candidates (reviewed 2026-11-11)
+
+### First-party wake-word training route
+
+The upstream openWakeWord project documents a custom-model training pipeline using generated positive speech, negative/background examples, a frozen shared embedding backbone, and a small classifier exported for ONNX inference. Its README links both a quick Colab workflow and a more configurable training notebook. The README also states that Windows inference uses ONNX Runtime; the training workflow itself should be treated as a separate reproducible build step, not as a first-launch download.
+
+For JARVIS, the target label must remain exactly the requested wake phrase, and generated clips must be reviewed for pronunciation before training. Keep the user's locally recorded positive/negative clips as held-out real-microphone evaluation data; do not mix held-out clips into training. A model trained from synthetic data is only a candidate until it passes measured false-accept and false-reject testing on real Windows microphones.
+
+Upstream references:
+
+- https://github.com/dscripka/openWakeWord#training-new-models
+- https://github.com/dscripka/openWakeWord/blob/main/notebooks/automatic_model_training.ipynb
+
+### Speaker-verification candidate
+
+The speechbrain/spkrec-ecapa-voxceleb model card currently declares Apache-2.0 for the model repository and documents 16 kHz mono input, ECAPA-TDNN embeddings, and cosine-distance speaker verification. It is a reasonable candidate for a prototype, not an approved production dependency: the card explicitly warns that performance on other datasets is not guaranteed. Before integration, verify the exact model files, transitive runtime dependencies, offline packaging size, Windows CPU behavior, and license notices. Calibrate thresholds only against separate owner and consented non-owner recordings; never infer identity from the wake-word score.
+
+Reference: https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb
+
+No model weights are downloaded or bundled by this documentation change. No speaker-verification code is enabled by it.
