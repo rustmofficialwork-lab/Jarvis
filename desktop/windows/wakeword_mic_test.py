@@ -2,6 +2,10 @@
 
 No audio is saved or uploaded. Run from this folder with:
     py wakeword_mic_test.py
+List input devices with:
+    py wakeword_mic_test.py --list-devices
+Select one with:
+    py wakeword_mic_test.py --device-index 2
 """
 from __future__ import annotations
 
@@ -20,13 +24,38 @@ from jarvis_desktop import JARVIS_WAKEWORD_MODEL, update_wakeword_activation
 CHUNK_SIZE = 1280  # 80 ms at 16 kHz
 
 
-def capture_phase(audio, detector, model_name: str, label: str, seconds: int, threshold: float) -> dict:
+def print_input_devices(audio) -> None:
+    """Print available Windows input devices with the index accepted by PyAudio."""
+    found = False
+    for index in range(audio.get_device_count()):
+        info = audio.get_device_info_by_index(index)
+        if int(info.get("maxInputChannels", 0)) > 0:
+            found = True
+            print(
+                f"  [{index}] {info.get('name', 'Unknown input')} "
+                f"(channels: {int(info.get('maxInputChannels', 0))}, "
+                f"default rate: {int(info.get('defaultSampleRate', 0))} Hz)"
+            )
+    if not found:
+        print("No audio input devices were reported by Windows/PyAudio.")
+
+
+def capture_phase(
+    audio,
+    detector,
+    model_name: str,
+    label: str,
+    seconds: int,
+    threshold: float,
+    device_index: int | None = None,
+) -> dict:
     input(f"\n{label}\nPress Enter when ready...")
     stream = audio.open(
         format=pyaudio.paInt16,
         channels=1,
         rate=16000,
         input=True,
+        input_device_index=device_index,
         frames_per_buffer=CHUNK_SIZE,
     )
     end_at = time.monotonic() + seconds
@@ -69,36 +98,58 @@ def capture_phase(audio, detector, model_name: str, label: str, seconds: int, th
 def main() -> int:
     parser = argparse.ArgumentParser(description="Test JARVIS wake-word detection on this PC.")
     parser.add_argument("--model", type=Path, default=JARVIS_WAKEWORD_MODEL)
-    parser.add_argument("--device-index", type=int, default=None)
+    parser.add_argument("--device-index", type=int, default=None, help="PyAudio input device index; default input is used when omitted.")
+    parser.add_argument("--list-devices", action="store_true", help="List Windows audio input devices and exit.")
     parser.add_argument("--threshold", type=float, default=0.5)
     args = parser.parse_args()
 
-    if not args.model.is_file():
-        print(f"Wake-word model not found: {args.model}")
-        print("Complete the in-app Set up wake word step first.")
-        return 2
-
-    print("Loading the local Jarvis wake-word model…")
-    openwakeword.utils.download_models()
-    detector = Model(
-        wakeword_models=[str(args.model)],
-        inference_framework="onnx",
-    )
-    audio = pyaudio.PyAudio()
-    results = []
+    audio = None
     try:
+        audio = pyaudio.PyAudio()
+        if args.list_devices:
+            print("Available microphone/input devices:")
+            print_input_devices(audio)
+            return 0
+
+        if args.device_index is not None:
+            if args.device_index < 0 or args.device_index >= audio.get_device_count():
+                print(f"Invalid input device index: {args.device_index}")
+                print_input_devices(audio)
+                return 2
+            selected = audio.get_device_info_by_index(args.device_index)
+            if int(selected.get("maxInputChannels", 0)) < 1:
+                print(f"Device {args.device_index} is not an audio input device.")
+                print_input_devices(audio)
+                return 2
+            print(f"Using microphone [{args.device_index}]: {selected.get('name', 'Unknown input')}")
+        else:
+            print("Using the Windows/PyAudio default input device.")
+
+        if not args.model.is_file():
+            print(f"Wake-word model not found: {args.model}")
+            print("Complete the in-app Set up wake word step first.")
+            return 2
+
+        print("Loading the local Jarvis wake-word model…")
+        openwakeword.utils.download_models()
+        detector = Model(
+            wakeword_models=[str(args.model)],
+            inference_framework="onnx",
+        )
+        results = []
         print("\nJARVIS microphone test")
         print("- Quiet phase: stay quiet; this measures false activations.")
         print("- Speech phase: say 'Jarvis' clearly five times, with a short pause.")
         print("- Background phase: keep ordinary room/TV/fan noise at your normal level; do not say the wake word.")
-        results.append(capture_phase(audio, detector, args.model.stem, "QUIET ROOM — 12 seconds; stay silent.", 12, args.threshold))
-        results.append(capture_phase(audio, detector, args.model.stem, "WAKE WORD — 18 seconds; say Jarvis five times.", 18, args.threshold))
-        results.append(capture_phase(audio, detector, args.model.stem, "BACKGROUND NOISE — 15 seconds; do not say Jarvis.", 15, args.threshold))
+        results.append(capture_phase(audio, detector, args.model.stem, "QUIET ROOM — 12 seconds; stay silent.", 12, args.threshold, args.device_index))
+        results.append(capture_phase(audio, detector, args.model.stem, "WAKE WORD — 18 seconds; say Jarvis five times.", 18, args.threshold, args.device_index))
+        results.append(capture_phase(audio, detector, args.model.stem, "BACKGROUND NOISE — 15 seconds; do not say Jarvis.", 15, args.threshold, args.device_index))
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"Microphone/model test failed: {exc}")
         return 1
     finally:
-        audio.terminate()
+        if audio is not None:
+            audio.terminate()
 
     print("\nResults (audio was not saved):")
     for item in results:
