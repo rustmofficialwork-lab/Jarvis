@@ -15,6 +15,12 @@ JARVIS requests microphone access only after a first-launch consent prompt. If y
 
 Wake-word inference runs locally through openWakeWord after its ONNX model and shared feature files are installed; no Picovoice account, AccessKey, or cloud wake-word service is required. The first setup needs internet to obtain the model files. Speech transcription tries Google's online recognizer first and automatically falls back to a local Vosk model when the network request fails. JARVIS automatically downloads the selected language model in the background on first launch (and after a language change) when internet is available; no Settings visit is required. After the one-time download, speech transcription and allowlisted Windows commands can work without internet. Online recognition requests have an eight-second network timeout. Offline models are stored under `%LOCALAPPDATA%\\JARVISDesktop\\models` and are not bundled into the installer. Model downloads are capped at 250 MB, and ZIP extraction rejects path traversal, symbolic links, unexpected top-level paths, archives with more than 20,000 entries, or expanded content larger than 500 MB. The desktop app does not hide or bypass Windows microphone privacy indicators.
 
+## 3D hologram and optional hand gestures
+
+The HUD includes an animated Three.js reactor overlay. The **ENABLE GESTURES** control is opt-in and requests webcam permission only after it is clicked. Hand landmarks are processed in the browser with MediaPipe; camera frames are not uploaded by this feature. Pinch triggers the nearest HUD action to the screen center, a fist toggles the reactor glow, and a horizontal swipe rotates the hologram. Disable gestures or close JARVIS to stop the camera stream. The first activation downloads the Three.js/MediaPipe runtime and hand-landmarker model, so internet access is required. Camera support depends on the Windows WebView runtime and its privacy permissions.
+
+Face identity unlock is not included in this build. Camera presence is not treated as identity, and JARVIS does not store face templates or use face recognition as a Windows sign-in/security replacement.
+
 ## Offline reminders
 
 JARVIS can create local reminders by typing or speaking commands such as:
