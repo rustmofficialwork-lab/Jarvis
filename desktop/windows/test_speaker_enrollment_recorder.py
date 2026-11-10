@@ -12,12 +12,15 @@ from speaker_enrollment_recorder import PROMPTS, record_enrollment
 
 
 class FakeStream:
-    def __init__(self, *, fail_close: bool = False):
+    def __init__(self, *, fail_close: bool = False, empty_read: bool = False):
         self.closed = False
         self.stopped = False
         self.fail_close = fail_close
+        self.empty_read = empty_read
 
     def read(self, frames: int, exception_on_overflow: bool = False) -> bytes:
+        if self.empty_read:
+            return b""
         return b"\x01\x00" * frames
 
     def stop_stream(self) -> None:
