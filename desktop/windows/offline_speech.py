@@ -162,7 +162,7 @@ def install_offline_model(language: str, model_dir: Path = DEFAULT_MODEL_DIR,
                     or part.split(".", 1)[0].upper() in reserved_names
                     for part in meaningful_parts
                 )
-                if (not name or name.startswith("/") or "\\\\" in name
+                if (not name or name.startswith("/") or "\\" in name
                         or any(part in {"", ".", ".."} for part in meaningful_parts)
                         or not meaningful_parts or meaningful_parts[0] != model_name
                         or invalid_component):
