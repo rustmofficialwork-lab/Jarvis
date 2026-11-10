@@ -94,7 +94,7 @@ SYSTEM_PROMPT = (
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> dict:
-    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN", "device_id": "", "microphone_consent_version": 0, "microphone_consent_granted": False}
+    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN", "device_id": "", "microphone_consent_version": 0, "microphone_consent_granted": False, "voice_setup_completed": False}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
@@ -116,6 +116,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
                 else 0
             ),
             "microphone_consent_granted": data.get("microphone_consent_granted") is True,
+            "voice_setup_completed": data.get("voice_setup_completed") is True,
         }
         # Keep the per-install ID optional for older settings files. The desktop
         # app creates and persists it during startup when it is missing.
@@ -1140,8 +1141,9 @@ class JarvisDesktop:
         # Defer network activity until the HUD has settled.
         self.root.after(30000, lambda: self._check_for_updates(silent=True))
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
-        # Microphone consent is requested when the user activates voice listening,
-        # not during startup, so the HUD can finish rendering without a modal dialog.
+        self.voice_setup_window = None
+        # Defer guided voice onboarding until the HUD has settled.
+        self.root.after(1400, self._begin_first_launch_voice_setup)
 
     def _first_launch_permission_setup(self):
         if not microphone_consent_required(self.settings):
@@ -1172,6 +1174,121 @@ class JarvisDesktop:
             self._set_status("Microphone consent saved. Voice listening can now be activated.")
         else:
             self._set_status("Microphone permission declined. Chat and HUD remain available.")
+
+
+    def _begin_first_launch_voice_setup(self):
+        """Offer guided voice onboarding once, after the main HUD has settled."""
+        if self.settings.get("voice_setup_completed") or self.voice_setup_window is not None:
+            return
+        if microphone_consent_required(self.settings):
+            self._first_launch_permission_setup()
+        if not self.settings.get("microphone_consent_granted"):
+            self._set_status("Voice setup skipped: microphone permission was not granted.")
+            return
+        self._show_voice_setup_wizard()
+
+    def _show_voice_setup_wizard(self):
+        """Show microphone and wake-word setup steps in a first-launch wizard."""
+        if self.voice_setup_window is not None:
+            try:
+                if self.voice_setup_window.winfo_exists():
+                    self.voice_setup_window.lift()
+                    return
+            except tk.TclError:
+                pass
+        window = tk.Toplevel(self.root)
+        self.voice_setup_window = window
+        window.title("JARVIS — Voice Setup")
+        window.configure(bg="#06121d")
+        window.geometry("600x470")
+        window.minsize(500, 420)
+        window.resizable(True, True)
+        window.transient(self.root)
+        window.protocol("WM_DELETE_WINDOW", lambda: self._close_voice_setup_wizard(window))
+        tk.Label(window, text="J.A.R.V.I.S", bg="#06121d", fg="#00e5ff",
+                 font=("Segoe UI", 20, "bold")).pack(pady=(24, 4))
+        tk.Label(window, text="VOICE ACTIVATION SETUP", bg="#06121d", fg="#d7f4ff",
+                 font=("Segoe UI", 11, "bold")).pack(pady=(0, 10))
+        tk.Label(window, text="Prepare local microphone access and the Jarvis wake word. "
+                 "This setup does not upload microphone recordings.",
+                 bg="#06121d", fg="#8fb4c5", wraplength=510, justify="center",
+                 font=("Segoe UI", 10)).pack(padx=28, pady=(0, 18))
+        self.voice_setup_status_var = tk.StringVar(value="STEP 1 OF 2 — MICROPHONE")
+        tk.Label(window, textvariable=self.voice_setup_status_var, bg="#06121d",
+                 fg="#00e5ff", font=("Segoe UI", 10, "bold")).pack(pady=8)
+        self.voice_setup_mic_var = tk.StringVar(value="1. Check Windows microphone access.")
+        self.voice_setup_model_var = tk.StringVar(
+            value=("2. Wake-word model is installed." if JARVIS_WAKEWORD_MODEL.is_file()
+                   else "2. Install the licensed Jarvis wake-word model.")
+        )
+        for variable in (self.voice_setup_mic_var, self.voice_setup_model_var):
+            tk.Label(window, textvariable=variable, bg="#0b1d2b", fg="#d7f4ff",
+                     anchor="w", justify="left", wraplength=490, padx=14, pady=14,
+                     font=("Segoe UI", 10)).pack(fill="x", padx=28, pady=6)
+        actions = tk.Frame(window, bg="#06121d")
+        actions.pack(fill="x", padx=28, pady=(16, 8))
+        self.voice_setup_mic_button = ttk.Button(
+            actions, text="Check microphone", command=self._check_voice_setup_microphone
+        )
+        self.voice_setup_mic_button.pack(fill="x", pady=5)
+        ttk.Button(actions, text="Set up wake word",
+                   command=self._start_voice_setup_model).pack(fill="x", pady=5)
+        self.voice_setup_finish_button = ttk.Button(
+            actions, text="Finish setup", command=lambda: self._finish_voice_setup(window),
+            state=("normal" if JARVIS_WAKEWORD_MODEL.is_file() else "disabled")
+        )
+        self.voice_setup_finish_button.pack(fill="x", pady=5)
+        tk.Button(window, text="Do this later",
+                  command=lambda: self._close_voice_setup_wizard(window),
+                  bg="#06121d", fg="#8fb4c5", relief="flat").pack(pady=(4, 14))
+
+    def _close_voice_setup_wizard(self, window):
+        try:
+            window.destroy()
+        except tk.TclError:
+            pass
+        if self.voice_setup_window is window:
+            self.voice_setup_window = None
+
+    def _check_voice_setup_microphone(self):
+        if not self.settings.get("microphone_consent_granted"):
+            self.voice_setup_status_var.set("Microphone permission is required.")
+            return
+        self.voice_setup_mic_button.configure(state="disabled")
+        self.voice_setup_status_var.set("CHECKING MICROPHONE…")
+        def worker():
+            try:
+                import speech_recognition as sr
+                with sr.Microphone():
+                    pass
+                self.events.put(("voice_setup_mic_result", {"ok": True}))
+            except Exception as exc:
+                self.events.put(("voice_setup_mic_result", {"ok": False, "error": str(exc)}))
+        threading.Thread(target=worker, name="JARVIS-voice-setup-mic", daemon=True).start()
+
+    def _start_voice_setup_model(self):
+        if JARVIS_WAKEWORD_MODEL.is_file():
+            self.voice_setup_model_var.set("2. Wake-word model is installed and validated.")
+            self.voice_setup_finish_button.configure(state="normal")
+            return
+        self.voice_setup_model_var.set(
+            "2. Download the licensed ONNX model from the official page. "
+            "JARVIS will install it from Downloads when complete."
+        )
+        self._open_wakeword_setup()
+
+    def _finish_voice_setup(self, window):
+        if not JARVIS_WAKEWORD_MODEL.is_file():
+            self.voice_setup_status_var.set("Wake-word model is missing; setup cannot finish.")
+            return
+        self.settings["voice_setup_completed"] = True
+        try:
+            save_settings(self.settings)
+        except OSError as exc:
+            self.voice_setup_status_var.set(f"Could not save setup state: {exc}")
+            return
+        self._set_status("Voice setup completed. Activate Voice Listening when ready.")
+        self._close_voice_setup_wizard(window)
 
     def _request_microphone_access(self):
         """Check the microphone only after the user has granted JARVIS consent."""
@@ -2844,6 +2961,19 @@ class JarvisDesktop:
                         self._set_status("Update download failed.")
                 elif kind == "memory_clear_confirmation":
                     self._handle_memory_command(value, display_user=False)
+                elif kind == "voice_setup_mic_result":
+                    if self.voice_setup_window is not None:
+                        try:
+                            if value.get("ok"):
+                                self.voice_setup_mic_var.set("1. Microphone check passed.")
+                                self.voice_setup_status_var.set("STEP 2 OF 2 — MICROPHONE READY")
+                                self.voice_setup_mic_button.configure(state="disabled", text="Microphone ready")
+                            else:
+                                self.voice_setup_mic_var.set("1. Microphone check failed. Check Windows Privacy settings and your input device.")
+                                self.voice_setup_status_var.set("MICROPHONE CHECK FAILED")
+                                self.voice_setup_mic_button.configure(state="normal")
+                        except tk.TclError:
+                            self.voice_setup_window = None
                 elif kind == "permission_result":
                     if value.get("ok"):
                         self._set_status("Microphone access is available. Voice listening still starts only when you activate it.")
