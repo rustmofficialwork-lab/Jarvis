@@ -122,6 +122,50 @@ class OfflineSpeechTests(unittest.TestCase):
                     "hi-IN", Path(temp), lambda _url, timeout: io.BytesIO(archive_bytes.getvalue())
                 )
 
+    def test_installer_rejects_windows_alternate_data_stream_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive_bytes = io.BytesIO()
+            with zipfile.ZipFile(archive_bytes, "w") as archive:
+                archive.writestr(MODEL_CATALOG["hi-IN"][0] + "/config.txt:payload", "unsafe")
+            with self.assertRaisesRegex(RuntimeError, "unsafe file path"):
+                install_offline_model("hi-IN", Path(temp), lambda _url, timeout: io.BytesIO(archive_bytes.getvalue()))
+
+    def test_installer_rejects_windows_reserved_device_names(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive_bytes = io.BytesIO()
+            with zipfile.ZipFile(archive_bytes, "w") as archive:
+                archive.writestr(MODEL_CATALOG["hi-IN"][0] + "/NUL.txt", "unsafe")
+            with self.assertRaisesRegex(RuntimeError, "unsafe file path"):
+                install_offline_model("hi-IN", Path(temp), lambda _url, timeout: io.BytesIO(archive_bytes.getvalue()))
+
+    def test_installer_rejects_case_insensitive_duplicate_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive_bytes = io.BytesIO()
+            with zipfile.ZipFile(archive_bytes, "w") as archive:
+                archive.writestr(MODEL_CATALOG["hi-IN"][0] + "/Config.txt", "first")
+                archive.writestr(MODEL_CATALOG["hi-IN"][0] + "/config.txt", "second")
+            with self.assertRaisesRegex(RuntimeError, "duplicate file paths"):
+                install_offline_model("hi-IN", Path(temp), lambda _url, timeout: io.BytesIO(archive_bytes.getvalue()))
+
+    def test_installer_rejects_encrypted_entries(self):
+        from unittest.mock import patch
+        class FakeMember:
+            filename = MODEL_CATALOG["hi-IN"][0] + "/secret.bin"
+            file_size = 1
+            external_attr = 0
+            flag_bits = 0x1
+        class FakeArchive:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def infolist(self):
+                return [FakeMember()]
+        with tempfile.TemporaryDirectory() as temp:
+            with patch("offline_speech.zipfile.ZipFile", return_value=FakeArchive()):
+                with self.assertRaisesRegex(RuntimeError, "encrypted file"):
+                    install_offline_model("hi-IN", Path(temp), lambda _url, timeout: io.BytesIO(b"unused"))
+
     def test_installer_rejects_symbolic_links(self):
         import stat
         with tempfile.TemporaryDirectory() as temp:
