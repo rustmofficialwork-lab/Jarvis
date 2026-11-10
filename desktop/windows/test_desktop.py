@@ -2063,6 +2063,20 @@ class HudRuntimeStateTests(unittest.TestCase):
 
 
 class WebBridgeStartupTests(unittest.TestCase):
+    def test_open_url_reports_browser_launch_failure(self):
+        from unittest.mock import patch
+
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
+        with patch("webbrowser.open", return_value=False):
+            self.assertFalse(bridge.open_url("https://example.com"))
+
+    def test_open_url_reports_success_only_when_browser_accepts_url(self):
+        from unittest.mock import patch
+
+        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
+        with patch("webbrowser.open", return_value=True):
+            self.assertTrue(bridge.open_url("https://example.com"))
+
     def test_settings_api_is_safe_before_backend_initializes(self):
         bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
         self.assertEqual(bridge.get_settings(), {"ready": False})
