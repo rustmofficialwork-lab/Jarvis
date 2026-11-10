@@ -20,7 +20,7 @@ from jarvis_desktop import JARVIS_WAKEWORD_MODEL, update_wakeword_activation
 CHUNK_SIZE = 1280  # 80 ms at 16 kHz
 
 
-def capture_phase(audio, detector, label: str, seconds: int, threshold: float) -> dict:
+def capture_phase(audio, detector, model_name: str, label: str, seconds: int, threshold: float) -> dict:
     input(f"\n{label}\nPress Enter when ready...")
     stream = audio.open(
         format=pyaudio.paInt16,
@@ -40,7 +40,7 @@ def capture_phase(audio, detector, label: str, seconds: int, threshold: float) -
             raw = stream.read(CHUNK_SIZE, exception_on_overflow=False)
             frame = np.frombuffer(raw, dtype=np.int16)
             scores = detector.predict(frame)
-            score = float(scores.get(JARVIS_WAKEWORD_MODEL.stem, 0.0))
+            score = float(scores.get(model_name, 0.0))
             max_score = max(max_score, score)
             activated, streak = update_wakeword_activation(
                 score, streak, threshold=threshold, required_frames=2
@@ -91,9 +91,9 @@ def main() -> int:
         print("- Quiet phase: stay quiet; this measures false activations.")
         print("- Speech phase: say 'Jarvis' clearly five times, with a short pause.")
         print("- Background phase: keep ordinary room/TV/fan noise at your normal level; do not say the wake word.")
-        results.append(capture_phase(audio, detector, "QUIET ROOM — 12 seconds; stay silent.", 12, args.threshold))
-        results.append(capture_phase(audio, detector, "WAKE WORD — 18 seconds; say Jarvis five times.", 18, args.threshold))
-        results.append(capture_phase(audio, detector, "BACKGROUND NOISE — 15 seconds; do not say Jarvis.", 15, args.threshold))
+        results.append(capture_phase(audio, detector, args.model.stem, "QUIET ROOM — 12 seconds; stay silent.", 12, args.threshold))
+        results.append(capture_phase(audio, detector, args.model.stem, "WAKE WORD — 18 seconds; say Jarvis five times.", 18, args.threshold))
+        results.append(capture_phase(audio, detector, args.model.stem, "BACKGROUND NOISE — 15 seconds; do not say Jarvis.", 15, args.threshold))
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"Microphone/model test failed: {exc}")
         return 1
