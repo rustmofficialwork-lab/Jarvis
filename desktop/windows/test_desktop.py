@@ -2194,6 +2194,11 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn("const run=async el=>", hud)
         self.assertIn("else if(!await call('open_system_tool',d.tool))", hud)
 
+    def test_hud_orb_has_no_click_to_command_mapping(self):
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        self.assertNotIn("mark(orb,'Enter a command for JARVIS'", hud)
+        self.assertNotIn("orb.style.cursor='pointer'", hud)
+
     def test_hud_starts_dashboard_refresh_if_bridge_is_already_ready(self):
         hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
         self.assertIn("window.addEventListener('pywebviewready',startBridgeRefresh)", hud)
