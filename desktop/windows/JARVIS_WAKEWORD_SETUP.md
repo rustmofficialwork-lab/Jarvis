@@ -21,7 +21,7 @@ You do not need to manually create the folder, rename the file, or copy it into 
 
 ## Internet and offline behavior
 
-Internet is needed for the publisher's one-time model download and for openWakeWord's shared feature/VAD runtime files on first activation. JARVIS requests these shared assets without downloading openWakeWord's unrelated pretrained wake-word model catalog. After those files are cached, wake-word detection runs locally on the PC and does not send microphone audio to a wake-word cloud service. Speech-to-text uses the project's existing online recognition with its local Vosk fallback.
+Internet is needed for the publisher's one-time model download and for openWakeWord's shared feature/VAD runtime files on first activation. JARVIS stores these shared assets under `%APPDATA%\\JARVISDesktop\\wakeword_runtime\\models` so standard Windows users do not need write access to the installation folder. JARVIS requests these shared assets without downloading openWakeWord's unrelated pretrained wake-word model catalog. After those files are cached, wake-word detection runs locally on the PC and does not send microphone audio to a wake-word cloud service. Speech-to-text uses the project's existing online recognition with its local Vosk fallback.
 
 The app does not silently fetch or redistribute the custom model because the publisher gates downloads behind its own page and its default model terms are personal/non-commercial. The user must complete the publisher's download step and review those terms.
 
