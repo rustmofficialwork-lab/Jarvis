@@ -30,8 +30,8 @@ class FakeStream:
 
 
 class FakeAudio:
-    def __init__(self, *, fail_close: bool = False):
-        self.stream = FakeStream(fail_close=fail_close)
+    def __init__(self, *, fail_close: bool = False, empty_read: bool = False):
+        self.stream = FakeStream(fail_close=fail_close, empty_read=empty_read)
         self.terminated = False
 
     def get_device_info_by_index(self, index: int) -> dict:
@@ -89,6 +89,18 @@ class SpeakerEnrollmentRecorderTests(unittest.TestCase):
                 with self.assertRaisesRegex(OSError, "stream close failure"):
                     record_enrollment(5, Path(directory))
         self.assertTrue(fake_audio.terminated)
+
+    def test_empty_microphone_reads_abort_and_release_audio(self):
+        fake_audio = FakeAudio(empty_read=True)
+        fake_module = types.SimpleNamespace(PyAudio=lambda: fake_audio, paInt16=8)
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(sys.modules, {"pyaudio": fake_module}), patch(
+                "speaker_enrollment_recorder.time.sleep"
+            ):
+                with self.assertRaisesRegex(RuntimeError, "empty audio chunk"):
+                    record_enrollment(5, Path(directory))
+        self.assertTrue(fake_audio.terminated)
+        self.assertTrue(fake_audio.stream.closed)
 
     def test_has_multiple_prompts_for_varied_speech(self):
         self.assertGreaterEqual(len(PROMPTS), 3)
