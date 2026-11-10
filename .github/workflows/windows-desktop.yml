@@ -42,8 +42,8 @@ jobs:
       - name: Validate inline HUD JavaScript
         shell: pwsh
         run: |
-          python -c "import pathlib,re; html=pathlib.Path('desktop/windows/jarvis_hud.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.I|re.S); [pathlib.Path(f'hud-script-{i}.js').write_text(script, encoding='utf-8') for i,script in enumerate(scripts)]"
-          $scripts = Get-ChildItem hud-script-*.js
+          python -c "import pathlib,re; html=pathlib.Path('desktop/windows/jarvis_hud.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.I|re.S); [pathlib.Path(f'hud-script-{i}.js').write_text(script, encoding='utf-8') for i,script in enumerate(scripts)]; pathlib.Path('hud-extensions.js').write_text(pathlib.Path('desktop/windows/jarvis_hud_extensions.js').read_text(encoding='utf-8'), encoding='utf-8')"
+          $scripts = Get-ChildItem hud-script-*.js, hud-extensions.js
           if (-not $scripts) { throw "No inline HUD scripts were found." }
           foreach ($script in $scripts) {
             node --check $script.FullName
@@ -79,7 +79,7 @@ jobs:
         run: python -m pip install -r desktop/windows/requirements.txt
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --name JARVIS jarvis_desktop.py
       - name: Upload JARVIS Windows executable
         uses: actions/upload-artifact@v7
         with:
