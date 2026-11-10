@@ -2986,8 +2986,7 @@ class JarvisWebBridge:
         parsed = urlparse(url)
         if parsed.scheme != "https" or not parsed.netloc:
             return False
-        webbrowser.open(url)
-        return True
+        return bool(webbrowser.open(url))
 
     def get_dashboard(self):
         """Return immediately with cached data while hardware reads refresh off-thread."""
