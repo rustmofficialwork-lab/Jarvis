@@ -68,6 +68,8 @@ def record_clips(label: str, count: int, output_dir: Path, device_index: int | N
             captured = bytearray()
             while len(captured) < frames_per_clip * 2:
                 chunk = stream.read(1024, exception_on_overflow=False)
+                if not chunk:
+                    raise RuntimeError("Microphone returned an empty audio chunk; recording stopped.")
                 captured.extend(chunk)
             captured = captured[: frames_per_clip * 2]
             stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
