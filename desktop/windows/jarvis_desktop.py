@@ -2706,6 +2706,10 @@ class JarvisDesktop:
         """Open the publisher's licensed model page and automatically install its completed download."""
         import webbrowser
 
+        # Avoid launching multiple browsers/watchers when the user clicks repeatedly.
+        if getattr(self, "wakeword_setup_running", False):
+            self._set_status("Wake-word setup is already waiting for the model download.")
+            return
         try:
             model_path = prepare_wakeword_setup_folder()
         except OSError as exc:
