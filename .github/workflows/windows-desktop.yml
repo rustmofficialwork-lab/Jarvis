@@ -93,6 +93,14 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or -not $threeArchive) { throw "Could not download the pinned Three.js package." }
           tar -xf (Join-Path $env:RUNNER_TEMP $threeArchive) -C $threeTemp
           Copy-Item (Join-Path $threeTemp "package/build/three.module.js") (Join-Path $vendor "three.module.js") -Force
+          $licenseDir = Join-Path $vendor "licenses"
+          New-Item -ItemType Directory -Force -Path $licenseDir | Out-Null
+          $threeLicense = Join-Path $threeTemp "package/LICENSE"
+          if (Test-Path $threeLicense) {
+            Copy-Item $threeLicense (Join-Path $licenseDir "THREE-MIT.txt") -Force
+          } else {
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mrdoob/three.js/r160/LICENSE" -OutFile (Join-Path $licenseDir "THREE-MIT.txt")
+          }
 
           $visionArchive = npm pack @mediapipe/tasks-vision@0.10.14 --pack-destination $env:RUNNER_TEMP --silent | Select-Object -Last 1
           if ($LASTEXITCODE -ne 0 -or -not $visionArchive) { throw "Could not download the pinned MediaPipe package." }
@@ -101,6 +109,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $visionVendor | Out-Null
           Copy-Item (Join-Path $visionTemp "package/vision_bundle.mjs") (Join-Path $visionVendor "vision_bundle.mjs") -Force
           Copy-Item (Join-Path $visionTemp "package/wasm") (Join-Path $visionVendor "wasm") -Recurse -Force
+          Invoke-WebRequest -Uri "https://www.apache.org/licenses/LICENSE-2.0.txt" -OutFile (Join-Path $licenseDir "APACHE-2.0.txt")
+          Copy-Item "desktop/windows/THIRD_PARTY_NOTICES.md" (Join-Path $vendor "THIRD_PARTY_NOTICES.md") -Force
 
           if (-not (Test-Path (Join-Path $vendor "three.module.js")) -or
               -not (Test-Path (Join-Path $visionVendor "vision_bundle.mjs")) -or
