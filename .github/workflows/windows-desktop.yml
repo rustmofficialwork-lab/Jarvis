@@ -174,7 +174,9 @@ jobs:
           $lines | Out-File -FilePath SHA256SUMS.txt -Encoding ascii
 
       - name: Point rolling release tag at this build
+        id: update_rolling_tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
@@ -194,7 +196,7 @@ jobs:
           }
 
       - name: Publish latest Windows downloads
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.update_rolling_tag.outcome == 'success'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: jarvis-latest
