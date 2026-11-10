@@ -1158,12 +1158,21 @@ class JarvisDesktop:
             importlib.util.find_spec(module) is not None
             for module in ("openwakeword", "pyaudio", "numpy", "speech_recognition", "pyttsx3")
         )
+        # The Python packages alone are insufficient: the custom single-word
+        # Jarvis ONNX model is a required local asset for wake-word detection.
+        wakeword_model_ready = JARVIS_WAKEWORD_MODEL.is_file()
+        voice_ready = voice_packages and wakeword_model_ready
+        if not voice_packages:
+            voice_detail = "INSTALL VOICE PACKAGES"
+        elif not wakeword_model_ready:
+            voice_detail = "INSTALL JARVIS WAKE MODEL"
+        else:
+            voice_detail = "LOCAL WAKE WORD READY"
         memory_store = getattr(self, "memory_store", None)
         memory_detail = f"{len(memory_store.list())} SAVED LOCALLY" if memory_store else "LOCAL STORE"
         return [
             ("AI CHAT", ai_ready, ai_detail),
-            ("VOICE ENGINE", voice_packages,
-             "LOCAL WAKE WORD READY" if voice_packages else "INSTALL VOICE PACKAGES"),
+            ("VOICE ENGINE", voice_ready, voice_detail),
             ("MEMORY", True, memory_detail),
             ("SYSTEM CONTROL", os.name == "nt",
              "WINDOWS" if os.name == "nt" else "WINDOWS ONLY"),
