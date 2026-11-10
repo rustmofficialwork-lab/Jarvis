@@ -11,6 +11,62 @@ SPEC.loader.exec_module(jarvis_desktop)
 
 
 class WakewordSetupTests(unittest.TestCase):
+    def test_wakeword_requires_two_consecutive_confident_frames(self):
+        detect = jarvis_desktop.update_wakeword_activation
+        activated, streak = detect(0.91, 0, threshold=0.5, required_frames=2)
+        self.assertFalse(activated)
+        self.assertEqual(streak, 1)
+        activated, streak = detect(0.88, streak, threshold=0.5, required_frames=2)
+        self.assertTrue(activated)
+        self.assertEqual(streak, 2)
+        activated, streak = detect(0.2, streak, threshold=0.5, required_frames=2)
+        self.assertFalse(activated)
+        self.assertEqual(streak, 0)
+
+    def test_wakeword_activation_rejects_non_finite_scores(self):
+        activated, streak = jarvis_desktop.update_wakeword_activation(float("nan"), 1)
+        self.assertFalse(activated)
+        self.assertEqual(streak, 0)
+
+    def test_downloaded_wakeword_model_is_validated_and_installed_atomically(self):
+        import sys
+        import tempfile
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        class FakeSession:
+            def __init__(self, path, providers):
+                self.path = path
+                self.providers = providers
+            def get_inputs(self):
+                return [object()]
+            def get_outputs(self):
+                return [object()]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            downloads = root / "Downloads"
+            downloads.mkdir()
+            target = root / "app" / "wakewords" / "Jarvis.onnx"
+            source = downloads / target.name
+            source.write_bytes(b"valid-model-placeholder" * 100)
+            fake_runtime = SimpleNamespace(InferenceSession=FakeSession)
+            with patch.dict(sys.modules, {"onnxruntime": fake_runtime}):
+                installed = jarvis_desktop.install_downloaded_wakeword_model(downloads, target)
+            self.assertEqual(installed, target)
+            self.assertEqual(target.read_bytes(), source.read_bytes())
+            self.assertFalse(target.with_name(target.name + ".part").exists())
+
+    def test_invalid_download_size_is_rejected(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "Jarvis.onnx").write_bytes(b"too small")
+            with self.assertRaises(ValueError):
+                jarvis_desktop.install_downloaded_wakeword_model(
+                    root, root / "installed" / "Jarvis.onnx"
+                )
+
     def test_setup_dialog_uses_real_line_breaks_for_model_path(self):
         from unittest.mock import patch
 
