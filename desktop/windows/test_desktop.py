@@ -24,8 +24,8 @@ class WakewordSetupTests(unittest.TestCase):
             app._open_wakeword_setup()
 
         message = showinfo.call_args.args[1]
-        self.assertIn("\\n", message)
-        self.assertNotIn("\\\\n", message)
+        self.assertIn("\n", message)
+        self.assertNotIn("\\n", message)
         self.assertIn(str(model_path), message)
 
     def test_setup_folder_is_created_and_model_filename_is_exact(self):
