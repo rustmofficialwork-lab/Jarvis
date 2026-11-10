@@ -28,8 +28,12 @@ PROMPTS = (
 
 def record_enrollment(count: int, output_dir: Path, device_index: int | None = None) -> list[Path]:
     """Capture prompted, consent-based owner speech clips locally."""
-    if not 5 <= count <= 200:
-        raise ValueError("count must be between 5 and 200")
+    if isinstance(count, bool) or not isinstance(count, int) or not 5 <= count <= 200:
+        raise ValueError("count must be an integer between 5 and 200")
+    if device_index is not None and (
+        isinstance(device_index, bool) or not isinstance(device_index, int) or device_index < 0
+    ):
+        raise ValueError("device_index must be a non-negative integer")
 
     try:
         import pyaudio
@@ -73,12 +77,16 @@ def record_enrollment(count: int, output_dir: Path, device_index: int | None = N
             written.append(path)
             print(f"  Saved locally: {path.name}")
     finally:
-        if stream is not None:
-            try:
-                stream.stop_stream()
-            finally:
-                stream.close()
-        audio.terminate()
+        # Always release the PyAudio host API, even if stopping or closing the
+        # input stream raises while handling a recording/device error.
+        try:
+            if stream is not None:
+                try:
+                    stream.stop_stream()
+                finally:
+                    stream.close()
+        finally:
+            audio.terminate()
     return written
 
 
