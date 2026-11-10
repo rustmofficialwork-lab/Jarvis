@@ -59,3 +59,17 @@ The current positive/negative dataset recorder is for wake-word classification, 
 ## Current implementation boundary
 
 The current Windows listener activates immediately after the publisher wake-word model crosses its threshold. It does not yet run a speaker-verification gate. The current "Set up wake word" flow also still requires the publisher-hosted ONNX model and downloads shared openWakeWord runtime assets. Therefore neither first-party offline wake-word setup nor owner-only activation is complete. Do not label the current listener as owner-voice-only.
+
+## Local owner-voice enrollment recorder
+
+A separate recorder is now available for collecting longer owner speech samples for future speaker-verification evaluation. It is not a verifier and does not train a model.
+
+Run from `desktop/windows`:
+
+```powershell
+py speaker_enrollment_recorder.py --count 20
+```
+
+It records prompted 3-second clips at 16 kHz mono PCM into `speaker_dataset/owner`. Record only your own voice, in a quiet environment, and vary natural speaking pace/volume across sessions. The files stay local and are not uploaded. You can cancel with Ctrl+C; already completed clips remain saved.
+
+These samples are not required for ordinary wake-word model training, and they do not yet enable owner-only activation. A compatible speaker-embedding model, local enrollment/profile storage, calibrated match threshold, explicit profile reset, and held-out impostor testing still need to be implemented before the listener can safely use speaker verification.
