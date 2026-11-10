@@ -36,6 +36,18 @@ class WakewordDatasetAuditTests(unittest.TestCase):
             self.assertFalse(result["valid"])
             self.assertIn("expected 16000 Hz", result["issues"])
 
+    def test_audit_fails_when_a_class_contains_an_invalid_clip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "positive").mkdir()
+            (root / "negative").mkdir()
+            write_wav(root / "positive" / "wrong-rate.wav", rate=8_000)
+            write_wav(root / "negative" / "valid.wav")
+            report = audit_dataset(root)
+            self.assertEqual(report["status"], "needs-attention")
+            self.assertEqual(report["classes"]["positive"]["invalid_count"], 1)
+            self.assertIn("positive/ contains 1 invalid clip(s)", report["issues"])
+
     def test_audit_requires_both_classes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
