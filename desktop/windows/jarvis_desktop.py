@@ -140,6 +140,31 @@ def prepare_wakeword_setup_folder(settings_dir: Path = SETTINGS_DIR) -> Path:
     return folder / JARVIS_WAKEWORD_MODEL.name
 
 
+def prepare_openwakeword_assets(
+    openwakeword_module,
+    model_path: Path,
+    settings_dir: Path = SETTINGS_DIR,
+) -> dict[str, str]:
+    """Download shared openWakeWord assets into a user-writable app-data folder."""
+    models_dir = Path(settings_dir) / "wakeword_runtime" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    openwakeword_module.utils.download_models(
+        model_names=[Path(model_path).stem],
+        target_directory=str(models_dir),
+    )
+    melspec_path = models_dir / "melspectrogram.onnx"
+    embedding_path = models_dir / "embedding_model.onnx"
+    missing = [path.name for path in (melspec_path, embedding_path) if not path.is_file()]
+    if missing:
+        raise RuntimeError(
+            "The openWakeWord runtime assets could not be installed: " + ", ".join(missing)
+        )
+    return {
+        "melspec_model_path": str(melspec_path),
+        "embedding_model_path": str(embedding_path),
+    }
+
+
 def install_downloaded_wakeword_model(
     downloads_dir: Path | None = None,
     model_path: Path = JARVIS_WAKEWORD_MODEL,
@@ -2068,13 +2093,13 @@ class JarvisDesktop:
                 return
 
             self.events.put(("status", "Preparing the Jarvis wake-word model…"))
-            # Fetch shared feature/VAD assets, but not the full catalog of
-            # unrelated pretrained wake-word models. The custom Jarvis ONNX
-            # file is supplied separately below.
-            openwakeword.utils.download_models(model_names=[model_path.stem])
+            # Keep downloaded runtime assets in user-writable AppData rather
+            # than the potentially read-only Program Files installation folder.
+            runtime_paths = prepare_openwakeword_assets(openwakeword, model_path)
             detector = Model(
                 wakeword_models=[str(model_path)],
                 inference_framework="onnx",
+                **runtime_paths,
             )
             audio = pyaudio.PyAudio()
             self.events.put(("status", "Listening locally for “Jarvis”."))
