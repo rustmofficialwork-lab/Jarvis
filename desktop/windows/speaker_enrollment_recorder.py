@@ -65,7 +65,10 @@ def record_enrollment(count: int, output_dir: Path, device_index: int | None = N
                 time.sleep(1)
             captured = bytearray()
             while len(captured) < bytes_per_clip:
-                captured.extend(stream.read(1024, exception_on_overflow=False))
+                chunk = stream.read(1024, exception_on_overflow=False)
+                if not chunk:
+                    raise RuntimeError("Microphone returned an empty audio chunk; enrollment stopped.")
+                captured.extend(chunk)
             captured = captured[:bytes_per_clip]
             stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
             path = destination / f"owner_{index + 1:04d}_{stamp}.wav"
