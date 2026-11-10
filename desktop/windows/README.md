@@ -17,7 +17,7 @@ Wake-word inference runs locally through openWakeWord after its ONNX model and s
 
 ## 3D hologram and optional hand gestures
 
-The HUD includes an animated Three.js reactor overlay. The **ENABLE GESTURES** control is opt-in and requests webcam permission only after it is clicked. Hand landmarks are processed in the browser with MediaPipe; camera frames are not uploaded by this feature. Pinch triggers the nearest HUD action to the screen center, a fist toggles the reactor glow, and a horizontal swipe rotates the hologram. Disable gestures or close JARVIS to stop the camera stream. The first activation downloads the Three.js/MediaPipe runtime and hand-landmarker model, so internet access is required. Camera support depends on the Windows WebView runtime and its privacy permissions.
+The HUD includes an animated Three.js reactor overlay. The **ENABLE GESTURES** control is opt-in and requests webcam permission only after it is clicked. Hand landmarks are processed in the browser with MediaPipe; camera frames are not uploaded by this feature. Pinch triggers the nearest HUD action to the screen center, a fist toggles the reactor glow, and a horizontal swipe rotates the hologram. Disable gestures or close JARVIS to stop the camera stream. The Windows installer bundles pinned Three.js and MediaPipe runtime libraries locally, with a CDN fallback if a bundled asset is unavailable. The first activation still downloads the hand-landmarker model from Google's model host; face presence downloads its detector model separately. Therefore, camera features need internet on first activation and are not yet fully offline. Camera support depends on the Windows WebView runtime and its privacy permissions.
 
 ### Face presence (not biometric identity unlock)
 
