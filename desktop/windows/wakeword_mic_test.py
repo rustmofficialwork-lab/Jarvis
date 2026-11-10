@@ -1,0 +1,119 @@
+"""Interactive, local-only wake-word microphone check for Windows.
+
+No audio is saved or uploaded. Run from this folder with:
+    py wakeword_mic_test.py
+"""
+from __future__ import annotations
+
+import argparse
+import time
+from pathlib import Path
+
+import numpy as np
+import pyaudio
+import openwakeword
+from openwakeword.model import Model
+
+from jarvis_desktop import JARVIS_WAKEWORD_MODEL, update_wakeword_activation
+
+
+CHUNK_SIZE = 1280  # 80 ms at 16 kHz
+
+
+def capture_phase(audio, detector, label: str, seconds: int, threshold: float) -> dict:
+    input(f"\n{label}\nPress Enter when ready...")
+    stream = audio.open(
+        format=pyaudio.paInt16,
+        channels=1,
+        rate=16000,
+        input=True,
+        frames_per_buffer=CHUNK_SIZE,
+    )
+    end_at = time.monotonic() + seconds
+    streak = 0
+    last_activation = 0.0
+    activations = 0
+    max_score = 0.0
+    frames = 0
+    try:
+        while time.monotonic() < end_at:
+            raw = stream.read(CHUNK_SIZE, exception_on_overflow=False)
+            frame = np.frombuffer(raw, dtype=np.int16)
+            scores = detector.predict(frame)
+            score = float(scores.get(JARVIS_WAKEWORD_MODEL.stem, 0.0))
+            max_score = max(max_score, score)
+            activated, streak = update_wakeword_activation(
+                score, streak, threshold=threshold, required_frames=2
+            )
+            now = time.monotonic()
+            if activated and now - last_activation >= 2.0:
+                activations += 1
+                last_activation = now
+                streak = 0
+            frames += 1
+    finally:
+        try:
+            stream.stop_stream()
+        finally:
+            stream.close()
+        detector.reset()
+    return {
+        "phase": label,
+        "seconds": seconds,
+        "frames": frames,
+        "max_score": max_score,
+        "activations": activations,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Test JARVIS wake-word detection on this PC.")
+    parser.add_argument("--model", type=Path, default=JARVIS_WAKEWORD_MODEL)
+    parser.add_argument("--device-index", type=int, default=None)
+    parser.add_argument("--threshold", type=float, default=0.5)
+    args = parser.parse_args()
+
+    if not args.model.is_file():
+        print(f"Wake-word model not found: {args.model}")
+        print("Complete the in-app Set up wake word step first.")
+        return 2
+
+    print("Loading the local Jarvis wake-word model…")
+    openwakeword.utils.download_models()
+    detector = Model(
+        wakeword_models=[str(args.model)],
+        inference_framework="onnx",
+    )
+    audio = pyaudio.PyAudio()
+    results = []
+    try:
+        print("\nJARVIS microphone test")
+        print("- Quiet phase: stay quiet; this measures false activations.")
+        print("- Speech phase: say 'Jarvis' clearly five times, with a short pause.")
+        print("- Background phase: keep ordinary room/TV/fan noise at your normal level; do not say the wake word.")
+        results.append(capture_phase(audio, detector, "QUIET ROOM — 12 seconds; stay silent.", 12, args.threshold))
+        results.append(capture_phase(audio, detector, "WAKE WORD — 18 seconds; say Jarvis five times.", 18, args.threshold))
+        results.append(capture_phase(audio, detector, "BACKGROUND NOISE — 15 seconds; do not say Jarvis.", 15, args.threshold))
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"Microphone/model test failed: {exc}")
+        return 1
+    finally:
+        audio.terminate()
+
+    print("\nResults (audio was not saved):")
+    for item in results:
+        print(
+            f"- {item['phase']}: {item['activations']} activation(s), "
+            f"peak score {item['max_score']:.3f}, {item['frames']} frames"
+        )
+    quiet, speech, noise = results
+    print("\nAssessment:")
+    print("PASS: no false activations in quiet phase." if quiet["activations"] == 0 else "CHECK: activation(s) occurred during quiet; inspect mic noise/placement.")
+    print("PASS: wake word was detected." if speech["activations"] > 0 else "CHECK: no wake word detected; check input device, mic level, pronunciation and distance.")
+    print("PASS: no false activations in background phase." if noise["activations"] == 0 else "CHECK: background noise caused activation(s); try a different mic position or reduce speaker feedback.")
+    print("\nThis is a local spot-check, not a certified accuracy benchmark. Repeat in the room and with the microphone you normally use.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
