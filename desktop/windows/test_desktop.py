@@ -11,6 +11,23 @@ SPEC.loader.exec_module(jarvis_desktop)
 
 
 class WakewordSetupTests(unittest.TestCase):
+    def test_setup_dialog_uses_real_line_breaks_for_model_path(self):
+        from unittest.mock import patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        model_path = Path("C:/Users/test/AppData/Roaming/JARVISDesktop/wakewords/Jarvis.onnx")
+        with (
+            patch.object(jarvis_desktop, "prepare_wakeword_setup_folder", return_value=model_path),
+            patch("webbrowser.open", return_value=True),
+            patch.object(jarvis_desktop.messagebox, "showinfo") as showinfo,
+        ):
+            app._open_wakeword_setup()
+
+        message = showinfo.call_args.args[1]
+        self.assertIn("\\n", message)
+        self.assertNotIn("\\\\n", message)
+        self.assertIn(str(model_path), message)
+
     def test_setup_folder_is_created_and_model_filename_is_exact(self):
         import tempfile
 
