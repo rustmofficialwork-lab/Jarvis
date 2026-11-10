@@ -2991,6 +2991,23 @@ class JarvisDesktop:
                                 self.voice_setup_mic_button.configure(state="normal")
                         except tk.TclError:
                             self.voice_setup_window = None
+                elif kind == "voice_setup_model_ready":
+                    if self.voice_setup_window is not None:
+                        try:
+                            self.voice_setup_model_var.set(
+                                "2. Wake-word model installed and validated."
+                            )
+                            if getattr(self, "voice_setup_mic_ready", False):
+                                self.voice_setup_status_var.set(
+                                    "SETUP READY — YOU CAN FINISH"
+                                )
+                                self.voice_setup_finish_button.configure(state="normal")
+                            else:
+                                self.voice_setup_status_var.set(
+                                    "WAKE WORD READY — CHECK MICROPHONE"
+                                )
+                        except tk.TclError:
+                            self.voice_setup_window = None
                 elif kind == "permission_result":
                     if value.get("ok"):
                         self._set_status("Microphone access is available. Voice listening still starts only when you activate it.")
