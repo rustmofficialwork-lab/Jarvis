@@ -7,14 +7,14 @@ AppMutex=JARVIS.Desktop.Singleton
 #endif
 AppVersion={#MyAppVersion}
 AppPublisher=JARVIS
-DefaultDirName={autopf}\JARVIS Desktop
+; Per-user installation matches PrivilegesRequired=lowest and avoids Program Files elevation failures.
+DefaultDirName={localappdata}\Programs\JARVIS Desktop
 DefaultGroupName=JARVIS Desktop
 OutputDir={#SourcePath}\..\dist-installer
 OutputBaseFilename=JARVIS-Setup-x64
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
-SetupIconFile=
 UninstallDisplayIcon={app}\JARVIS.exe
 Compression=lzma2
 SolidCompression=yes
