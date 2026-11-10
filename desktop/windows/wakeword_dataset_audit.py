@@ -99,6 +99,8 @@ def audit_dataset(dataset_dir: Path) -> dict[str, Any]:
         }
         if not files:
             report["issues"].append(f"missing or empty {label}/ folder")
+        elif invalid:
+            report["issues"].append(f"{label}/ contains {len(invalid)} invalid clip(s)")
     if not report["issues"]:
         report["status"] = "format-audit-passed"
     else:
