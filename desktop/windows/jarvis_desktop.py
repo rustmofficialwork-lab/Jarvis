@@ -2068,9 +2068,10 @@ class JarvisDesktop:
                 return
 
             self.events.put(("status", "Preparing the Jarvis wake-word model…"))
-            # Downloads only openWakeWord's shared feature models if not cached.
-            # The custom Jarvis detector itself is loaded from the local ONNX file.
-            openwakeword.utils.download_models()
+            # Fetch shared feature/VAD assets, but not the full catalog of
+            # unrelated pretrained wake-word models. The custom Jarvis ONNX
+            # file is supplied separately below.
+            openwakeword.utils.download_models(model_names=[model_path.stem])
             detector = Model(
                 wakeword_models=[str(model_path)],
                 inference_framework="onnx",
