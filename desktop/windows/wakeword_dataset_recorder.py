@@ -25,8 +25,12 @@ def record_clips(label: str, count: int, output_dir: Path, device_index: int | N
     """Record fixed-length WAV clips from a local microphone."""
     if label not in {"positive", "negative"}:
         raise ValueError("label must be 'positive' or 'negative'")
-    if count < 1 or count > 500:
-        raise ValueError("count must be between 1 and 500")
+    if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 500:
+        raise ValueError("count must be an integer between 1 and 500")
+    if device_index is not None and (
+        isinstance(device_index, bool) or not isinstance(device_index, int) or device_index < 0
+    ):
+        raise ValueError("device_index must be a non-negative integer")
 
     try:
         import pyaudio
@@ -76,12 +80,15 @@ def record_clips(label: str, count: int, output_dir: Path, device_index: int | N
             written.append(path)
             print(f"  Saved locally: {path.name}")
     finally:
-        if stream is not None:
-            try:
-                stream.stop_stream()
-            finally:
-                stream.close()
-        audio.terminate()
+        # Ensure the PyAudio host API is released even when stream cleanup fails.
+        try:
+            if stream is not None:
+                try:
+                    stream.stop_stream()
+                finally:
+                    stream.close()
+        finally:
+            audio.terminate()
     return written
 
 
