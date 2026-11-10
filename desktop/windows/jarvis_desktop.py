@@ -2531,25 +2531,28 @@ class JarvisDesktop:
         deadline = time.monotonic() + 600
         previous_signature = None
         stable_checks = 0
-        while time.monotonic() < deadline:
-            try:
-                if candidate.is_file():
-                    stat = candidate.stat()
-                    signature = (stat.st_size, stat.st_mtime_ns)
-                    if signature == previous_signature:
-                        stable_checks += 1
-                    else:
-                        stable_checks = 0
-                    previous_signature = signature
-                    if stable_checks >= 2:
-                        installed = install_downloaded_wakeword_model(downloads_dir, model_path)
-                        self.events.put(("status", f"Jarvis wake-word model installed and validated: {installed.name}. Enable Voice Listening again."))
-                        return
-            except Exception as exc:
-                self.events.put(("error", f"Wake-word model download could not be installed: {exc}"))
-                return
-            time.sleep(1)
-        self.events.put(("status", "Wake-word setup is still waiting. Download the exact ONNX file in your browser, then choose Set up wake word again."))
+        try:
+            while time.monotonic() < deadline:
+                try:
+                    if candidate.is_file():
+                        stat = candidate.stat()
+                        signature = (stat.st_size, stat.st_mtime_ns)
+                        if signature == previous_signature:
+                            stable_checks += 1
+                        else:
+                            stable_checks = 0
+                        previous_signature = signature
+                        if stable_checks >= 2:
+                            installed = install_downloaded_wakeword_model(downloads_dir, model_path)
+                            self.events.put(("status", f"Jarvis wake-word model installed and validated: {installed.name}. Enable Voice Listening again."))
+                            return
+                except Exception as exc:
+                    self.events.put(("error", f"Wake-word model download could not be installed: {exc}"))
+                    return
+                time.sleep(1)
+            self.events.put(("status", "Wake-word setup is still waiting. Download the exact ONNX file in your browser, then choose Set up wake word again."))
+        finally:
+            self.wakeword_setup_running = False
 
     def _open_wakeword_setup(self):
         """Open the publisher's licensed model page and automatically install its completed download."""
@@ -2569,6 +2572,7 @@ class JarvisDesktop:
         except Exception:
             pass
         if getattr(self, "events", None) is not None:
+            self.wakeword_setup_running = True
             threading.Thread(
                 target=self._watch_wakeword_download, args=(model_path,), daemon=True,
                 name="JARVIS-Wakeword-Setup",
@@ -2860,7 +2864,8 @@ class JarvisDesktop:
                         )
                         self._set_status("Reminder notification failed; it will be retried.")
                 elif kind == "listener_stopped":
-                    self._set_status("Wake listener stopped.")
+                    if not getattr(self, "wakeword_setup_running", False):
+                        self._set_status("Wake listener stopped.")
         except queue.Empty:
             pass
         self.root.after(350, self._poll_events)
