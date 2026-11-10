@@ -10,6 +10,7 @@ Select one with:
 from __future__ import annotations
 
 import argparse
+import math
 import time
 from pathlib import Path
 
@@ -71,6 +72,12 @@ def capture_phase(
     try:
         while time.monotonic() < end_at:
             raw = stream.read(CHUNK_SIZE, exception_on_overflow=False)
+            expected_bytes = CHUNK_SIZE * 2  # 16-bit mono PCM
+            if len(raw) != expected_bytes:
+                raise RuntimeError(
+                    "Microphone returned an empty or incomplete audio frame "
+                    f"({len(raw)} of {expected_bytes} bytes). Check the input device and reconnect it."
+                )
             frame = np.frombuffer(raw, dtype=np.int16)
             scores = detector.predict(frame)
             score = float(scores.get(model_name, 0.0))
@@ -106,6 +113,8 @@ def main() -> int:
     parser.add_argument("--list-devices", action="store_true", help="List Windows audio input devices and exit.")
     parser.add_argument("--threshold", type=float, default=0.5)
     args = parser.parse_args()
+    if not math.isfinite(args.threshold) or not 0.0 <= args.threshold <= 1.0:
+        parser.error("--threshold must be a finite number between 0 and 1")
 
     audio = None
     try:
