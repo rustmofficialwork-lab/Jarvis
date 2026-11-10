@@ -68,6 +68,10 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - name: Set up Node.js for bundled HUD runtimes
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Set build version
         shell: pwsh
         run: |
@@ -77,9 +81,36 @@ jobs:
           "APP_VERSION = `"$version`"" | Set-Content -Path desktop/windows/build_version.py -Encoding utf8
       - name: Install desktop dependencies
         run: python -m pip install -r desktop/windows/requirements.txt
+      - name: Bundle pinned HUD runtime libraries
+        shell: pwsh
+        run: |
+          $vendor = Join-Path $PWD "desktop/windows/vendor"
+          $threeTemp = Join-Path $env:RUNNER_TEMP "jarvis-three"
+          $visionTemp = Join-Path $env:RUNNER_TEMP "jarvis-vision"
+          New-Item -ItemType Directory -Force -Path $vendor, $threeTemp, $visionTemp | Out-Null
+
+          $threeArchive = npm pack three@0.160.0 --pack-destination $env:RUNNER_TEMP --silent | Select-Object -Last 1
+          if ($LASTEXITCODE -ne 0 -or -not $threeArchive) { throw "Could not download the pinned Three.js package." }
+          tar -xf (Join-Path $env:RUNNER_TEMP $threeArchive) -C $threeTemp
+          Copy-Item (Join-Path $threeTemp "package/build/three.module.js") (Join-Path $vendor "three.module.js") -Force
+
+          $visionArchive = npm pack @mediapipe/tasks-vision@0.10.14 --pack-destination $env:RUNNER_TEMP --silent | Select-Object -Last 1
+          if ($LASTEXITCODE -ne 0 -or -not $visionArchive) { throw "Could not download the pinned MediaPipe package." }
+          tar -xf (Join-Path $env:RUNNER_TEMP $visionArchive) -C $visionTemp
+          $visionVendor = Join-Path $vendor "mediapipe"
+          New-Item -ItemType Directory -Force -Path $visionVendor | Out-Null
+          Copy-Item (Join-Path $visionTemp "package/vision_bundle.mjs") (Join-Path $visionVendor "vision_bundle.mjs") -Force
+          Copy-Item (Join-Path $visionTemp "package/wasm") (Join-Path $visionVendor "wasm") -Recurse -Force
+
+          if (-not (Test-Path (Join-Path $vendor "three.module.js")) -or
+              -not (Test-Path (Join-Path $visionVendor "vision_bundle.mjs")) -or
+              -not (Test-Path (Join-Path $visionVendor "wasm"))) {
+            throw "One or more bundled HUD runtime assets are missing."
+          }
+
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "vendor;vendor" --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --name JARVIS jarvis_desktop.py
       - name: Upload JARVIS Windows executable
         uses: actions/upload-artifact@v7
         with:
