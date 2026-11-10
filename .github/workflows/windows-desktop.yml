@@ -23,7 +23,7 @@ permissions:
 # Only the newest main-branch build may publish the rolling latest release.
 concurrency:
   group: jarvis-windows-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   source-checks:
