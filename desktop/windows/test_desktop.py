@@ -102,6 +102,26 @@ class WakewordSetupTests(unittest.TestCase):
                     root, root / "installed" / "Jarvis.onnx"
                 )
 
+    def test_repeated_wakeword_setup_click_does_not_open_another_browser(self):
+        from unittest.mock import patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.wakeword_setup_running = True
+        statuses = []
+        app._set_status = statuses.append
+        with (
+            patch.object(jarvis_desktop, "prepare_wakeword_setup_folder") as prepare,
+            patch("webbrowser.open") as open_browser,
+            patch.object(jarvis_desktop.messagebox, "showinfo") as showinfo,
+        ):
+            app._open_wakeword_setup()
+
+        prepare.assert_not_called()
+        open_browser.assert_not_called()
+        showinfo.assert_not_called()
+        self.assertTrue(statuses)
+        self.assertIn("already waiting", statuses[0])
+
     def test_setup_dialog_uses_real_line_breaks_for_model_path(self):
         from unittest.mock import patch
 
