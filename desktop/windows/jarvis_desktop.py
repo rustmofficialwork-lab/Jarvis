@@ -2236,10 +2236,27 @@ class JarvisDesktop:
                             input=True,
                             frames_per_buffer=chunk_size,
                         )
-                    frame = np.frombuffer(
-                        stream.read(chunk_size, exception_on_overflow=False),
-                        dtype=np.int16,
-                    )
+                    raw_chunk = stream.read(chunk_size, exception_on_overflow=False)
+                    if not raw_chunk:
+                        # A disconnected or faulty input device can return an empty
+                        # chunk. Reset the stream instead of feeding invalid audio
+                        # into ONNX inference and leaving the listener stuck.
+                        try:
+                            stream.close()
+                        finally:
+                            stream = None
+                        self.events.put(("status", "Wake microphone returned empty audio. Reconnecting…"))
+                        self.stop_event.wait(1)
+                        continue
+                    frame = np.frombuffer(raw_chunk, dtype=np.int16)
+                    if frame.size != chunk_size:
+                        self.events.put(("status", "Wake microphone returned an incomplete audio frame. Reconnecting…"))
+                        try:
+                            stream.close()
+                        finally:
+                            stream = None
+                        self.stop_event.wait(1)
+                        continue
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
                     activated, activation_frames = update_wakeword_activation(
