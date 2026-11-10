@@ -177,6 +177,8 @@ def install_offline_model(language: str, model_dir: Path = DEFAULT_MODEL_DIR,
                 if target != root and root not in target.parents:
                     raise RuntimeError("The model archive contains an unsafe file path.")
                 mode = (member.external_attr >> 16) & 0xFFFF
+                if stat.S_ISLNK(mode):
+                    raise RuntimeError("The model archive contains an unsafe symbolic link.")
                 file_type = stat.S_IFMT(mode)
                 if file_type not in (0, stat.S_IFREG, stat.S_IFDIR):
                     raise RuntimeError("The model archive contains an unsafe file type.")
