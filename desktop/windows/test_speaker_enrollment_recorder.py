@@ -18,7 +18,7 @@ class FakeStream:
         self.fail_close = fail_close
 
     def read(self, frames: int, exception_on_overflow: bool = False) -> bytes:
-        return b"\\x01\\x00" * frames
+        return b"\x01\x00" * frames
 
     def stop_stream(self) -> None:
         self.stopped = True
@@ -61,10 +61,11 @@ class SpeakerEnrollmentRecorderTests(unittest.TestCase):
     def test_records_valid_mono_16khz_pcm_wav_files_and_releases_audio(self):
         fake_audio = FakeAudio()
         fake_module = types.SimpleNamespace(PyAudio=lambda: fake_audio, paInt16=8)
-        with tempfile.TemporaryDirectory() as directory, \\
-                patch.dict(sys.modules, {"pyaudio": fake_module}), \\
-                patch("speaker_enrollment_recorder.time.sleep"):
-            files = record_enrollment(5, Path(directory), device_index=0)
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(sys.modules, {"pyaudio": fake_module}), patch(
+                "speaker_enrollment_recorder.time.sleep"
+            ):
+                files = record_enrollment(5, Path(directory), device_index=0)
 
             self.assertEqual(len(files), 5)
             self.assertTrue(all(path.is_file() for path in files))
@@ -81,11 +82,12 @@ class SpeakerEnrollmentRecorderTests(unittest.TestCase):
     def test_audio_api_is_terminated_even_if_stream_close_fails(self):
         fake_audio = FakeAudio(fail_close=True)
         fake_module = types.SimpleNamespace(PyAudio=lambda: fake_audio, paInt16=8)
-        with tempfile.TemporaryDirectory() as directory, \\
-                patch.dict(sys.modules, {"pyaudio": fake_module}), \\
-                patch("speaker_enrollment_recorder.time.sleep"):
-            with self.assertRaisesRegex(OSError, "stream close failure"):
-                record_enrollment(5, Path(directory))
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(sys.modules, {"pyaudio": fake_module}), patch(
+                "speaker_enrollment_recorder.time.sleep"
+            ):
+                with self.assertRaisesRegex(OSError, "stream close failure"):
+                    record_enrollment(5, Path(directory))
         self.assertTrue(fake_audio.terminated)
 
     def test_has_multiple_prompts_for_varied_speech(self):
