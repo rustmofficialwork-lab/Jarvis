@@ -1216,6 +1216,7 @@ class JarvisDesktop:
         self.voice_setup_status_var = tk.StringVar(value="STEP 1 OF 2 — MICROPHONE")
         tk.Label(window, textvariable=self.voice_setup_status_var, bg="#06121d",
                  fg="#00e5ff", font=("Segoe UI", 10, "bold")).pack(pady=8)
+        self.voice_setup_mic_ready = False
         self.voice_setup_mic_var = tk.StringVar(value="1. Check Windows microphone access.")
         self.voice_setup_model_var = tk.StringVar(
             value=("2. Wake-word model is installed." if JARVIS_WAKEWORD_MODEL.is_file()
@@ -1235,7 +1236,7 @@ class JarvisDesktop:
                    command=self._start_voice_setup_model).pack(fill="x", pady=5)
         self.voice_setup_finish_button = ttk.Button(
             actions, text="Finish setup", command=lambda: self._finish_voice_setup(window),
-            state=("normal" if JARVIS_WAKEWORD_MODEL.is_file() else "disabled")
+            state="disabled"
         )
         self.voice_setup_finish_button.pack(fill="x", pady=5)
         tk.Button(window, text="Do this later",
@@ -1278,6 +1279,9 @@ class JarvisDesktop:
         self._open_wakeword_setup()
 
     def _finish_voice_setup(self, window):
+        if not self.voice_setup_mic_ready:
+            self.voice_setup_status_var.set("Complete the microphone check before finishing setup.")
+            return
         if not JARVIS_WAKEWORD_MODEL.is_file():
             self.voice_setup_status_var.set("Wake-word model is missing; setup cannot finish.")
             return
@@ -2966,7 +2970,8 @@ class JarvisDesktop:
                     if self.voice_setup_window is not None:
                         try:
                             self.voice_setup_model_var.set("2. Wake-word model installed and validated.")
-                            self.voice_setup_finish_button.configure(state="normal")
+                            if self.voice_setup_mic_ready:
+                                self.voice_setup_finish_button.configure(state="normal")
                             self.voice_setup_status_var.set("WAKE-WORD MODEL READY")
                         except tk.TclError:
                             self.voice_setup_window = None
@@ -2974,9 +2979,12 @@ class JarvisDesktop:
                     if self.voice_setup_window is not None:
                         try:
                             if value.get("ok"):
+                                self.voice_setup_mic_ready = True
                                 self.voice_setup_mic_var.set("1. Microphone check passed.")
-                                self.voice_setup_status_var.set("STEP 2 OF 2 — MICROPHONE READY")
+                                self.voice_setup_status_var.set("MICROPHONE READY — CHECK WAKE WORD")
                                 self.voice_setup_mic_button.configure(state="disabled", text="Microphone ready")
+                                if JARVIS_WAKEWORD_MODEL.is_file():
+                                    self.voice_setup_finish_button.configure(state="normal")
                             else:
                                 self.voice_setup_mic_var.set("1. Microphone check failed. Check Windows Privacy settings and your input device.")
                                 self.voice_setup_status_var.set("MICROPHONE CHECK FAILED")
