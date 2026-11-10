@@ -132,6 +132,13 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         return defaults
 
 
+def prepare_wakeword_setup_folder(settings_dir: Path = SETTINGS_DIR) -> Path:
+    """Create the user-local wake-word folder and return the exact model destination."""
+    folder = Path(settings_dir) / "wakewords"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / JARVIS_WAKEWORD_MODEL.name
+
+
 MICROPHONE_CONSENT_VERSION = 1
 
 
@@ -2412,6 +2419,7 @@ class JarvisDesktop:
         actions = tk.Frame(content, bg="#07111b")
         actions.grid(row=10, column=0, columnspan=2, sticky="ew", padx=14, pady=(4, 16))
         ttk.Button(actions, text="Check microphone access", command=self._request_microphone_access).pack(side="left")
+        ttk.Button(actions, text="Set up wake word", command=self._open_wakeword_setup).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Check for updates", command=self._check_for_updates).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Save settings", command=save).pack(side="right")
 
@@ -2457,6 +2465,34 @@ class JarvisDesktop:
             command=clear_local_chat,
         ).pack(side="left", padx=(8, 0))
         content.grid_columnconfigure(1, weight=1)
+
+    def _open_wakeword_setup(self):
+        """Guide the user through the licensed one-time wake-word model download."""
+        import webbrowser
+
+        try:
+            model_path = prepare_wakeword_setup_folder()
+        except OSError as exc:
+            messagebox.showerror(
+                "Wake-word setup unavailable",
+                f"JARVIS could not prepare the model folder:\\n{exc}",
+            )
+            return
+        try:
+            webbrowser.open(JARVIS_WAKEWORD_MODEL_PAGE)
+        except Exception:
+            # The exact URL and destination are still shown if no browser is registered.
+            pass
+        messagebox.showinfo(
+            "Finish Jarvis wake-word setup",
+            "Download the Jarvis ONNX model from the official model page, review its license, "
+            "then save it with this exact filename:\\n\\n"
+            f"{model_path.name}\\n\\n"
+            "Save it to:\\n"
+            f"{model_path}\\n\\n"
+            "JARVIS will detect it the next time voice listening starts. The model is not "
+            "bundled because its publisher's terms restrict redistribution.",
+        )
 
     def _check_for_updates(self, silent: bool = False):
         """Check GitHub Releases off the UI thread; install only after user approval."""
