@@ -2688,6 +2688,7 @@ class JarvisDesktop:
                         if stable_checks >= 2:
                             installed = install_downloaded_wakeword_model(downloads_dir, model_path)
                             self.events.put(("status", f"Jarvis wake-word model installed and validated: {installed.name}. Enable Voice Listening again."))
+                            self.events.put(("voice_setup_model_ready", str(installed)))
                             return
                 except Exception as exc:
                     self.events.put(("error", f"Wake-word model download could not be installed: {exc}"))
@@ -2961,6 +2962,14 @@ class JarvisDesktop:
                         self._set_status("Update download failed.")
                 elif kind == "memory_clear_confirmation":
                     self._handle_memory_command(value, display_user=False)
+                elif kind == "voice_setup_model_ready":
+                    if self.voice_setup_window is not None:
+                        try:
+                            self.voice_setup_model_var.set("2. Wake-word model installed and validated.")
+                            self.voice_setup_finish_button.configure(state="normal")
+                            self.voice_setup_status_var.set("WAKE-WORD MODEL READY")
+                        except tk.TclError:
+                            self.voice_setup_window = None
                 elif kind == "voice_setup_mic_result":
                     if self.voice_setup_window is not None:
                         try:
