@@ -27,11 +27,19 @@ The app does not silently fetch or redistribute the custom model because the pub
 
 ## Microphone diagnostics
 
-To check your actual Windows microphone, open PowerShell in this folder and run:
+To list available Windows microphone/input devices:
 
 ```powershell
-py wakeword_mic_test.py
+py wakeword_mic_test.py --list-devices
 ```
+
+The list shows each input device's PyAudio index. To test a particular microphone, pass that index:
+
+```powershell
+py wakeword_mic_test.py --device-index 2
+```
+
+Replace `2` with the index shown for the microphone you want to test. If no index is supplied, the Windows/PyAudio default input is used.
 
 The local diagnostic runs three short phases: quiet room, five spoken "Jarvis" attempts, and ordinary background noise. It reports peak confidence and activation counts. It does not save or upload audio. Repeat it with the microphone, distance, room and speaker volume you normally use. A spot-check is not a guarantee of zero false activations or perfect recall.
 
