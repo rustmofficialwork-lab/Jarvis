@@ -10,6 +10,17 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class WakewordSetupTests(unittest.TestCase):
+    def test_setup_folder_is_created_and_model_filename_is_exact(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            model_path = jarvis_desktop.prepare_wakeword_setup_folder(Path(temporary))
+            self.assertTrue(model_path.parent.is_dir())
+            self.assertEqual(model_path.name, "Jarvis_20260313_215039.onnx")
+            self.assertFalse(model_path.exists())
+
+
 class DocumentHistoryPrivacyTests(unittest.TestCase):
     def test_document_text_is_not_persisted_in_chat_history(self):
         document = {
