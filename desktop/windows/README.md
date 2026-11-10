@@ -19,7 +19,12 @@ Wake-word inference runs locally through openWakeWord after its ONNX model and s
 
 The HUD includes an animated Three.js reactor overlay. The **ENABLE GESTURES** control is opt-in and requests webcam permission only after it is clicked. Hand landmarks are processed in the browser with MediaPipe; camera frames are not uploaded by this feature. Pinch triggers the nearest HUD action to the screen center, a fist toggles the reactor glow, and a horizontal swipe rotates the hologram. Disable gestures or close JARVIS to stop the camera stream. The first activation downloads the Three.js/MediaPipe runtime and hand-landmarker model, so internet access is required. Camera support depends on the Windows WebView runtime and its privacy permissions.
 
-Face identity unlock is not included in this build. Camera presence is not treated as identity, and JARVIS does not store face templates or use face recognition as a Windows sign-in/security replacement.
+### Face presence (not biometric identity unlock)
+
+The **FACE PRESENCE** control is a separate opt-in camera feature. It runs MediaPipe face detection locally and changes the HUD reactor glow while a face is in view. It does not identify whose face is present, does not enroll or store biometric templates, and must not be used to unlock Windows or protect accounts. Stop Face Check to release the camera. The first activation downloads the detector runtime/model.
+
+Voice examples include “Jarvis Chrome kholo”, “Google Chrome kholo”, “volume kam kar do”, and “awaaz badhao”. Local desktop actions remain restricted to the fixed allowlist.
+
 
 ## Offline reminders
 
