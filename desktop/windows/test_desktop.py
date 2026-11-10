@@ -985,18 +985,32 @@ class ServiceStatusTests(unittest.TestCase):
         self.assertFalse(ai_status[1])
         self.assertEqual(ai_status[2], "ADD API TOKEN")
 
-    def test_configured_ai_and_voice_readiness_uses_installed_packages(self):
+    def test_voice_readiness_requires_the_custom_wakeword_model(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
         from unittest.mock import patch
+
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.ai_api_key = "test-token"
-        with patch("importlib.util.find_spec", return_value=object()):
-            statuses = app._get_service_statuses()
-        by_name = {name: ready for name, ready, _detail in statuses}
-        self.assertTrue(by_name["AI CHAT"])
-        self.assertTrue(by_name["VOICE ENGINE"])
+        with TemporaryDirectory() as temp:
+            model_path = Path(temp) / "Jarvis.onnx"
+            with (
+                patch("importlib.util.find_spec", return_value=object()),
+                patch.object(jarvis_desktop, "JARVIS_WAKEWORD_MODEL", model_path),
+            ):
+                statuses = app._get_service_statuses()
+                voice = next(item for item in statuses if item[0] == "VOICE ENGINE")
+                self.assertFalse(voice[1])
+                self.assertEqual(voice[2], "INSTALL JARVIS WAKE MODEL")
+
+                model_path.write_bytes(b"test model placeholder")
+                statuses = app._get_service_statuses()
+                voice = next(item for item in statuses if item[0] == "VOICE ENGINE")
+                self.assertTrue(voice[1])
+                self.assertEqual(voice[2], "LOCAL WAKE WORD READY")
+
         details = {name: detail for name, _ready, detail in statuses}
         self.assertEqual(details["AI CHAT"], "CONFIGURED")
-        self.assertEqual(details["VOICE ENGINE"], "LOCAL WAKE WORD READY")
 
 
 class SystemMetricsTests(unittest.TestCase):
