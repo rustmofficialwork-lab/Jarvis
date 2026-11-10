@@ -555,13 +555,6 @@ setInterval(updateClock,1000);updateClock();
     .forEach(([a,n],i)=>{const b=$$('.hex-btn')[i];if(b)mark(b,n,{action:a});});
   [['play','Play'],['stop','Stop'],['next','Next track'],['prev','Previous track']]
     .forEach(([a,n],i)=>{const b=$$('.power-controls i')[i];if(b)mark(b,n,{action:a});});
-  const orb=document.querySelector('.orb-wrapper');
-  // The central reactor is the primary command entry point: clicking it opens
-  // the same accessible command prompt as the command shortcut.
-  if(orb){
-    mark(orb,'Enter a command for JARVIS',{action:'command'});
-    orb.style.cursor='pointer';
-  }
   const gear=document.querySelector('.gear');
   if(gear)mark(gear,'Open JARVIS settings',{action:'settings'});
   const back=document.querySelector('.back-btn');
