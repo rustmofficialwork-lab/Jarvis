@@ -798,6 +798,24 @@ class LocalCommandTests(unittest.TestCase):
         self.assertEqual(result, "Opening Notepad.")
         self.assertEqual(calls, [(["notepad.exe"], {"shell": False})])
 
+    def test_chrome_and_hinglish_voice_aliases_use_fixed_allowlisted_actions(self):
+        calls = []
+        for phrase in ("Jarvis Chrome kholo", "open chrome", "Google Chrome kholo"):
+            self.assertEqual(
+                jarvis_desktop.run_local_command(
+                    phrase, popen=lambda args, **kwargs: calls.append((args, kwargs)),
+                ),
+                "Opening Chrome.",
+            )
+        self.assertEqual(calls, [(["chrome.exe"], {"shell": False})] * 3)
+
+    def test_volume_hinglish_variants_use_fixed_media_keys(self):
+        from unittest.mock import patch
+        with patch.object(jarvis_desktop, "press_windows_media_key", return_value=True) as press:
+            self.assertEqual(jarvis_desktop.run_local_command("volume kam kar do"), "Volume decreased.")
+            self.assertEqual(jarvis_desktop.run_local_command("awaaz badhao"), "Volume increased.")
+        self.assertEqual([call.args[0] for call in press.call_args_list], ["volume_down", "volume_up"])
+
     def test_polite_normalization_keeps_extra_command_text_rejected(self):
         phrase = "please open notepad and delete files"
         self.assertEqual(
