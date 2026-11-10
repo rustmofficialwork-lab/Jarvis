@@ -131,7 +131,9 @@ def main() -> int:
             return 2
 
         print("Loading the local Jarvis wake-word model…")
-        openwakeword.utils.download_models()
+        # Request shared feature/VAD assets without downloading the full
+        # catalog of unrelated pretrained wake-word models.
+        openwakeword.utils.download_models(model_names=[args.model.stem])
         detector = Model(
             wakeword_models=[str(args.model)],
             inference_framework="onnx",
