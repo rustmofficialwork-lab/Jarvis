@@ -298,6 +298,13 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         "open browser": ("url", "https://www.google.com", "Opening your default browser."),
         "open google": ("url", "https://www.google.com", "Opening Google."),
         "open youtube": ("url", "https://www.youtube.com", "Opening YouTube."),
+        "chrome kholo": ("app", ["cmd.exe", "/c", "start", "", "chrome"], "Opening Chrome."),
+        "chrome open karo": ("app", ["cmd.exe", "/c", "start", "", "chrome"], "Opening Chrome."),
+        "open chrome": ("app", ["cmd.exe", "/c", "start", "", "chrome"], "Opening Chrome."),
+        "google chrome kholo": ("app", ["cmd.exe", "/c", "start", "", "chrome"], "Opening Chrome."),
+        "youtube kholo": ("url", "https://www.youtube.com", "Opening YouTube."),
+        "youtube chalao": ("url", "https://www.youtube.com", "Opening YouTube."),
+        "google kholo": ("url", "https://www.google.com", "Opening Google."),
     }
     brightness_actions = {
         "brightness up": "up",
@@ -314,10 +321,16 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
         return f"Display brightness set to {level}%."
     media_actions = {
         "volume up": ("volume_up", "Volume increased."),
+        "volume badha do": ("volume_up", "Volume increased."),
+        "awaaz badhao": ("volume_up", "Volume increased."),
+        "आवाज बढ़ाओ": ("volume_up", "Volume increased."),
         "increase volume": ("volume_up", "Volume increased."),
         "volume badhao": ("volume_up", "Volume increased."),
         "आवाज़ बढ़ाओ": ("volume_up", "Volume increased."),
         "volume down": ("volume_down", "Volume decreased."),
+        "volume kam kar do": ("volume_down", "Volume decreased."),
+        "awaaz kam karo": ("volume_down", "Volume decreased."),
+        "आवाज कम करो": ("volume_down", "Volume decreased."),
         "decrease volume": ("volume_down", "Volume decreased."),
         "volume kam karo": ("volume_down", "Volume decreased."),
         "आवाज़ कम करो": ("volume_down", "Volume decreased."),
