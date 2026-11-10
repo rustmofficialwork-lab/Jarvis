@@ -18,7 +18,11 @@ import pyaudio
 import openwakeword
 from openwakeword.model import Model
 
-from jarvis_desktop import JARVIS_WAKEWORD_MODEL, update_wakeword_activation
+from jarvis_desktop import (
+    JARVIS_WAKEWORD_MODEL,
+    prepare_openwakeword_assets,
+    update_wakeword_activation,
+)
 
 
 CHUNK_SIZE = 1280  # 80 ms at 16 kHz
@@ -131,12 +135,12 @@ def main() -> int:
             return 2
 
         print("Loading the local Jarvis wake-word model…")
-        # Request shared feature/VAD assets without downloading the full
-        # catalog of unrelated pretrained wake-word models.
-        openwakeword.utils.download_models(model_names=[args.model.stem])
+        # Store shared runtime files in the current user's writable AppData.
+        runtime_paths = prepare_openwakeword_assets(openwakeword, args.model)
         detector = Model(
             wakeword_models=[str(args.model)],
             inference_framework="onnx",
+            **runtime_paths,
         )
         results = []
         print("\nJARVIS microphone test")
