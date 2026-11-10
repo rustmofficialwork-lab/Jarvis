@@ -2584,6 +2584,7 @@ class JarvisDesktop:
             "JARVIS will automatically detect the completed download in your Downloads folder, "
             "validate it, and install it in the correct app folder. You do not need to copy or "
             "rename the file yourself.\n\n"
+            f"Installed model path:\n{model_path}\n\n"
             "The model is not bundled because its publisher restricts redistribution. "
             "Internet is needed for this one-time download; wake-word detection then runs locally.",
             parent=getattr(self, "root", None),
