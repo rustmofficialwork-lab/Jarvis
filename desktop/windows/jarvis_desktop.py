@@ -2475,7 +2475,7 @@ class JarvisDesktop:
         except OSError as exc:
             messagebox.showerror(
                 "Wake-word setup unavailable",
-                f"JARVIS could not prepare the model folder:\\n{exc}",
+                f"JARVIS could not prepare the model folder:\n{exc}",
             )
             return
         try:
@@ -2486,10 +2486,10 @@ class JarvisDesktop:
         messagebox.showinfo(
             "Finish Jarvis wake-word setup",
             "Download the Jarvis ONNX model from the official model page, review its license, "
-            "then save it with this exact filename:\\n\\n"
-            f"{model_path.name}\\n\\n"
-            "Save it to:\\n"
-            f"{model_path}\\n\\n"
+            "then save it with this exact filename:\n\n"
+            f"{model_path.name}\n\n"
+            "Save it to:\n"
+            f"{model_path}\n\n"
             "JARVIS will detect it the next time voice listening starts. The model is not "
             "bundled because its publisher's terms restrict redistribution.",
         )
