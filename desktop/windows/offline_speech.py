@@ -149,21 +149,37 @@ def install_offline_model(language: str, model_dir: Path = DEFAULT_MODEL_DIR,
             expanded_size = sum(member.file_size for member in members)
             if expanded_size > MAX_MODEL_EXTRACTED_BYTES:
                 raise RuntimeError("The offline model archive exceeds the 500 MB extraction safety limit.")
+            seen_paths = set()
+            reserved_names = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"}
             for member in members:
-                # ZIP paths are POSIX-style, but backslashes and drive prefixes can
-                # become path separators on Windows. Accept only the expected model root.
+                # Reject Windows-specific path tricks before extracting an untrusted archive.
                 name = member.filename
-                parts = name.replace("\\", "/").split("/")
-                if (not name or name.startswith(("/", "\\")) or "\\" in name
-                        or any(part in {"", ".", ".."} for part in parts if part)
-                        or not parts or parts[0] != model_name):
+                parts = name.split("/")
+                meaningful_parts = parts[:-1] if parts and parts[-1] == "" else parts
+                invalid_component = any(
+                    ":" in part or part.endswith((".", " "))
+                    or any(ord(char) < 32 for char in part)
+                    or part.split(".", 1)[0].upper() in reserved_names
+                    for part in meaningful_parts
+                )
+                if (not name or name.startswith("/") or "\\\\" in name
+                        or any(part in {"", ".", ".."} for part in meaningful_parts)
+                        or not meaningful_parts or meaningful_parts[0] != model_name
+                        or invalid_component):
                     raise RuntimeError("The model archive contains an unsafe file path.")
+                normalized_name = "/".join(meaningful_parts).casefold()
+                if normalized_name in seen_paths:
+                    raise RuntimeError("The model archive contains duplicate file paths.")
+                seen_paths.add(normalized_name)
+                if member.flag_bits & 0x1:
+                    raise RuntimeError("The model archive contains an encrypted file.")
                 target = (extracted / name).resolve()
                 if target != root and root not in target.parents:
                     raise RuntimeError("The model archive contains an unsafe file path.")
                 mode = (member.external_attr >> 16) & 0xFFFF
-                if stat.S_ISLNK(mode):
-                    raise RuntimeError("The model archive contains an unsafe symbolic link.")
+                file_type = stat.S_IFMT(mode)
+                if file_type not in (0, stat.S_IFREG, stat.S_IFDIR):
+                    raise RuntimeError("The model archive contains an unsafe file type.")
             archive.extractall(extracted)
         source = extracted / model_name
         if not source.is_dir() or not any(source.iterdir()):
