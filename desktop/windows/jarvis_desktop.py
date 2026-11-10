@@ -10,6 +10,7 @@ import logging
 import logging.handlers
 import os
 import queue
+import shutil
 import sys
 import threading
 import time
@@ -137,6 +138,61 @@ def prepare_wakeword_setup_folder(settings_dir: Path = SETTINGS_DIR) -> Path:
     folder = Path(settings_dir) / "wakewords"
     folder.mkdir(parents=True, exist_ok=True)
     return folder / JARVIS_WAKEWORD_MODEL.name
+
+
+def install_downloaded_wakeword_model(
+    downloads_dir: Path | None = None,
+    model_path: Path = JARVIS_WAKEWORD_MODEL,
+) -> Path:
+    """Validate the publisher-downloaded ONNX model and install it atomically."""
+    downloads_dir = Path(downloads_dir or (Path.home() / "Downloads"))
+    model_path = Path(model_path)
+    source = downloads_dir / model_path.name
+    if not source.is_file():
+        raise FileNotFoundError(f"Expected model download was not found: {source}")
+    size = source.stat().st_size
+    if size < 1024 or size > 25 * 1024 * 1024:
+        raise ValueError("The downloaded wake-word model has an unexpected file size.")
+    try:
+        import onnxruntime as ort
+        session = ort.InferenceSession(str(source), providers=["CPUExecutionProvider"])
+        if not session.get_inputs() or not session.get_outputs():
+            raise ValueError("The downloaded ONNX model has no usable inputs or outputs.")
+    except ImportError as exc:
+        raise RuntimeError("ONNX Runtime is missing. Reinstall JARVIS voice dependencies.") from exc
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = model_path.with_name(model_path.name + ".part")
+    try:
+        shutil.copyfile(source, temporary_path)
+        if temporary_path.stat().st_size != size:
+            raise OSError("The wake-word model changed while it was being installed.")
+        os.replace(temporary_path, model_path)
+    finally:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return model_path
+
+
+def update_wakeword_activation(
+    confidence: float,
+    consecutive_frames: int,
+    threshold: float = 0.5,
+    required_frames: int = 2,
+) -> tuple[bool, int]:
+    """Require stable confidence across consecutive audio frames before activation."""
+    import math
+    try:
+        score = float(confidence)
+    except (TypeError, ValueError):
+        score = 0.0
+    if not math.isfinite(score) or not math.isfinite(float(threshold)):
+        score = 0.0
+    if required_frames < 1:
+        raise ValueError("required_frames must be at least one.")
+    count = min(consecutive_frames + 1, required_frames) if score >= threshold else 0
+    return count >= required_frames, count
 
 
 MICROPHONE_CONSENT_VERSION = 1
@@ -2008,11 +2064,8 @@ class JarvisDesktop:
             model_path = JARVIS_WAKEWORD_MODEL
             model_path.parent.mkdir(parents=True, exist_ok=True)
             if not model_path.is_file():
-                raise FileNotFoundError(
-                    "The single-word Jarvis wake model is not installed. "
-                    f"Download the ONNX file from {JARVIS_WAKEWORD_MODEL_PAGE} "
-                    f"and save it as: {model_path}"
-                )
+                self.events.put(("wakeword_setup_required", str(model_path)))
+                return
 
             self.events.put(("status", "Preparing the Jarvis wake-word model…"))
             # Downloads only openWakeWord's shared feature models if not cached.
@@ -2025,6 +2078,7 @@ class JarvisDesktop:
             audio = pyaudio.PyAudio()
             self.events.put(("status", "Listening locally for “Jarvis”."))
             last_activation = 0.0
+            activation_frames = 0
             while not self.stop_event.is_set():
                 try:
                     if stream is None:
@@ -2041,9 +2095,13 @@ class JarvisDesktop:
                     )
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
+                    activated, activation_frames = update_wakeword_activation(
+                        confidence, activation_frames, threshold=0.5, required_frames=2
+                    )
                     now = time.monotonic()
-                    if confidence < 0.5 or now - last_activation < 2.0:
+                    if not activated or now - last_activation < 2.0:
                         continue
+                    activation_frames = 0
                     last_activation = now
 
                     # Release the detector stream before SpeechRecognition opens
@@ -2466,8 +2524,35 @@ class JarvisDesktop:
         ).pack(side="left", padx=(8, 0))
         content.grid_columnconfigure(1, weight=1)
 
+    def _watch_wakeword_download(self, model_path: Path):
+        """Wait for the user's official model download and install it without manual file copying."""
+        downloads_dir = Path.home() / "Downloads"
+        candidate = downloads_dir / model_path.name
+        deadline = time.monotonic() + 600
+        previous_signature = None
+        stable_checks = 0
+        while time.monotonic() < deadline:
+            try:
+                if candidate.is_file():
+                    stat = candidate.stat()
+                    signature = (stat.st_size, stat.st_mtime_ns)
+                    if signature == previous_signature:
+                        stable_checks += 1
+                    else:
+                        stable_checks = 0
+                    previous_signature = signature
+                    if stable_checks >= 2:
+                        installed = install_downloaded_wakeword_model(downloads_dir, model_path)
+                        self.events.put(("status", f"Jarvis wake-word model installed and validated: {installed.name}. Enable Voice Listening again."))
+                        return
+            except Exception as exc:
+                self.events.put(("error", f"Wake-word model download could not be installed: {exc}"))
+                return
+            time.sleep(1)
+        self.events.put(("status", "Wake-word setup is still waiting. Download the exact ONNX file in your browser, then choose Set up wake word again."))
+
     def _open_wakeword_setup(self):
-        """Guide the user through the licensed one-time wake-word model download."""
+        """Open the publisher's licensed model page and automatically install its completed download."""
         import webbrowser
 
         try:
@@ -2476,22 +2561,28 @@ class JarvisDesktop:
             messagebox.showerror(
                 "Wake-word setup unavailable",
                 f"JARVIS could not prepare the model folder:\n{exc}",
+                parent=getattr(self, "root", None),
             )
             return
         try:
             webbrowser.open(JARVIS_WAKEWORD_MODEL_PAGE)
         except Exception:
-            # The exact URL and destination are still shown if no browser is registered.
             pass
+        if getattr(self, "events", None) is not None:
+            threading.Thread(
+                target=self._watch_wakeword_download, args=(model_path,), daemon=True,
+                name="JARVIS-Wakeword-Setup",
+            ).start()
         messagebox.showinfo(
             "Finish Jarvis wake-word setup",
-            "Download the Jarvis ONNX model from the official model page, review its license, "
-            "then save it with this exact filename:\n\n"
-            f"{model_path.name}\n\n"
-            "Save it to:\n"
-            f"{model_path}\n\n"
-            "JARVIS will detect it the next time voice listening starts. The model is not "
-            "bundled because its publisher's terms restrict redistribution.",
+            "1. Sign in on the official model page if asked.\n"
+            "2. Download the ONNX model. Do not rename it.\n\n"
+            "JARVIS will automatically detect the completed download in your Downloads folder, "
+            "validate it, and install it in the correct app folder. You do not need to copy or "
+            "rename the file yourself.\n\n"
+            "The model is not bundled because its publisher restricts redistribution. "
+            "Internet is needed for this one-time download; wake-word detection then runs locally.",
+            parent=getattr(self, "root", None),
         )
 
     def _check_for_updates(self, silent: bool = False):
@@ -2744,6 +2835,9 @@ class JarvisDesktop:
                                 "Open Start → Settings → Privacy & security → Microphone, then enable Microphone access and Let desktop apps access your microphone.",
                                 parent=self.root,
                             )
+                elif kind == "wakeword_setup_required":
+                    self._set_status("Jarvis wake-word model is missing. Opening the one-time setup…")
+                    self._open_wakeword_setup()
                 elif kind == "status":
                     self._set_status(value)
                 elif kind == "voice_command":
