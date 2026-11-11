@@ -32,6 +32,8 @@ from document_reader import read_document
 from updater import check_for_update, download_verified_installer
 from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
 from ai_tools import TOOL_DEFINITIONS, execute_tool
+from owner_voice_setup import enroll_owner_voice
+from owner_voice_verification import load_owner_profile, load_encoder, verify_pcm_bytes
 
 APP_NAME = "JARVIS"
 try:
@@ -1366,7 +1368,6 @@ class JarvisDesktop:
 
     def _owner_voice_profile_ready(self):
         try:
-            from owner_voice_verification import load_owner_profile
             return load_owner_profile() is not None
         except Exception:
             return False
@@ -1391,7 +1392,6 @@ class JarvisDesktop:
 
         def worker():
             try:
-                from owner_voice_setup import enroll_owner_voice
                 result = enroll_owner_voice(confirmed=True, model_dir=OWNER_VOICE_MODEL_DIR)
                 self.events.put(("owner_voice_enrollment_result", {"ok": True, **result}))
             except Exception as exc:
@@ -2386,7 +2386,6 @@ class JarvisDesktop:
                 self.events.put(("wakeword_setup_required", str(model_path)))
                 return
 
-            from owner_voice_verification import load_encoder, load_owner_profile, verify_pcm_bytes
             owner_profile = load_owner_profile()
             if owner_profile is None:
                 self.events.put(("status", "Owner voice is not enrolled. Open Voice Setup and enroll your voice locally."))
