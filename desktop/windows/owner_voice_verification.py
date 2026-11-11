@@ -6,6 +6,7 @@ This is a convenience gate, not strong authentication or liveness detection.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import wave
@@ -13,7 +14,8 @@ from pathlib import Path
 from typing import Any
 
 MODEL_ID = "kenrunio/transcriber-speaker-onnx"
-MODEL_REVISION = "4467ef1"
+MODEL_REVISION = "4467ef1f92829ca0ff4bbdaa70d31f7d7d25c12c"
+MODEL_SHA256 = "700b63064ee98981186f59f247d28e56f7f6ab265d8b50ebb450db5a8ce21dc7"
 MODEL_FILENAME = "ecapa-any-length.onnx"
 PROFILE_SCHEMA = 2
 PROFILE_SERVICE = "JARVIS-Desktop-OwnerVoice"
@@ -40,7 +42,12 @@ def ensure_model(model_dir: Path, allow_download: bool = False) -> Path:
     target = Path(model_dir)
     model_path = target / MODEL_FILENAME
     if model_path.is_file() and model_path.stat().st_size > 10_000_000:
-        return model_path
+        digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+        if digest == MODEL_SHA256:
+            return model_path
+        if not allow_download:
+            raise RuntimeError("The local owner voice model failed its SHA-256 integrity check.")
+        model_path.unlink()
     if not allow_download:
         raise FileNotFoundError("Owner voice model is not installed. Run the explicit owner-voice enrollment setup.")
     try:
@@ -56,6 +63,10 @@ def ensure_model(model_dir: Path, allow_download: bool = False) -> Path:
     )
     if not model_path.is_file() or model_path.stat().st_size <= 10_000_000:
         raise RuntimeError("The downloaded ECAPA ONNX model is missing or incomplete.")
+    digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    if digest != MODEL_SHA256:
+        model_path.unlink(missing_ok=True)
+        raise RuntimeError("The downloaded ECAPA ONNX model failed its SHA-256 integrity check.")
     return model_path
 
 
