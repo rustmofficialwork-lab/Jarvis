@@ -11,6 +11,7 @@ import json
 import os
 from dataclasses import dataclass
 from typing import Any
+import re
 from urllib.parse import urlsplit
 
 import httpx
@@ -19,6 +20,8 @@ DEFAULT_UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions"
 # 404 is common when a configured model is not available on a provider. Treat it
 # as provider-specific unavailability and allow the next configured provider a try.
 RETRYABLE_STATUS_CODES = {404, 408, 425, 429}
+MAX_CONFIGURED_PROVIDERS = 5
+_ENV_VAR_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True)
@@ -68,7 +71,17 @@ def _is_chat_completion_response(body: bytes) -> bool:
     if not isinstance(choices, list) or not choices:
         return False
     first = choices[0]
-    return isinstance(first, dict) and isinstance(first.get("message"), dict)
+    if not isinstance(first, dict):
+        return False
+    message = first.get("message")
+    if not isinstance(message, dict):
+        return False
+    # A syntactically valid JSON object with an empty message is not a usable
+    # completion. Tool-call-only and refusal responses remain valid.
+    return (
+        message.get("role") in (None, "assistant")
+        and any(key in message for key in ("content", "tool_calls", "refusal"))
+    )
 
 
 def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
@@ -107,11 +120,21 @@ def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
             raise ProviderConfigurationError(
                 f"AI provider entry {index + 1} must use a valid HTTPS endpoint without embedded credentials."
             )
+        name = name.strip()
+        key_env = key_env.strip()
+        model = model.strip()
         if len(name) > 64 or len(key_env) > 128 or len(model) > 200:
             raise ProviderConfigurationError(f"AI provider entry {index + 1} contains an oversized setting.")
+        if not _ENV_VAR_NAME.fullmatch(key_env):
+            raise ProviderConfigurationError(
+                f"AI provider entry {index + 1} has an invalid API-key environment variable name."
+            )
+        if name.casefold() in provider_names:
+            raise ProviderConfigurationError("AI provider names must be unique.")
+        provider_names.add(name.casefold())
         key = env.get(key_env, "").strip()
         if key:
-            providers.append(Provider(name=name.strip(), base_url=url, api_key=key, model=model.strip()))
+            providers.append(Provider(name=name, base_url=url, api_key=key, model=model))
     return providers
 
 
