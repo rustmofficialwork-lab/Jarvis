@@ -1459,6 +1459,7 @@ class JarvisDesktop:
                             "Microphone returned an empty or incomplete audio frame."
                         )
                     frame = np.frombuffer(raw, dtype=np.int16)
+                    recent_audio.append(raw_chunk)
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
                     activated, streak = update_wakeword_activation(
@@ -2366,11 +2367,19 @@ class JarvisDesktop:
             from openwakeword.model import Model
             import speech_recognition as sr
 
-            model_path = JARVIS_WAKEWORD_MODEL
+            model_path = active_wakeword_model_path()
             model_path.parent.mkdir(parents=True, exist_ok=True)
             if not model_path.is_file():
                 self.events.put(("wakeword_setup_required", str(model_path)))
                 return
+
+            from owner_voice_verification import load_encoder, load_owner_profile, verify_pcm_bytes
+            owner_profile = load_owner_profile()
+            if owner_profile is None:
+                self.events.put(("status", "Owner voice is not enrolled. Open Voice Setup and enroll your voice locally."))
+                return
+            self.events.put(("status", "Loading local owner voice verification…"))
+            speaker_encoder = load_encoder(OWNER_VOICE_MODEL_DIR, allow_download=False)
 
             self.events.put(("status", "Preparing the Jarvis wake-word model…"))
             # Keep downloaded runtime assets in user-writable AppData rather
@@ -2385,6 +2394,8 @@ class JarvisDesktop:
             self.events.put(("status", "Listening locally for “Jarvis”."))
             last_activation = 0.0
             activation_frames = 0
+            from collections import deque
+            recent_audio = deque(maxlen=40)  # 3.2 seconds at 80 ms per frame
             while not self.stop_event.is_set():
                 try:
                     if stream is None:
@@ -2404,6 +2415,7 @@ class JarvisDesktop:
                             stream.close()
                         finally:
                             stream = None
+                        recent_audio.clear()
                         self.events.put(("status", "Wake microphone returned empty audio. Reconnecting…"))
                         self.stop_event.wait(1)
                         continue
@@ -2426,6 +2438,16 @@ class JarvisDesktop:
                         continue
                     activation_frames = 0
                     last_activation = now
+
+                    # Require a local speaker match before opening the command pipeline.
+                    owner_audio = b"".join(recent_audio)
+                    recent_audio.clear()
+                    verified_owner, _score = verify_pcm_bytes(
+                        owner_audio, speaker_encoder, owner_profile
+                    )
+                    if not verified_owner:
+                        self.events.put(("status", "Wake word ignored — owner voice was not verified."))
+                        continue
 
                     # Release the detector stream before SpeechRecognition opens
                     # the same microphone for the user's actual command.
