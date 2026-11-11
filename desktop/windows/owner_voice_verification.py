@@ -42,7 +42,8 @@ def ensure_model(model_dir: Path, allow_download: bool = False) -> Path:
     target = Path(model_dir)
     model_path = target / MODEL_FILENAME
     if model_path.is_file() and model_path.stat().st_size > 10_000_000:
-        digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+        with model_path.open("rb") as model_file:
+            digest = hashlib.file_digest(model_file, "sha256").hexdigest()
         if digest == MODEL_SHA256:
             return model_path
         if not allow_download:
@@ -63,7 +64,8 @@ def ensure_model(model_dir: Path, allow_download: bool = False) -> Path:
     )
     if not model_path.is_file() or model_path.stat().st_size <= 10_000_000:
         raise RuntimeError("The downloaded ECAPA ONNX model is missing or incomplete.")
-    digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    with model_path.open("rb") as model_file:
+        digest = hashlib.file_digest(model_file, "sha256").hexdigest()
     if digest != MODEL_SHA256:
         model_path.unlink(missing_ok=True)
         raise RuntimeError("The downloaded ECAPA ONNX model failed its SHA-256 integrity check.")
