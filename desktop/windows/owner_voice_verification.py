@@ -1,4 +1,4 @@
-"""Local ECAPA-TDNN owner-speaker verification for JARVIS.
+"""Local ECAPA-TDNN owner-speaker verification using ONNX Runtime.
 
 The model is downloaded only by an explicit enrollment action. Runtime verification
 is offline and fails closed when the model or local owner profile is missing.
@@ -12,11 +12,12 @@ import wave
 from pathlib import Path
 from typing import Any
 
-MODEL_ID = "speechbrain/spkrec-ecapa-voxceleb"
-MODEL_REVISION = "b3e6e444667c2bc4f3d62ba2531a0cc784dd04f1"
-PROFILE_SCHEMA = 1
+MODEL_ID = "kenrunio/transcriber-speaker-onnx"
+MODEL_REVISION = "4467ef1"
+MODEL_FILENAME = "ecapa-any-length.onnx"
+PROFILE_SCHEMA = 2
 PROFILE_SERVICE = "JARVIS-Desktop-OwnerVoice"
-PROFILE_USERNAME = "owner-ecapa-centroid-v1"
+PROFILE_USERNAME = "owner-ecapa-centroid-v2"
 DEFAULT_COSINE_THRESHOLD = 0.25
 SAMPLE_RATE = 16_000
 MIN_AUDIO_SECONDS = 2.5
@@ -35,39 +36,37 @@ def _normalise(vector):
 
 
 def ensure_model(model_dir: Path, allow_download: bool = False) -> Path:
-    """Return the pinned local model directory; download only after explicit opt-in."""
+    """Return the pinned local model file; download only after explicit opt-in."""
     target = Path(model_dir)
-    if (target / "hyperparams.yaml").is_file():
-        return target
+    model_path = target / MODEL_FILENAME
+    if model_path.is_file() and model_path.stat().st_size > 10_000_000:
+        return model_path
     if not allow_download:
         raise FileNotFoundError("Owner voice model is not installed. Run the explicit owner-voice enrollment setup.")
     try:
         from huggingface_hub import snapshot_download
     except ImportError as exc:
-        raise RuntimeError("Install voice identity dependencies from voice_identity_requirements.txt.") from exc
+        raise RuntimeError("Install huggingface_hub from voice_identity_requirements.txt.") from exc
     target.mkdir(parents=True, exist_ok=True)
     snapshot_download(
         repo_id=MODEL_ID,
         revision=MODEL_REVISION,
         local_dir=str(target),
+        allow_patterns=[MODEL_FILENAME, "LICENSE", "README.md"],
     )
-    if not (target / "hyperparams.yaml").is_file():
-        raise RuntimeError("The downloaded speaker model is incomplete.")
-    return target
+    if not model_path.is_file() or model_path.stat().st_size <= 10_000_000:
+        raise RuntimeError("The downloaded ECAPA ONNX model is missing or incomplete.")
+    return model_path
 
 
 def load_encoder(model_dir: Path, allow_download: bool = False):
-    """Load the pinned ECAPA encoder on CPU; no network access during normal runtime."""
-    path = ensure_model(model_dir, allow_download=allow_download)
+    """Load the local ONNX speaker encoder on CPU; no network at runtime."""
+    model_path = ensure_model(model_dir, allow_download=allow_download)
     try:
-        from speechbrain.inference.classifiers import EncoderClassifier
+        import onnxruntime as ort
     except ImportError as exc:
-        raise RuntimeError("SpeechBrain is missing. Install voice_identity_requirements.txt.") from exc
-    return EncoderClassifier.from_hparams(
-        source=str(path),
-        savedir=str(path),
-        run_opts={"device": "cpu"},
-    )
+        raise RuntimeError("ONNX Runtime is missing. Reinstall JARVIS voice dependencies.") from exc
+    return ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
 
 
 def _read_wav(path: Path):
@@ -83,19 +82,22 @@ def _read_wav(path: Path):
 
 
 def embed_samples(samples, encoder):
-    """Extract one L2-normalised ECAPA embedding from 16 kHz mono float audio."""
+    """Extract a unit-length ECAPA embedding from 16 kHz mono float audio."""
     import numpy as np
-    import torch
 
     audio = np.asarray(samples, dtype=np.float32).reshape(-1)
     if audio.size < int(SAMPLE_RATE * MIN_AUDIO_SECONDS):
         raise ValueError(f"At least {MIN_AUDIO_SECONDS:.1f} seconds of audio is required.")
     if not np.isfinite(audio).all():
         raise ValueError("Audio contains invalid samples.")
-    signal = torch.from_numpy(audio).unsqueeze(0)
-    with torch.no_grad():
-        embedding = encoder.encode_batch(signal).detach().cpu().numpy().reshape(-1)
-    return _normalise(embedding)
+    outputs = encoder.run(
+        ["emb"],
+        {
+            "wav": audio[np.newaxis, :].astype(np.float32),
+            "lens": np.asarray([1.0], dtype=np.float32),
+        },
+    )
+    return _normalise(np.asarray(outputs[0])[0, 0])
 
 
 def build_owner_profile(wav_paths, encoder) -> dict[str, Any]:
@@ -160,7 +162,6 @@ def delete_owner_profile(keyring_module=None) -> None:
     try:
         keyring_module.delete_password(PROFILE_SERVICE, PROFILE_USERNAME)
     except Exception as exc:
-        # Missing profile is already the desired state.
         if "not found" not in str(exc).casefold() and "no password" not in str(exc).casefold():
             raise
 
