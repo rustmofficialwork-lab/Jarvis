@@ -13,15 +13,19 @@ def _safe_read(callback, fallback=None):
 
 
 def read_cpu_temperature(psutil_module):
-    """Return a CPU/core/package sensor reading; never mislabel GPU or board temps."""
-    sensors = psutil_module.sensors_temperatures(fahrenheit=False)
+    """Return a finite CPU/core/package reading; ignore GPU/board sensors and unsupported APIs."""
+    sensors = _safe_read(
+        lambda: psutil_module.sensors_temperatures(fahrenheit=False), {}
+    )
+    if not isinstance(sensors, dict):
+        return None
     for name, entries in sensors.items():
         sensor_name = str(name).casefold()
         if not any(token in sensor_name for token in ("cpu", "core", "package", "k10temp", "coretemp")):
             continue
-        for entry in entries:
-            current = getattr(entry, "current", None)
-            if current is not None:
+        for entry in entries or ():
+            current = _safe_read(lambda: float(getattr(entry, "current", None)))
+            if current is not None and current >= 0 and current < float("inf"):
                 return current
     return None
 
