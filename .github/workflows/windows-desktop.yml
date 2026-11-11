@@ -120,7 +120,7 @@ jobs:
 
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "vendor;vendor" --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "vendor;vendor" --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --collect-all huggingface_hub --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
       - name: Upload JARVIS Windows executable
         uses: actions/upload-artifact@v7
         with:
