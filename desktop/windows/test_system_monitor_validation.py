@@ -30,10 +30,11 @@ class InvalidMetricTests(unittest.TestCase):
         self.assertIsNone(metrics["cpu_percent"])
         self.assertIsNone(metrics["memory_percent"])
         self.assertIsNone(metrics["disk_percent"])
-        self.assertIn("CPU usage: Unavailable", get_system_status(Psutil()))
-        self.assertIn("Memory usage: Unavailable", get_system_status(Psutil()))
-        self.assertIn("System drive usage: Unavailable", get_system_status(Psutil()))
-        self.assertIn("Battery: N/A", get_system_status(Psutil()))
+        status = get_system_status(Psutil())
+        self.assertIn("CPU usage: Unavailable", status)
+        self.assertIn("Memory usage: Unavailable", status)
+        self.assertIn("System drive usage: Unavailable", status)
+        self.assertIn("Battery: Unavailable", status)
 
     def test_battery_formatter_rejects_non_finite_values(self):
         for value in (float("nan"), float("inf"), -1, 101, "invalid"):
