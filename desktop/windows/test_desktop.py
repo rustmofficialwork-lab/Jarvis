@@ -59,9 +59,9 @@ class WakewordSetupTests(unittest.TestCase):
             def __init__(self, path, providers=None):
                 self.path = path
             def get_inputs(self):
-                return [object()]
+                return [SimpleNamespace(shape=[1, 16, 96])]
             def get_outputs(self):
-                return [object()]
+                return [SimpleNamespace(shape=[1, 1])]
 
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "trained.onnx"
@@ -74,6 +74,17 @@ class WakewordSetupTests(unittest.TestCase):
             self.assertEqual(destination.read_bytes(), source.read_bytes())
             self.assertFalse(destination.with_name(destination.name + ".part").exists())
 
+    def test_custom_model_is_preferred_when_installed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            legacy = Path(temporary) / "legacy.onnx"
+            custom = Path(temporary) / "jarvis_first_party.onnx"
+            legacy.write_bytes(b"legacy")
+            custom.write_bytes(b"custom")
+            with patch.object(jarvis_desktop, "JARVIS_WAKEWORD_MODEL", legacy), patch.object(
+                jarvis_desktop, "JARVIS_FIRST_PARTY_WAKEWORD_MODEL", custom
+            ):
+                self.assertEqual(jarvis_desktop.active_wakeword_model_path(), custom)
     def test_first_party_wakeword_installer_rejects_non_onnx_files(self):
         import tempfile
         with tempfile.TemporaryDirectory() as temporary:
