@@ -267,6 +267,16 @@ class BackendApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
 
+    def test_chat_rejects_non_string_roles_without_server_error(self) -> None:
+        for role in ([], {}, 123, None):
+            with self.subTest(role=role):
+                response = self.client.post(
+                    "/v1/chat/completions",
+                    headers=self.headers,
+                    json={"messages": [{"role": role, "content": "Hello"}]},
+                )
+                self.assertEqual(response.status_code, 422, response.text)
+
     def test_deeply_nested_chat_json_is_rejected_without_server_error(self) -> None:
         nested = b'{"messages":' + (b"[" * 1100) + b"0" + (b"]" * 1100) + b"}"
         response = self.client.post(
