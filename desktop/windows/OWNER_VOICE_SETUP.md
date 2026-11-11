@@ -6,7 +6,7 @@ The voice setup wizard has an explicit **Enroll owner voice (local)** action. It
 
 JARVIS downloads the pinned ECAPA-TDNN ONNX speaker-embedding model during that explicit enrollment step. The model runs on the PC through ONNX Runtime. The derived voice embedding is stored in Windows Credential Manager through the existing keyring integration; raw recordings are not uploaded and are not retained by the enrollment flow.
 
-At runtime, the wake listener keeps a short rolling audio buffer in memory. When the wake-word model fires, JARVIS compares the buffer's speaker embedding with the locally enrolled profile. A non-match or missing profile is rejected before the command-capture pipeline opens.
+At runtime, the wake listener first detects “Jarvis”, then asks the speaker to say a separate short phrase. It captures 3.2 seconds in memory and compares that sample with the locally enrolled profile before opening command capture. A non-match, short sample, or missing profile is rejected. The verification phrase is not saved.
 
 ## Setup
 
@@ -34,7 +34,7 @@ Re-enroll after changing the microphone substantially or if verification becomes
 
 - Voice samples and the derived profile are biometric information. Enroll only your own voice, keep Windows access protected, and delete the profile when no longer needed.
 - Raw enrollment WAV clips are temporary; the derived embedding is stored in the OS credential vault.
-- The ECAPA model is a general speaker-embedding model trained on VoxCeleb, not a model trained specifically on the owner. The initial cosine threshold is a conservative starting point from the model family, not a threshold calibrated to every microphone or user.
+- The ECAPA model is a general speaker-embedding model trained on VoxCeleb, not a model trained specifically on the owner. The initial cosine threshold is 0.25, a starting point rather than a threshold calibrated to every microphone or user. Evaluate it with separate owner and consented non-owner recordings before relying on the gate.
 - Voice matching is not liveness detection. A recording, voice imitation, or other spoofing may pass. It is a convenience gate only and must never be used as the sole protection for payments, accounts, passwords, or other sensitive actions.
 - A failed or uncertain comparison rejects activation. If the microphone or room changes, re-enroll and evaluate before relying on it.
 
