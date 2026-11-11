@@ -40,10 +40,10 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 - `GET /health` — public minimal health response.
 - `POST /v1/devices/register` — accepts a random per-installation UUID and returns a signed, 30-day device credential. Registration is rate-limited by network address.
-- `POST /v1/chat/completions` — requires a valid signed device credential or a legacy `JARVIS_CLIENT_TOKEN`; accepts an OpenAI-compatible JSON object with 1–60 messages and forwards it to OpenRouter. Device credentials are rate-limited to 8 requests/minute and 120 requests/day per running backend process.
+- `POST /v1/chat/completions` — requires a valid signed device credential or a legacy `JARVIS_CLIENT_TOKEN`; accepts an OpenAI-compatible JSON object with 1–60 messages and forwards it to the configured provider chain. Signed device credentials are limited to 8 requests/minute and 120 requests/day per running backend process. Legacy shared-token clients remain supported and are throttled per direct peer IP at 30 requests/minute and 600 requests/day.
 - Interactive API docs are disabled.
 
-Requests are size-limited. Upstream calls have a bounded timeout and response-size cap. Streaming is intentionally disabled; the desktop client consumes a complete JSON response. Provider errors are normalized so secrets and upstream internals are not relayed.
+Requests are size-limited. Upstream calls have a bounded timeout and response-size cap. Registration and chat rate-limit counters are held in process memory: they reset on restart and are not shared between multiple backend workers/instances. For horizontally scaled production deployments, use a shared rate-limit store before relying on these limits as a hard global quota. Streaming is intentionally disabled; the desktop client consumes a complete JSON response. Provider errors are normalized so secrets and upstream internals are not relayed.
 
 ## Personal memory
 
