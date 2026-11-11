@@ -2345,6 +2345,40 @@ class HudLiveDataMappingTests(unittest.TestCase):
         self.assertIn("data.temperature_value", hud)
         self.assertIn("CPU sensor<br>Unavailable", hud)
 
+    def test_every_live_hud_metric_label_has_a_bridge_mapping(self):
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        mapping = hud[hud.index("const fields={"):hud.index("};", hud.index("const fields={")) + 1]
+        expected = (
+            "cpu:section.includes('system information')?data.cpuName:data.cpu",
+            "ram:data.ram",
+            "gpu:data.gpu",
+            "os:data.os",
+            "'operating system':data.os",
+            "architecture:data.architecture",
+            "uptime:data.uptime",
+            "temperature:data.temperature",
+            "temp:data.temperature",
+            "battery:data.battery",
+            "isp:data.isp",
+            "ip:data.ip",
+            "download:data.download",
+            "upload:data.upload",
+            "disk:data.disk_percent",
+            "network:data.network",
+        )
+        for expression in expected:
+            with self.subTest(expression=expression):
+                self.assertIn(expression, mapping)
+        self.assertIn("data.disk_percent_value", hud)
+        self.assertIn("data.disk_total", hud)
+        self.assertIn("data.disk_free", hud)
+
+    def test_hud_document_ids_are_unique(self):
+        import re
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        ids = re.findall(r'\\bid=["\\']([^"\\']+)["\\']', hud)
+        self.assertEqual(len(ids), len(set(ids)), "HUD contains duplicate element IDs")
+
 
 
 if __name__ == "__main__":
