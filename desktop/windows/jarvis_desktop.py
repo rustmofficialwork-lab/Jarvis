@@ -45,6 +45,8 @@ SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDeskto
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 JARVIS_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "Jarvis_20260313_215039.onnx"
 JARVIS_WAKEWORD_MODEL_PAGE = "https://openwakeword.com/library/422"
+JARVIS_FIRST_PARTY_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "jarvis_first_party.onnx"
+OWNER_VOICE_MODEL_DIR = SETTINGS_DIR / "speaker_model"
 HISTORY_FILE = SETTINGS_DIR / "chat_history.json"
 STARTUP_LOG_FILE = SETTINGS_DIR / "startup.log"
 DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
@@ -149,8 +151,14 @@ def prepare_openwakeword_assets(
     """Download shared openWakeWord assets into a user-writable app-data folder."""
     models_dir = Path(settings_dir) / "wakeword_runtime" / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
+    # A custom-trained ONNX file is already present; only the shared feature
+    # extractors are needed. The legacy publisher model is selected by its name.
+    model_names = (
+        [] if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name
+        else [Path(model_path).stem]
+    )
     openwakeword_module.utils.download_models(
-        model_names=[Path(model_path).stem],
+        model_names=model_names,
         target_directory=str(models_dir),
     )
     melspec_path = models_dir / "melspectrogram.onnx"
@@ -200,6 +208,46 @@ def install_downloaded_wakeword_model(
             pass
     return model_path
 
+
+
+def active_wakeword_model_path() -> Path:
+    """Prefer the project's custom-trained model; retain the licensed legacy model as fallback."""
+    if JARVIS_FIRST_PARTY_WAKEWORD_MODEL.is_file():
+        return JARVIS_FIRST_PARTY_WAKEWORD_MODEL
+    return JARVIS_WAKEWORD_MODEL
+
+
+def install_first_party_wakeword_model(source_path: Path,
+                                       model_path: Path = JARVIS_FIRST_PARTY_WAKEWORD_MODEL) -> Path:
+    """Validate and atomically install a locally trained JARVIS ONNX wake-word model."""
+    source = Path(source_path)
+    destination = Path(model_path)
+    if not source.is_file() or source.suffix.casefold() != ".onnx":
+        raise ValueError("Choose a trained .onnx wake-word model file.")
+    size = source.stat().st_size
+    if size < 1024 or size > 25 * 1024 * 1024:
+        raise ValueError("The custom wake-word model has an unexpected file size.")
+    try:
+        import onnxruntime as ort
+        session = ort.InferenceSession(str(source), providers=["CPUExecutionProvider"])
+        if not session.get_inputs() or not session.get_outputs():
+            raise ValueError("The ONNX model has no usable inputs or outputs.")
+    except ImportError as exc:
+        raise RuntimeError("ONNX Runtime is missing. Reinstall JARVIS voice dependencies.") from exc
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".part")
+    try:
+        shutil.copyfile(source, temporary)
+        if temporary.stat().st_size != size:
+            raise OSError("The model file changed while it was being installed.")
+        # Verify the copied artifact, not just the original path.
+        session = ort.InferenceSession(str(temporary), providers=["CPUExecutionProvider"])
+        if not session.get_inputs() or not session.get_outputs():
+            raise ValueError("The installed model failed ONNX validation.")
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return destination
 
 def update_wakeword_activation(
     confidence: float,
