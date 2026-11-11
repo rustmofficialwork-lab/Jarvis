@@ -1,6 +1,6 @@
 # JARVIS Backend
 
-The backend is an authenticated AI gateway for the Windows desktop client. It forwards chat-completions requests to a fixed OpenRouter endpoint. It does **not** expose a shared memory API or store desktop memories.
+The backend is an authenticated AI gateway for the Windows desktop client. It forwards chat-completions requests through an ordered chain of configured OpenAI-compatible providers, with the legacy OpenRouter setup retained as the default. It does **not** expose a shared memory API or store desktop memories.
 
 ## Run locally
 
@@ -30,7 +30,7 @@ OPENAI_API_KEY=...
 GROQ_API_KEY=...
 ```
 
-The provider array is attempted in order. A provider timeout, network failure, HTTP 408/425/429, authentication rejection, or server-side error causes the gateway to try the next configured provider. A malformed/unsupported request (other 4xx responses) is not retried. If `JARVIS_AI_PROVIDERS` is unset, the existing `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` configuration remains unchanged. Each provider must expose an OpenAI-compatible `/chat/completions` endpoint and use HTTPS. Provider names, endpoint URLs, model IDs, and key environment-variable names are configuration; actual API key values remain server-side secrets. This is sequential failover, not parallel load balancing, and provider/model compatibility and billing are determined by each upstream provider.
+The provider array is attempted in order (maximum five entries; provider names must be unique and API-key environment-variable names must be valid). A provider timeout, network failure, HTTP 408/425/429, authentication rejection, or server-side error causes the gateway to try the next configured provider. A malformed/unsupported request (other 4xx responses) is not retried. If `JARVIS_AI_PROVIDERS` is unset, the existing `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` configuration remains unchanged. Each provider must expose an OpenAI-compatible `/chat/completions` endpoint and use HTTPS. Provider names, endpoint URLs, model IDs, and key environment-variable names are configuration; actual API key values remain server-side secrets. This is sequential failover, not parallel load balancing, and provider/model compatibility and billing are determined by each upstream provider.
 
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 8000
