@@ -1,6 +1,6 @@
 # Single-word "Jarvis" wake-word model
 
-JARVIS uses the community-published openWakeWord model named **Jarvis**.
+JARVIS prefers the custom-trained first-party ONNX classifier at `%APPDATA%\\JARVISDesktop\\wakewords\\jarvis_first_party.onnx` when installed. If it is absent, JARVIS uses the community-published openWakeWord model named **Jarvis** as a fallback.
 
 ## One-time setup
 
@@ -9,7 +9,7 @@ JARVIS uses the community-published openWakeWord model named **Jarvis**.
 3. If the wake-word model is not installed, choose **Set up wake word**. JARVIS opens the model publisher's page. Sign in there if the publisher requests it, review the license, and download the ONNX model.
 4. Leave the downloaded filename unchanged. JARVIS watches the Windows **Downloads** folder, validates the ONNX file, and copies it to the app's wake-word folder automatically.
 5. Choose **Test wake word — say Jarvis** and say **"Jarvis"** clearly three times when prompted. The short test runs locally, saves no audio, and setup only finishes after all three detections register (the counter shows `1/3`, `2/3`, then `3/3`).
-6. After setup, activate Voice Listening when you want JARVIS to listen for the wake word.
+6. After setup, activate Voice Listening when you want JARVIS to listen for the wake word. Owner voice enrollment is a separate required gate; see [OWNER_VOICE_SETUP.md](OWNER_VOICE_SETUP.md).
 
 Expected model filename:
 
