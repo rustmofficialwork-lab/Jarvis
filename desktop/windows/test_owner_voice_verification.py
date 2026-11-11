@@ -4,7 +4,6 @@ import json
 import tempfile
 import unittest
 import wave
-from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -23,24 +22,13 @@ from owner_voice_verification import (
 )
 
 
-class FakeTensor:
-    def __init__(self, values):
-        self.values = values
-
-    def unsqueeze(self, _axis):
-        return self
-
-
 class FakeEncoder:
     def __init__(self, vector=None):
-        self.vector = np.asarray(vector or [1.0, 0.0, 0.0], dtype=np.float32)
+        self.vector = np.asarray(vector if vector is not None else [1.0, 0.0, 0.0], dtype=np.float32)
 
-    def encode_batch(self, _signal):
-        return SimpleNamespace(
-            detach=lambda: SimpleNamespace(
-                cpu=lambda: SimpleNamespace(numpy=lambda: self.vector.reshape(1, 1, -1))
-            )
-        )
+    def run(self, _outputs, inputs):
+        self.last_inputs = inputs
+        return [self.vector.reshape(1, 1, -1)]
 
 
 class MemoryKeyring:
@@ -59,10 +47,6 @@ class MemoryKeyring:
 
 class OwnerVoiceVerificationTests(unittest.TestCase):
     def setUp(self):
-        self.torch = SimpleNamespace(
-            from_numpy=lambda values: FakeTensor(values),
-            no_grad=nullcontext,
-        )
 
     def _write_clip(self, path: Path):
         with wave.open(str(path), "wb") as output:
@@ -78,8 +62,7 @@ class OwnerVoiceVerificationTests(unittest.TestCase):
                 path = Path(directory) / f"owner-{index}.wav"
                 self._write_clip(path)
                 paths.append(path)
-            with patch.dict("sys.modules", {"torch": self.torch}):
-                profile = build_owner_profile(paths, FakeEncoder())
+            profile = build_owner_profile(paths, FakeEncoder())
         self.assertEqual(profile["sample_count"], 5)
         self.assertEqual(len(profile["embedding"]), 3)
         self.assertAlmostEqual(profile["embedding"][0], 1.0, places=5)
@@ -101,21 +84,19 @@ class OwnerVoiceVerificationTests(unittest.TestCase):
         self.assertIsNone(load_owner_profile(keyring_module=keyring))
 
     def test_verification_rejects_missing_profile_and_accepts_matching_vector(self):
-        with patch.dict("sys.modules", {"torch": self.torch}):
-            accepted, score = verify_samples(np.ones(16_000 * 3, dtype=np.float32),
-                                             FakeEncoder(), None)
-            self.assertFalse(accepted)
-            self.assertIsNone(score)
-            profile = {"embedding": [1.0, 0.0, 0.0]}
-            accepted, score = verify_samples(np.ones(16_000 * 3, dtype=np.float32),
-                                             FakeEncoder(), profile)
+        accepted, score = verify_samples(np.ones(16_000 * 3, dtype=np.float32),
+                                         FakeEncoder(), None)
+        self.assertFalse(accepted)
+        self.assertIsNone(score)
+        profile = {"embedding": [1.0, 0.0, 0.0]}
+        accepted, score = verify_samples(np.ones(16_000 * 3, dtype=np.float32),
+                                         FakeEncoder(), profile)
         self.assertTrue(accepted)
         self.assertGreaterEqual(score, DEFAULT_COSINE_THRESHOLD)
 
     def test_verification_fails_closed_for_short_audio_and_mismatched_vectors(self):
-        with patch.dict("sys.modules", {"torch": self.torch}):
-            accepted, score = verify_samples(np.ones(100, dtype=np.float32),
-                                             FakeEncoder(), {"embedding": [1, 0, 0]})
+        accepted, score = verify_samples(np.ones(100, dtype=np.float32),
+                                         FakeEncoder(), {"embedding": [1, 0, 0]})
         self.assertFalse(accepted)
         self.assertIsNone(score)
 
