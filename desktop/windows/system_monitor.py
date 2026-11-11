@@ -1,6 +1,7 @@
 """Shared local system-metric collection and PC status formatting for JARVIS."""
 from __future__ import annotations
 
+import math
 import os
 from datetime import datetime
 
@@ -10,6 +11,17 @@ def _safe_read(callback, fallback=None):
         return callback()
     except Exception:
         return fallback
+
+
+def _finite_percent(value):
+    """Return a real OS percentage, rejecting invalid or out-of-range readings."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(value) or not 0 <= value <= 100:
+        return None
+    return value
 
 
 def read_cpu_temperature(psutil_module):
@@ -48,11 +60,11 @@ def collect_system_metrics(psutil_module=None) -> dict:
         )
     )
     return {
-        "cpu_percent": _safe_read(lambda: psutil_module.cpu_percent(interval=None)),
-        "memory_percent": _safe_read(lambda: memory.percent) if memory is not None else None,
+        "cpu_percent": _finite_percent(_safe_read(lambda: psutil_module.cpu_percent(interval=None))),
+        "memory_percent": _finite_percent(_safe_read(lambda: memory.percent)) if memory is not None else None,
         "memory_total": _safe_read(lambda: memory.total) if memory is not None else None,
         "memory_used": _safe_read(lambda: memory.used) if memory is not None else None,
-        "disk_percent": _safe_read(lambda: disk.percent) if disk is not None else None,
+        "disk_percent": _finite_percent(_safe_read(lambda: disk.percent)) if disk is not None else None,
         "disk_total": _safe_read(lambda: disk.total) if disk is not None else None,
         "disk_used": _safe_read(lambda: disk.used) if disk is not None else None,
         "disk_free": _safe_read(lambda: disk.free) if disk is not None else None,
@@ -68,9 +80,8 @@ def format_battery_status(battery) -> str:
     """Format battery state for the dashboard without assuming a laptop battery."""
     if battery is None:
         return "AC POWER"
-    try:
-        percent = max(0, min(100, float(battery.percent)))
-    except (AttributeError, TypeError, ValueError):
+    percent = _finite_percent(getattr(battery, "percent", None))
+    if percent is None:
         return "N/A"
     charging = getattr(battery, "power_plugged", None)
     suffix = " • CHARGING" if charging is True and percent < 100 else (
@@ -87,10 +98,8 @@ def get_system_status(psutil_module=None, now=None) -> str:
     metrics = collect_system_metrics(psutil_module)
 
     def percent(value):
-        try:
-            return f"{float(value):.0f}%"
-        except (TypeError, ValueError):
-            return "Unavailable"
+        value = _finite_percent(value)
+        return f"{value:.0f}%" if value is not None else "Unavailable"
 
     battery = metrics["battery"]
     if battery == "N/A":
@@ -98,12 +107,11 @@ def get_system_status(psutil_module=None, now=None) -> str:
     elif battery is None:
         battery_text = "No battery detected"
     else:
-        try:
-            battery_text = f"{float(battery.percent):.0f}%" + (
-                " (charging)" if battery.power_plugged else ""
-            )
-        except (AttributeError, TypeError, ValueError):
+        battery_text = format_battery_status(battery)
+        if battery_text == "AC POWER":
             battery_text = "Unavailable"
+        elif battery_text != "N/A" and " • " in battery_text:
+            battery_text = battery_text.replace(" • ", " (") + ")"
 
     network = metrics["network_online"]
     network_text = "Online" if network is True else "Offline" if network is False else "Unavailable"
@@ -132,7 +140,7 @@ def _format_bytes(value) -> str:
         amount = float(value)
     except (TypeError, ValueError):
         return "N/A"
-    if amount < 0:
+    if not math.isfinite(amount) or amount < 0:
         return "N/A"
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if amount < 1024 or unit == "TB":
@@ -145,7 +153,7 @@ def _format_battery_time(seconds) -> str:
     """Return remaining time only when the OS supplies a finite estimate."""
     try:
         seconds = int(seconds)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return "N/A"
     if seconds < 0 or seconds >= 0xFFFFFFFF:
         return "N/A"
