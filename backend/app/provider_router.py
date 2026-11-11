@@ -63,7 +63,7 @@ def _is_chat_completion_response(body: bytes) -> bool:
     """Reject malformed/non-chat success bodies so a healthy fallback can answer."""
     try:
         payload = json.loads(body)
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         return False
     if not isinstance(payload, dict):
         return False
@@ -92,7 +92,7 @@ def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
     if raw:
         try:
             parsed = json.loads(raw)
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, RecursionError) as exc:
             raise ProviderConfigurationError("JARVIS_AI_PROVIDERS must be valid JSON.") from exc
         if not isinstance(parsed, list) or not parsed:
             raise ProviderConfigurationError("JARVIS_AI_PROVIDERS must be a non-empty JSON array.")
