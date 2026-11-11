@@ -1264,8 +1264,8 @@ class JarvisDesktop:
         self.voice_setup_window = window
         window.title("JARVIS — Voice Setup")
         window.configure(bg="#06121d")
-        window.geometry("620x560")
-        window.minsize(520, 500)
+        window.geometry("620x660")
+        window.minsize(520, 620)
         window.resizable(True, True)
         window.transient(self.root)
         window.protocol("WM_DELETE_WINDOW", lambda: self._close_voice_setup_wizard(window))
@@ -1277,7 +1277,7 @@ class JarvisDesktop:
                  "This setup does not upload microphone recordings.",
                  bg="#06121d", fg="#8fb4c5", wraplength=510, justify="center",
                  font=("Segoe UI", 10)).pack(padx=28, pady=(0, 18))
-        self.voice_setup_status_var = tk.StringVar(value="STEP 1 OF 3 — MICROPHONE")
+        self.voice_setup_status_var = tk.StringVar(value="STEP 1 OF 4 — MICROPHONE")
         tk.Label(window, textvariable=self.voice_setup_status_var, bg="#06121d",
                  fg="#00e5ff", font=("Segoe UI", 10, "bold")).pack(pady=8)
         self.voice_setup_mic_ready = False
@@ -1296,6 +1296,13 @@ class JarvisDesktop:
             tk.Label(window, textvariable=variable, bg="#0b1d2b", fg="#d7f4ff",
                      anchor="w", justify="left", wraplength=510, padx=14, pady=12,
                      font=("Segoe UI", 10)).pack(fill="x", padx=28, pady=5)
+        self.voice_setup_owner_var = tk.StringVar(
+            value=("4. Owner voice profile is enrolled." if self._owner_voice_profile_ready()
+                   else "4. Enroll your voice locally to enable owner-only wake activation.")
+        )
+        tk.Label(window, textvariable=self.voice_setup_owner_var, bg="#0b1d2b", fg="#d7f4ff",
+                 anchor="w", justify="left", wraplength=510, padx=14, pady=12,
+                 font=("Segoe UI", 10)).pack(fill="x", padx=28, pady=5)
         actions = tk.Frame(window, bg="#06121d")
         actions.pack(fill="x", padx=28, pady=(16, 8))
         self.voice_setup_mic_button = ttk.Button(
@@ -1309,6 +1316,11 @@ class JarvisDesktop:
             command=self._test_voice_setup_wakeword, state="disabled"
         )
         self.voice_setup_test_button.pack(fill="x", pady=5)
+        self.voice_setup_owner_button = ttk.Button(
+            actions, text="Enroll owner voice (local)",
+            command=self._enroll_owner_voice, state="normal"
+        )
+        self.voice_setup_owner_button.pack(fill="x", pady=5)
         self.voice_setup_finish_button = ttk.Button(
             actions, text="Finish setup", command=lambda: self._finish_voice_setup(window),
             state="disabled"
@@ -1341,6 +1353,43 @@ class JarvisDesktop:
             except Exception as exc:
                 self.events.put(("voice_setup_mic_result", {"ok": False, "error": str(exc)}))
         threading.Thread(target=worker, name="JARVIS-voice-setup-mic", daemon=True).start()
+
+    def _owner_voice_profile_ready(self):
+        try:
+            from owner_voice_verification import load_owner_profile
+            return load_owner_profile() is not None
+        except Exception:
+            return False
+
+    def _enroll_owner_voice(self):
+        """Enroll the local user only after a clear, explicit microphone confirmation."""
+        if not self.settings.get("microphone_consent_granted") or not self.voice_setup_mic_ready:
+            self.voice_setup_status_var.set("Grant microphone permission and complete the microphone check first.")
+            return
+        if not messagebox.askyesno(
+            "Local owner voice enrollment",
+            "JARVIS will record eight short samples of your voice, create a local voice profile, "
+            "and delete the temporary WAV clips afterwards. The derived profile is stored in "
+            "Windows Credential Manager and is not uploaded. Voice matching is not strong security.\n\n"
+            "Continue with your own voice?",
+            parent=self.voice_setup_window,
+        ):
+            return
+        self.voice_setup_owner_button.configure(state="disabled")
+        self.voice_setup_status_var.set("OWNER VOICE SETUP — DOWNLOADING LOCAL MODEL")
+        self.voice_setup_owner_var.set("4. Preparing the local speaker model and recording your samples…")
+
+        def worker():
+            try:
+                from owner_voice_setup import enroll_owner_voice
+                result = enroll_owner_voice(confirmed=True, model_dir=OWNER_VOICE_MODEL_DIR)
+                self.events.put(("owner_voice_enrollment_result", {"ok": True, **result}))
+            except Exception as exc:
+                self.events.put(("owner_voice_enrollment_result", {"ok": False, "error": str(exc)}))
+
+        threading.Thread(
+            target=worker, name="JARVIS-owner-voice-enrollment", daemon=True
+        ).start()
 
     def _start_voice_setup_model(self):
         if JARVIS_WAKEWORD_MODEL.is_file():
