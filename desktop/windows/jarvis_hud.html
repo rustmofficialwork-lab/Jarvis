@@ -200,6 +200,20 @@ html,body,.hud-container{background:#000!important}
 }
 /* The helmet is a separate embedded image element, so it remains visible. */
 .helmet{background-color:transparent!important}
+/* Clean unwanted lettering/artifacts baked into the far-right edge of the helmet image. */
+.helmet{position:absolute;isolation:isolate}
+.helmet::after{
+  content:"";
+  position:absolute;
+  z-index:2;
+  top:0;
+  right:0;
+  width:76px;
+  height:100%;
+  pointer-events:none;
+  background:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.72) 34%,#000 88%);
+}
+
 .orb-mid-ring{background:radial-gradient(circle,#020609 30%,#000 78%)!important}
 .orb-inner-detail{background:radial-gradient(circle,#2fd8ff 5%,#06384a 55%,#000 100%)!important}
 #jx-toast{background:rgba(0,0,0,.98)!important}
