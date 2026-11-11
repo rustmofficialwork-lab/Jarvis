@@ -1,3 +1,6 @@
+import base64
+import hashlib
+import hmac
 import json
 import os
 import tempfile
@@ -17,8 +20,8 @@ os.environ["OPENROUTER_API_KEY"] = "test-upstream-key"
 os.environ["JARVIS_DEVICE_TOKEN_SECRET"] = "test-device-token-secret-that-is-long-enough-123"
 
 from app.main import (  # noqa: E402
-    UPSTREAM_URL, _chat_attempts, _legacy_chat_attempts,
-    _read_request_body_limited, app, require_client_token,
+    UPSTREAM_URL, _chat_attempts, _legacy_chat_attempts, _b64url,
+    _read_request_body_limited, _verify_device_token, app, require_client_token,
 )
 
 
@@ -194,6 +197,29 @@ class BackendApiTests(unittest.TestCase):
             response.json()["choices"][0]["message"]["content"],
             "Device authenticated",
         )
+
+    def test_device_token_verifier_rejects_malformed_signed_claims(self) -> None:
+        secret = os.environ["JARVIS_DEVICE_TOKEN_SECRET"].encode("utf-8")
+        valid_id = str(uuid.uuid4())
+        cases = (
+            [],
+            {"sub": valid_id, "iat": "1", "exp": int(time.time()) + 60,
+             "iss": "jarvis-backend", "aud": "jarvis-desktop"},
+            {"sub": "not-a-uuid", "iat": int(time.time()), "exp": int(time.time()) + 60,
+             "iss": "jarvis-backend", "aud": "jarvis-desktop"},
+            {"sub": valid_id, "iat": int(time.time()), "exp": "later",
+             "iss": "jarvis-backend", "aud": "jarvis-desktop"},
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                encoded = _b64url(json.dumps(payload).encode("utf-8"))
+                signature = _b64url(
+                    hmac.new(secret, encoded.encode("ascii"), hashlib.sha256).digest()
+                )
+                self.assertIsNone(_verify_device_token(f"jdt1.{encoded}.{signature}"))
+
+    def test_device_token_verifier_rejects_non_ascii_token_without_crashing(self) -> None:
+        self.assertIsNone(_verify_device_token("jdt1.é.signature"))
 
     def test_tampered_device_token_is_rejected(self) -> None:
         device_id = str(uuid.uuid4())
