@@ -11,11 +11,14 @@ import json
 import os
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
 DEFAULT_UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions"
-RETRYABLE_STATUS_CODES = {408, 425, 429}
+# 404 is common when a configured model is not available on a provider. Treat it
+# as provider-specific unavailability and allow the next configured provider a try.
+RETRYABLE_STATUS_CODES = {404, 408, 425, 429}
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,23 @@ class ProviderUnavailable(Exception):
     def __init__(self, message: str, *, status_code: int = 502):
         super().__init__(message)
         self.status_code = status_code
+
+
+def _valid_provider_url(url: str) -> bool:
+    """Accept only well-formed HTTPS endpoints without URL-embedded credentials."""
+    try:
+        parsed = urlsplit(url)
+        port = parsed.port
+    except ValueError:
+        return False
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.fragment == ""
+        and (port is None or 1 <= port <= 65535)
+    )
 
 
 def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
@@ -67,13 +87,16 @@ def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
         model = item.get("model")
         if not all(isinstance(value, str) and value.strip() for value in (name, url, key_env, model)):
             raise ProviderConfigurationError(f"AI provider entry {index + 1} is missing required fields.")
-        if not url.startswith("https://") or len(url) > 500:
-            raise ProviderConfigurationError(f"AI provider entry {index + 1} must use an HTTPS endpoint.")
+        url = url.strip()
+        if len(url) > 500 or not _valid_provider_url(url):
+            raise ProviderConfigurationError(
+                f"AI provider entry {index + 1} must use a valid HTTPS endpoint without embedded credentials."
+            )
         if len(name) > 64 or len(key_env) > 128 or len(model) > 200:
             raise ProviderConfigurationError(f"AI provider entry {index + 1} contains an oversized setting.")
         key = env.get(key_env, "").strip()
         if key:
-            providers.append(Provider(name=name.strip(), base_url=url.strip(), api_key=key, model=model.strip()))
+            providers.append(Provider(name=name.strip(), base_url=url, api_key=key, model=model.strip()))
     return providers
 
 
@@ -120,16 +143,16 @@ async def request_with_failover(
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
                         if total > max_response_bytes:
-                            failures.append(f"{provider.name}:response-too-large")
+                            failures.append("response-too-large")
                             break
                         chunks.append(chunk)
                     else:
                         return b"".join(chunks)
                     continue
         except httpx.TimeoutException:
-            failures.append(f"{provider.name}:timeout")
+            failures.append("timeout")
         except httpx.RequestError:
-            failures.append(f"{provider.name}:network-error")
+            failures.append("network-error")
     if failures and all(reason == "rate-limited" for reason in failures):
         raise ProviderUnavailable("AI provider rate limit reached.", status_code=429)
     if failures and all(reason == "auth-rejected" for reason in failures):
