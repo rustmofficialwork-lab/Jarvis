@@ -1547,68 +1547,6 @@ class JarvisDesktop:
         self._process_summary_cache = (now, summary)
         return summary
 
-    def _get_system_metrics(self):
-        """Format the shared system snapshot for desktop status displays."""
-        import time
-        from system_monitor import collect_system_metrics
-
-        now = time.monotonic()
-        cached = getattr(self, "_metrics_cache", None)
-        if cached and now - cached[0] < 1.0:
-            return cached[1]
-
-        metrics = collect_system_metrics()
-        def percent(value):
-            try:
-                return f"{float(value):.0f}%"
-            except (TypeError, ValueError):
-                return "N/A"
-
-        temperature = metrics["cpu_temperature"]
-        try:
-            temperature = f"{float(temperature):.0f}°C" if temperature is not None else "N/A"
-        except (TypeError, ValueError):
-            temperature = "N/A"
-        gpu = metrics.get("gpu")
-        gpu_load = percent(gpu.get("load")) if gpu else "N/A"
-        gpu_temp = f"{gpu['temperature']:.0f}°C" if gpu else "N/A"
-        gpu_vram = (f"{gpu['memory_used']:.0f}/{gpu['memory_total']:.0f} MB"
-                    if gpu else "N/A")
-        online = metrics["network_online"]
-        network = "ONLINE" if online is True else "OFFLINE" if online is False else "N/A"
-        from system_monitor import _format_bytes, _format_battery_time, _format_uptime
-        import time
-        counters = metrics.get("network_counters")
-        now = time.monotonic()
-        previous = getattr(self, "_network_sample", None)
-        down_rate = up_rate = "N/A"
-        if counters is not None:
-            received, sent = counters
-            if previous is not None:
-                elapsed = max(0.001, now - previous[0])
-                down_rate = _format_bytes(max(0, received - previous[1]) / elapsed) + "/s"
-                up_rate = _format_bytes(max(0, sent - previous[2]) / elapsed) + "/s"
-            self._network_sample = (now, received, sent)
-        uptime = _format_uptime(metrics.get("uptime_seconds") or 0)
-        values = [
-            ("CPU LOAD", percent(metrics["cpu_percent"])),
-            ("MEMORY", percent(metrics["memory_percent"])),
-            ("DISK USED", percent(metrics["disk_percent"])),
-            ("BATTERY", self._format_battery_status(metrics["battery"])),
-            ("CPU TEMP", temperature),
-            ("GPU LOAD", gpu_load),
-            ("GPU TEMP", gpu_temp),
-            ("GPU VRAM", gpu_vram),
-            ("NETWORK", network),
-            ("NETWORK DOWN", down_rate),
-            ("NETWORK UP", up_rate),
-            ("UPTIME", uptime),
-            ("STORAGE FREE", _format_bytes(metrics.get("disk_free"))),
-            ("STORAGE TOTAL", _format_bytes(metrics.get("disk_total"))),
-        ]
-        self._metrics_cache = (now, values)
-        return values
-
     def _handle_memory_command(
         self, prompt: str, *, from_voice: bool = False, display_user: bool = True,
     ) -> bool:
