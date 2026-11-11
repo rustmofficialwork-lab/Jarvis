@@ -33,6 +33,55 @@ class WakewordSetupTests(unittest.TestCase):
             self.assertEqual(paths["melspec_model_path"], str(expected_dir / "melspectrogram.onnx"))
             self.assertEqual(paths["embedding_model_path"], str(expected_dir / "embedding_model.onnx"))
 
+    def test_first_party_model_downloads_only_shared_feature_assets(self):
+        import tempfile
+        from types import SimpleNamespace
+
+        calls = []
+        with tempfile.TemporaryDirectory() as temporary:
+            def fake_download_models(model_names, target_directory):
+                calls.append(model_names)
+                root = Path(target_directory)
+                (root / "melspectrogram.onnx").write_bytes(b"mel")
+                (root / "embedding_model.onnx").write_bytes(b"embedding")
+
+            module = SimpleNamespace(utils=SimpleNamespace(download_models=fake_download_models))
+            custom_path = Path(temporary) / "jarvis_first_party.onnx"
+            jarvis_desktop.prepare_openwakeword_assets(module, custom_path, Path(temporary) / "appdata")
+        self.assertEqual(calls, [["__jarvis_custom__"]])
+
+    def test_first_party_wakeword_model_is_validated_and_installed_atomically(self):
+        import sys
+        import tempfile
+        from types import SimpleNamespace
+
+        class FakeSession:
+            def __init__(self, path, providers=None):
+                self.path = path
+            def get_inputs(self):
+                return [object()]
+            def get_outputs(self):
+                return [object()]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "trained.onnx"
+            source.write_bytes(b"x" * 2048)
+            destination = Path(temporary) / "appdata" / "jarvis_first_party.onnx"
+            fake_ort = SimpleNamespace(InferenceSession=FakeSession)
+            with patch.dict(sys.modules, {"onnxruntime": fake_ort}):
+                installed = jarvis_desktop.install_first_party_wakeword_model(source, destination)
+            self.assertEqual(installed, destination)
+            self.assertEqual(destination.read_bytes(), source.read_bytes())
+            self.assertFalse(destination.with_name(destination.name + ".part").exists())
+
+    def test_first_party_wakeword_installer_rejects_non_onnx_files(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "model.bin"
+            source.write_bytes(b"x" * 2048)
+            with self.assertRaisesRegex(ValueError, "trained .onnx"):
+                jarvis_desktop.install_first_party_wakeword_model(source, Path(temporary) / "installed.onnx")
+
     def test_openwakeword_asset_setup_fails_clearly_when_feature_files_are_missing(self):
         import tempfile
         from types import SimpleNamespace
