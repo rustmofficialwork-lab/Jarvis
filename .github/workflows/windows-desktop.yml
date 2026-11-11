@@ -42,13 +42,15 @@ jobs:
       - name: Validate inline HUD JavaScript
         shell: pwsh
         run: |
-          python -c "import pathlib,re; html=pathlib.Path('desktop/windows/jarvis_hud.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.I|re.S); [pathlib.Path(f'hud-script-{i}.js').write_text(script, encoding='utf-8') for i,script in enumerate(scripts)]; pathlib.Path('hud-extensions.js').write_text(pathlib.Path('desktop/windows/jarvis_hud_extensions.js').read_text(encoding='utf-8'), encoding='utf-8')"
-          $scripts = Get-ChildItem hud-script-*.js, hud-extensions.js
+          python -c "import pathlib,re; html=pathlib.Path('desktop/windows/jarvis_hud.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.I|re.S); [pathlib.Path(f'hud-script-{i}.js').write_text(script, encoding='utf-8') for i,script in enumerate(scripts)]; pathlib.Path('hud-extensions.js').write_text(pathlib.Path('desktop/windows/jarvis_hud_extensions.js').read_text(encoding='utf-8'), encoding='utf-8'); pathlib.Path('hud-gesture-logic.js').write_text(pathlib.Path('desktop/windows/jarvis_gesture_logic.js').read_text(encoding='utf-8'), encoding='utf-8')"
+          $scripts = Get-ChildItem hud-script-*.js, hud-extensions.js, hud-gesture-logic.js
           if (-not $scripts) { throw "No inline HUD scripts were found." }
           foreach ($script in $scripts) {
             node --check $script.FullName
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+      - name: Test hand gesture logic
+        run: node --test desktop/windows/test_jarvis_gesture_logic.cjs
       - name: Compile Python source
         run: python -m compileall -q desktop/windows
       - name: Install PDF parser for document tests
@@ -109,18 +111,23 @@ jobs:
           New-Item -ItemType Directory -Force -Path $visionVendor | Out-Null
           Copy-Item (Join-Path $visionTemp "package/vision_bundle.mjs") (Join-Path $visionVendor "vision_bundle.mjs") -Force
           Copy-Item (Join-Path $visionTemp "package/wasm") (Join-Path $visionVendor "wasm") -Recurse -Force
+          $modelDir = Join-Path $visionVendor "models"
+          New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
+          Invoke-WebRequest -Uri "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" -OutFile (Join-Path $modelDir "hand_landmarker.task")
+          if ((Get-Item (Join-Path $modelDir "hand_landmarker.task")).Length -lt 1000000) { throw "The MediaPipe hand-landmarker model download is missing or incomplete." }
           Invoke-WebRequest -Uri "https://www.apache.org/licenses/LICENSE-2.0.txt" -OutFile (Join-Path $licenseDir "APACHE-2.0.txt")
           Copy-Item "desktop/windows/THIRD_PARTY_NOTICES.md" (Join-Path $vendor "THIRD_PARTY_NOTICES.md") -Force
 
           if (-not (Test-Path (Join-Path $vendor "three.module.js")) -or
               -not (Test-Path (Join-Path $visionVendor "vision_bundle.mjs")) -or
-              -not (Test-Path (Join-Path $visionVendor "wasm"))) {
-            throw "One or more bundled HUD runtime assets are missing."
+              -not (Test-Path (Join-Path $visionVendor "wasm")) -or
+              -not (Test-Path (Join-Path $modelDir "hand_landmarker.task"))) {
+            throw "One or more bundled HUD runtime or hand-landmarker model assets are missing."
           }
 
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "vendor;vendor" --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --collect-all huggingface_hub --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_gesture_logic.js;." --add-data "vendor;vendor" --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --collect-all huggingface_hub --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
       - name: Upload JARVIS Windows executable
         uses: actions/upload-artifact@v7
         with:
