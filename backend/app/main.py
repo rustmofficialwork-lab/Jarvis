@@ -162,6 +162,34 @@ async def _read_request_body_limited(
     return b"".join(chunks)
 
 
+def _validate_json_nesting(raw: bytes, *, maximum_depth: int = 100) -> None:
+    """Reject excessively nested JSON before the decoder builds deeply nested objects.
+
+    Count only structural brackets outside strings, respecting JSON escapes. This
+    provides a deterministic, low-cost bound across Python decoder versions.
+    """
+    depth = 0
+    in_string = False
+    escaped = False
+    for byte in raw:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif byte == 0x5C:  # backslash
+                escaped = True
+            elif byte == 0x22:  # quote
+                in_string = False
+            continue
+        if byte == 0x22:
+            in_string = True
+        elif byte in (0x7B, 0x5B):  # { or [
+            depth += 1
+            if depth > maximum_depth:
+                raise HTTPException(status_code=400, detail="Request JSON is nested too deeply.")
+        elif byte in (0x7D, 0x5D):  # } or ]
+            depth -= 1
+
+
 def _prune_rate_buckets(
     buckets: dict[str, deque[float]], *, now: float, window: int, maximum_keys: int = 10_000
 ) -> None:
@@ -203,6 +231,7 @@ async def register_device(request: Request) -> Response:
     raw_body = await _read_request_body_limited(
         request, 512, detail="Registration request is too large."
     )
+    _validate_json_nesting(raw_body)
     try:
         payload = json.loads(raw_body)
     except (ValueError, UnicodeDecodeError, RecursionError):
@@ -329,9 +358,10 @@ async def chat_completions(
     raw = await _read_request_body_limited(
         request, MAX_REQUEST_BYTES, detail="Request is too large."
     )
+    _validate_json_nesting(raw)
     try:
         payload: dict[str, Any] = json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         raise HTTPException(status_code=400, detail="Request body must be valid JSON.")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="Request body must be a JSON object.")
@@ -370,4 +400,3 @@ async def chat_completions(
         media_type="application/json",
         headers={"Cache-Control": "no-store"},
     )
-
