@@ -10,6 +10,7 @@ Only the derived ECAPA embedding is stored in Windows Credential Manager.
 from __future__ import annotations
 
 import argparse
+import os
 import tempfile
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from owner_voice_verification import (
 )
 from speaker_enrollment_recorder import record_enrollment
 
-MODEL_DIR = Path.home() / "AppData" / "Roaming" / "JARVISDesktop" / "speaker_model"
+MODEL_DIR = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))) / "JARVISDesktop" / "speaker_model"
 
 
 def enroll_owner_voice(*, confirmed: bool = False, model_dir: Path = MODEL_DIR,
