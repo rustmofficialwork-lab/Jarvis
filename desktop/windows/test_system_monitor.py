@@ -113,6 +113,37 @@ class SystemMonitorTests(unittest.TestCase):
 
 
 
+    def test_cpu_temperature_reader_handles_unsupported_and_invalid_sensors(self):
+        from system_monitor import read_cpu_temperature
+
+        class Unsupported:
+            def sensors_temperatures(self, fahrenheit=False):
+                raise OSError("sensor API unavailable")
+
+        class InvalidReadings:
+            def sensors_temperatures(self, fahrenheit=False):
+                return {
+                    "coretemp": [
+                        SimpleNamespace(current=float("nan")),
+                        SimpleNamespace(current=-4),
+                        SimpleNamespace(current=57.5),
+                    ],
+                    "amdgpu": [SimpleNamespace(current=90.0)],
+                }
+
+        self.assertIsNone(read_cpu_temperature(Unsupported()))
+        self.assertEqual(read_cpu_temperature(InvalidReadings()), 57.5)
+
+    def test_cpu_temperature_reader_rejects_gpu_only_sensor(self):
+        from system_monitor import read_cpu_temperature
+
+        class GpuOnly:
+            def sensors_temperatures(self, fahrenheit=False):
+                return {"amdgpu": [SimpleNamespace(current=80.0)]}
+
+        self.assertIsNone(read_cpu_temperature(GpuOnly()))
+
+
 class TopProcessTests(unittest.TestCase):
     def test_processes_are_sorted_by_memory_and_bounded(self):
         class Process:
