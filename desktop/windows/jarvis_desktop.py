@@ -1396,7 +1396,7 @@ class JarvisDesktop:
             self.voice_setup_model_var.set("2. Wake-word model is installed and validated.")
             if self.voice_setup_mic_ready:
                 self.voice_setup_test_button.configure(state="normal")
-                self.voice_setup_status_var.set("STEP 3 OF 3 — SAY JARVIS")
+                self.voice_setup_status_var.set("STEP 3 OF 4 — SAY JARVIS")
             return
         self.voice_setup_model_var.set(
             "2. Download the licensed ONNX model from the official page. "
@@ -3228,8 +3228,8 @@ class JarvisDesktop:
                         try:
                             self.voice_setup_model_var.set("2. Wake-word model installed and validated.")
                             if self.voice_setup_mic_ready:
-                                self.voice_setup_finish_button.configure(state="normal")
-                            self.voice_setup_status_var.set("WAKE-WORD MODEL READY")
+                                self.voice_setup_test_button.configure(state="normal")
+                            self.voice_setup_status_var.set("WAKE-WORD MODEL READY — RUN THE LIVE TEST")
                         except tk.TclError:
                             self.voice_setup_window = None
                 elif kind == "voice_setup_mic_result":
@@ -3242,7 +3242,7 @@ class JarvisDesktop:
                                 self.voice_setup_mic_button.configure(state="disabled", text="Microphone ready")
                                 if active_wakeword_model_path().is_file():
                                     self.voice_setup_test_button.configure(state="normal")
-                                    self.voice_setup_status_var.set("STEP 3 OF 3 — SAY JARVIS")
+                                    self.voice_setup_status_var.set("STEP 3 OF 4 — SAY JARVIS")
                             else:
                                 self.voice_setup_mic_var.set("1. Microphone check failed. Check Windows Privacy settings and your input device.")
                                 self.voice_setup_status_var.set("MICROPHONE CHECK FAILED")
@@ -3256,7 +3256,7 @@ class JarvisDesktop:
                                 "2. Wake-word model installed and validated."
                             )
                             if getattr(self, "voice_setup_mic_ready", False):
-                                self.voice_setup_status_var.set("STEP 3 OF 3 — SAY JARVIS")
+                                self.voice_setup_status_var.set("STEP 3 OF 4 — SAY JARVIS")
                                 self.voice_setup_test_button.configure(state="normal")
                             else:
                                 self.voice_setup_status_var.set(
