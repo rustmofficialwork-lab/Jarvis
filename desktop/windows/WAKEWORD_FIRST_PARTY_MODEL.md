@@ -1,95 +1,71 @@
-# First-party JARVIS wake-word model: data collection
+# First-party JARVIS wake-word model
 
-The current desktop build still uses a publisher-hosted ONNX model. That model cannot be silently bundled or redistributed by this project under the publisher's current download/license flow. Do not describe the wake-word feature as self-contained yet.
+## Current runtime behavior
 
-A first-party model must be trained and validated from properly labeled audio before the app can switch away from the existing detector. A model file must not be fabricated or checked in without a real training run and evaluation.
+JARVIS now prefers a locally installed custom model at:
 
-## Collecting a local development dataset
+`%APPDATA%\JARVISDesktop\wakewords\jarvis_first_party.onnx`
 
-Run these commands from `desktop/windows` on the Windows development PC:
+If that file is absent, the app falls back to the legacy community-published Jarvis model. The custom model is loaded through the same local openWakeWord runtime. The first-party model is a JARVIS-specific classifier trained for the phrase "Jarvis"; it uses openWakeWord's shared frozen feature extractor, so it is not a newly trained speech backbone.
+
+The installer validates the ONNX file and installs it atomically. It does not claim that an arbitrary ONNX file is a compatible or accurate wake-word classifier; the model must come from the training pipeline below and must pass real microphone evaluation.
+
+## Training pipeline
+
+The repository does not contain a trained first-party model binary. A model must be produced by an actual training run; never create a placeholder ONNX file or relabel the publisher's model.
+
+The recommended starting point is the official openWakeWord automatic custom-model notebook:
+
+- Notebook: https://colab.research.google.com/github/dscripka/openWakeWord/blob/main/notebooks/automatic_model_training.ipynb
+- Training overview and data requirements: https://pypi.org/project/openwakeword/#training-new-models
+
+In the notebook:
+
+1. Set the target phrase to exactly `Jarvis`.
+2. Set the exported model name to `jarvis_first_party`.
+3. Generate diverse positive speech examples and hard negative examples using the notebook's supported workflow.
+4. Keep training and validation/test recordings separate. Do not place the same session in both splits.
+5. Export the ONNX artifact and download it to the Windows development PC.
+
+openWakeWord's documentation recommends several thousand positive examples for useful training and large, varied negative audio coverage. A model trained from a tiny hand-recorded sample set is not a reliable general wake-word detector. Keep the user-collected local clips for independent real-microphone evaluation, not as a substitute for broad training data.
+
+Install the exported model from PowerShell, run from `desktop/windows`:
+
+```powershell
+py install_first_party_wakeword.py --model "$HOME\Downloads\jarvis_first_party.onnx" --confirm
+```
+
+The installer places the model in the JARVIS AppData wake-word directory. Restart Voice Listening; the custom model is preferred automatically. The model runs locally after installation.
+
+## Required release evaluation
+
+Do not mark the model production-ready until all of these are recorded:
+
+- ONNX model loads through the exact Windows openWakeWord runtime.
+- Held-out owner attempts measure missed detections across normal speaking pace, distance, and microphone positions.
+- Several hours of representative background speech/noise are used to estimate false activations per hour.
+- Test sessions are separate from training and validation.
+- The chosen confidence threshold is based on the measured false-accept/false-reject trade-off, not a guessed value.
+- Model file SHA-256, training configuration, source notebook revision, and evaluation report are retained with the release.
+
+The app's two-consecutive-frame rule and cooldown are runtime filters; they do not replace model evaluation.
+
+## Local dataset utilities
+
+For optional local recordings:
 
 ```powershell
 py wakeword_dataset_recorder.py --label positive --count 30
 py wakeword_dataset_recorder.py --label negative --count 30
+py wakeword_dataset_audit.py --dataset-dir wakeword_dataset
 ```
 
-- Positive: say only "Jarvis" once per clip, naturally, after the countdown.
-- Negative: do not say "Jarvis"; capture ordinary room noise and unrelated speech.
-- Use a quiet room for some clips and normal everyday background sound for others.
-- Keep clips from different recording sessions separated when evaluating so validation does not simply reuse training audio.
-- Record only your own voice or voices for which you have permission. The recorder stores WAV files locally and does not upload them.
+Record only your own voice or voices for which you have permission. These tools save locally and do not upload recordings. The format audit is not an accuracy test.
 
-The recorder uses 16 kHz, mono, 16-bit PCM and 1.5-second clips. It supports `--device-index` to select a microphone. The dataset is written under `wakeword_dataset/positive` and `wakeword_dataset/negative` by default.
+## Owner-only activation is a separate gate
 
-## Release gate (not yet complete)
+Wake-word detection and speaker verification are independent. A positive wake-word score is not proof of who spoke. JARVIS now checks a local ECAPA speaker profile before opening the command-capture pipeline. See `OWNER_VOICE_SETUP.md` for enrollment, privacy, and verification limitations.
 
-Before replacing the current detector, the project still needs:
+## License and model provenance
 
-1. A reproducible training pipeline and a documented model architecture.
-2. Separate train, validation, and held-out test splits.
-3. Evaluation for missed detections and false activations per hour in quiet and noisy conditions.
-4. A trained ONNX artifact with a recorded SHA-256 hash and model/version metadata.
-5. Runtime integration and installer bundling of that first-party artifact.
-6. Windows microphone testing on more than one device.
-
-Do not claim the custom model is complete until all release gates pass. The existing publisher model remains the active implementation until then.
-
-## Owner-only activation requirement
-
-The requested behavior is stricter than ordinary wake-word detection: JARVIS should accept "Jarvis" only when the enrolled owner says it. The runtime therefore needs two independent gates:
-
-1. Wake-word detection decides whether the word "Jarvis" was spoken.
-2. Speaker verification decides whether the voice matches the locally enrolled owner profile.
-
-A positive wake-word clip is not, by itself, a reliable speaker identity model. Do not treat a keyword classifier score as proof of speaker identity, and do not claim owner-only activation until impostor-speaker testing has been completed.
-
-### Speaker-profile design and privacy gates
-
-- Enrollment must be an explicit user action with clear microphone consent.
-- Store the derived speaker profile locally in the user's AppData, not in the repository or cloud. Provide a clear delete/reset action.
-- Prefer a documented, license-compatible speaker-embedding model that can be bundled with the installer and run offline. Verify its redistribution terms before bundling; do not silently download model weights at first launch.
-- Compare embeddings with a calibrated threshold and reject uncertain matches. A threshold must be measured against held-out owner and non-owner recordings, not guessed.
-- Evaluate false accepts and false rejects across different sessions, microphone distances, room noise, and more than one non-owner speaker.
-- Voice matching is not strong authentication: recordings and voice imitation can spoof it. Do not use it as the sole gate for sensitive actions or account access.
-
-### Additional owner-enrollment data needed
-
-The current positive/negative dataset recorder is for wake-word classification, not complete speaker verification. A later enrollment flow must collect multiple short owner utterances across separate sessions and retain a separate held-out owner set. Evaluation also needs consented non-owner samples that are never mixed into the owner's enrollment profile. Keep all samples local and make deletion straightforward.
-
-## Current implementation boundary
-
-The current Windows listener activates immediately after the publisher wake-word model crosses its threshold. It does not yet run a speaker-verification gate. The current "Set up wake word" flow also still requires the publisher-hosted ONNX model and downloads shared openWakeWord runtime assets. Therefore neither first-party offline wake-word setup nor owner-only activation is complete. Do not label the current listener as owner-voice-only.
-
-## Local owner-voice enrollment recorder
-
-A separate recorder is now available for collecting longer owner speech samples for future speaker-verification evaluation. It is not a verifier and does not train a model.
-
-Run from `desktop/windows`:
-
-```powershell
-py speaker_enrollment_recorder.py --count 20
-```
-
-It records prompted 3-second clips at 16 kHz mono PCM into `speaker_dataset/owner`. Record only your own voice, in a quiet environment, and vary natural speaking pace/volume across sessions. The files stay local and are not uploaded. You can cancel with Ctrl+C; already completed clips remain saved.
-
-These samples are not required for ordinary wake-word model training, and they do not yet enable owner-only activation. A compatible speaker-embedding model, local enrollment/profile storage, calibrated match threshold, explicit profile reset, and held-out impostor testing still need to be implemented before the listener can safely use speaker verification.
-## Upstream training and speaker-model candidates (reviewed 2026-11-11)
-
-### First-party wake-word training route
-
-The upstream openWakeWord project documents a custom-model training pipeline using generated positive speech, negative/background examples, a frozen shared embedding backbone, and a small classifier exported for ONNX inference. Its README links both a quick Colab workflow and a more configurable training notebook. The README also states that Windows inference uses ONNX Runtime; the training workflow itself should be treated as a separate reproducible build step, not as a first-launch download.
-
-For JARVIS, the target label must remain exactly the requested wake phrase, and generated clips must be reviewed for pronunciation before training. Keep the user's locally recorded positive/negative clips as held-out real-microphone evaluation data; do not mix held-out clips into training. A model trained from synthetic data is only a candidate until it passes measured false-accept and false-reject testing on real Windows microphones.
-
-Upstream references:
-
-- https://github.com/dscripka/openWakeWord#training-new-models
-- https://github.com/dscripka/openWakeWord/blob/main/notebooks/automatic_model_training.ipynb
-
-### Speaker-verification candidate
-
-The speechbrain/spkrec-ecapa-voxceleb model card currently declares Apache-2.0 for the model repository and documents 16 kHz mono input, ECAPA-TDNN embeddings, and cosine-distance speaker verification. It is a reasonable candidate for a prototype, not an approved production dependency: the card explicitly warns that performance on other datasets is not guaranteed. Before integration, verify the exact model files, transitive runtime dependencies, offline packaging size, Windows CPU behavior, and license notices. Calibrate thresholds only against separate owner and consented non-owner recordings; never infer identity from the wake-word score.
-
-Reference: https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb
-
-No model weights are downloaded or bundled by this documentation change. No speaker-verification code is enabled by it.
+The openWakeWord project code is Apache-2.0, while its included pretrained models have separate model terms; the current publisher-hosted Jarvis model remains a separate fallback and is not bundled. Review the terms for every model and dataset used in a custom training run. The custom JARVIS classifier artifact must be generated by the project training run, not copied from the publisher model.
