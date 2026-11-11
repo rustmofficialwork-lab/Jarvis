@@ -1392,7 +1392,7 @@ class JarvisDesktop:
         ).start()
 
     def _start_voice_setup_model(self):
-        if JARVIS_WAKEWORD_MODEL.is_file():
+        if active_wakeword_model_path().is_file():
             self.voice_setup_model_var.set("2. Wake-word model is installed and validated.")
             if self.voice_setup_mic_ready:
                 self.voice_setup_test_button.configure(state="normal")
@@ -1409,8 +1409,8 @@ class JarvisDesktop:
         if not self.voice_setup_mic_ready:
             self.voice_setup_status_var.set("Check microphone access before testing the wake word.")
             return
-        if not JARVIS_WAKEWORD_MODEL.is_file():
-            self.voice_setup_status_var.set("Install the wake-word model before testing.")
+        if not active_wakeword_model_path().is_file():
+            self.voice_setup_status_var.set("Install a wake-word model before testing.")
             return
         if getattr(self, "wakeword_test_running", False):
             self.voice_setup_status_var.set("Wake-word test is already running.")
@@ -1437,7 +1437,7 @@ class JarvisDesktop:
                 import openwakeword
                 from openwakeword.model import Model
 
-                model_path = JARVIS_WAKEWORD_MODEL
+                model_path = active_wakeword_model_path()
                 runtime_paths = prepare_openwakeword_assets(openwakeword, model_path)
                 detector = Model(
                     wakeword_models=[str(model_path)],
@@ -1501,11 +1501,14 @@ class JarvisDesktop:
         if not self.voice_setup_mic_ready:
             self.voice_setup_status_var.set("Complete the microphone check before finishing setup.")
             return
-        if not JARVIS_WAKEWORD_MODEL.is_file():
+        if not active_wakeword_model_path().is_file():
             self.voice_setup_status_var.set("Wake-word model is missing; setup cannot finish.")
             return
         if not self.voice_setup_test_passed:
             self.voice_setup_status_var.set("Complete the live “Jarvis” microphone test before finishing.")
+            return
+        if not self._owner_voice_profile_ready():
+            self.voice_setup_status_var.set("Enroll your owner voice before finishing owner-only voice setup.")
             return
         self.settings["voice_setup_completed"] = True
         try:
@@ -3168,6 +3171,27 @@ class JarvisDesktop:
                         self._set_status("Update download failed.")
                 elif kind == "memory_clear_confirmation":
                     self._handle_memory_command(value, display_user=False)
+                elif kind == "owner_voice_enrollment_result":
+                    if self.voice_setup_window is not None:
+                        try:
+                            if value.get("ok") and self._owner_voice_profile_ready():
+                                self.voice_setup_owner_var.set(
+                                    f"4. Owner voice profile saved locally from {value.get('sample_count', 8)} clips."
+                                )
+                                self.voice_setup_status_var.set("OWNER VOICE READY — COMPLETE WAKE-WORD TEST")
+                                self.voice_setup_owner_button.configure(
+                                    state="normal", text="Re-enroll owner voice"
+                                )
+                                if self.voice_setup_test_passed:
+                                    self.voice_setup_finish_button.configure(state="normal")
+                            else:
+                                self.voice_setup_owner_var.set(
+                                    "4. Owner voice enrollment failed. " + str(value.get("error", "Try again."))
+                                )
+                                self.voice_setup_status_var.set("OWNER VOICE ENROLLMENT FAILED")
+                                self.voice_setup_owner_button.configure(state="normal")
+                        except tk.TclError:
+                            self.voice_setup_window = None
                 elif kind == "voice_setup_wakeword_test_result":
                     if self.voice_setup_window is not None:
                         try:
@@ -3177,8 +3201,14 @@ class JarvisDesktop:
                                 self.voice_setup_test_var.set(
                                     f"3. Wake word detected {activations}/{WAKEWORD_SETUP_REQUIRED_ACTIVATIONS} times."
                                 )
-                                self.voice_setup_status_var.set("VOICE TEST PASSED — SETUP READY")
-                                self.voice_setup_finish_button.configure(state="normal")
+                                self.voice_setup_status_var.set(
+                                    "VOICE TEST PASSED — " + (
+                                        "SETUP READY" if self._owner_voice_profile_ready()
+                                        else "ENROLL OWNER VOICE"
+                                    )
+                                )
+                                if self._owner_voice_profile_ready():
+                                    self.voice_setup_finish_button.configure(state="normal")
                             else:
                                 self.voice_setup_test_passed = False
                                 detail = value.get("error")
@@ -3209,7 +3239,7 @@ class JarvisDesktop:
                                 self.voice_setup_mic_var.set("1. Microphone check passed.")
                                 self.voice_setup_status_var.set("MICROPHONE READY — CHECK WAKE WORD")
                                 self.voice_setup_mic_button.configure(state="disabled", text="Microphone ready")
-                                if JARVIS_WAKEWORD_MODEL.is_file():
+                                if active_wakeword_model_path().is_file():
                                     self.voice_setup_test_button.configure(state="normal")
                                     self.voice_setup_status_var.set("STEP 3 OF 3 — SAY JARVIS")
                             else:
