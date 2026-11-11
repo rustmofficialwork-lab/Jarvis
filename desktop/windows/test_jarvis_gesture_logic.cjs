@@ -47,6 +47,9 @@ test('swipe detection requires movement in a time window and respects cooldown',
   result = logic.updateSwipe(0.4, 1500, state);
   assert.equal(result.direction, 0);
   result = logic.updateSwipe(0.4, 2300, state);
+  assert.equal(result.direction, 0);
+  state = result.state;
+  result = logic.updateSwipe(0.1, 2500, state);
   assert.equal(result.direction, -1);
 });
 
