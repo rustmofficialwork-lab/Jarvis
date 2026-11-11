@@ -97,6 +97,10 @@ def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
         if not isinstance(parsed, list) or not parsed:
             raise ProviderConfigurationError("JARVIS_AI_PROVIDERS must be a non-empty JSON array.")
         entries = parsed
+        if len(entries) > MAX_CONFIGURED_PROVIDERS:
+            raise ProviderConfigurationError(
+                f"At most {MAX_CONFIGURED_PROVIDERS} AI providers may be configured."
+            )
     else:
         entries = [{
             "name": "openrouter",
