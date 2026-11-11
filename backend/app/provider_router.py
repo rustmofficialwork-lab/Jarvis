@@ -106,6 +106,7 @@ def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
         }]
 
     providers: list[Provider] = []
+    provider_names: set[str] = set()
     for index, item in enumerate(entries):
         if not isinstance(item, dict):
             raise ProviderConfigurationError("Each AI provider entry must be an object.")
