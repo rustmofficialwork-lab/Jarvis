@@ -3543,8 +3543,8 @@ class JarvisWebBridge:
         disk_percent = safe_read(lambda: float(disk.percent)) if disk is not None else None
         temperature_value = None
         try:
-            from system_monitor import collect_system_metrics
-            temperature_value = collect_system_metrics()["cpu_temperature"]
+            from system_monitor import read_cpu_temperature
+            temperature_value = safe_read(lambda: read_cpu_temperature(psutil))
         except Exception:
             pass
         result.update({
