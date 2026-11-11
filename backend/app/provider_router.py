@@ -155,12 +155,6 @@ async def request_with_failover(
                         raise ProviderUnavailable("The AI provider rejected the request.")
                     chunks: list[bytes] = []
                     total = 0
-                    for chunk in response.aiter_bytes():
-                        # aiohttp/httpx async iterators are asynchronous; this loop
-                        # body is replaced below by the bounded async iteration.
-                        del chunk
-                    chunks = []
-                    total = 0
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
                         if total > max_response_bytes:
