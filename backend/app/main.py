@@ -57,9 +57,12 @@ CHAT_WINDOW_SECONDS = 60
 CHAT_MAX_REQUESTS_PER_WINDOW = 8
 CHAT_DAY_SECONDS = 24 * 60 * 60
 CHAT_MAX_REQUESTS_PER_DAY = 120
+LEGACY_CHAT_MAX_REQUESTS_PER_WINDOW = 30
+LEGACY_CHAT_MAX_REQUESTS_PER_DAY = 600
 _rate_lock = asyncio.Lock()
 _registration_attempts: dict[str, deque[float]] = defaultdict(deque)
 _chat_attempts: dict[str, deque[float]] = defaultdict(deque)
+_legacy_chat_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 
 def _device_token_secret() -> bytes:
@@ -257,22 +260,34 @@ async def health() -> dict[str, str]:
 async def chat_completions(
     request: Request, device_id: str | None = Depends(require_client_token)
 ) -> Response:
+    # Device tokens are limited per installation. Legacy shared tokens remain
+    # compatible, but are throttled per direct peer IP so they cannot bypass limits.
+    # Do not trust X-Forwarded-For here: clients can supply that header themselves.
+    now = time.monotonic()
     if device_id is not None:
-        now = time.monotonic()
-        async with _rate_lock:
-            _prune_rate_buckets(_chat_attempts, now=now, window=CHAT_DAY_SECONDS)
-            bucket = _chat_attempts[device_id]
-            while bucket and bucket[0] <= now - CHAT_DAY_SECONDS:
-                bucket.popleft()
-            minute_count = sum(1 for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS)
-            if minute_count >= CHAT_MAX_REQUESTS_PER_WINDOW or len(bucket) >= CHAT_MAX_REQUESTS_PER_DAY:
-                retry_after = CHAT_WINDOW_SECONDS if minute_count >= CHAT_MAX_REQUESTS_PER_WINDOW else CHAT_DAY_SECONDS
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="JARVIS usage limit reached. Please try again later.",
-                    headers={"Retry-After": str(retry_after)},
-                )
-            bucket.append(now)
+        buckets = _chat_attempts
+        rate_key = device_id
+        minute_limit = CHAT_MAX_REQUESTS_PER_WINDOW
+        day_limit = CHAT_MAX_REQUESTS_PER_DAY
+    else:
+        buckets = _legacy_chat_attempts
+        rate_key = request.client.host if request.client else "unknown"
+        minute_limit = LEGACY_CHAT_MAX_REQUESTS_PER_WINDOW
+        day_limit = LEGACY_CHAT_MAX_REQUESTS_PER_DAY
+    async with _rate_lock:
+        _prune_rate_buckets(buckets, now=now, window=CHAT_DAY_SECONDS)
+        bucket = buckets[rate_key]
+        while bucket and bucket[0] <= now - CHAT_DAY_SECONDS:
+            bucket.popleft()
+        minute_count = sum(1 for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS)
+        if minute_count >= minute_limit or len(bucket) >= day_limit:
+            retry_after = CHAT_WINDOW_SECONDS if minute_count >= minute_limit else CHAT_DAY_SECONDS
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="JARVIS usage limit reached. Please try again later.",
+                headers={"Retry-After": str(retry_after)},
+            )
+        bucket.append(now)
 
     length = request.headers.get("content-length")
     if length:
