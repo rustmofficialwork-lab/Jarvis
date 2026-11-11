@@ -46,6 +46,16 @@ class WakewordSetupTests(unittest.TestCase):
                     module, Path("Jarvis_Custom.onnx"), Path(temporary)
                 )
 
+    def test_voice_setup_requires_all_three_requested_wakeword_detections(self):
+        passed = jarvis_desktop.wakeword_setup_test_passed
+        self.assertFalse(passed(0))
+        self.assertFalse(passed(1))
+        self.assertFalse(passed(2))
+        self.assertTrue(passed(3))
+        self.assertTrue(passed(4))
+        self.assertFalse(passed(True))
+        self.assertFalse(passed("invalid"))
+
     def test_wakeword_requires_two_consecutive_confident_frames(self):
         detect = jarvis_desktop.update_wakeword_activation
         activated, streak = detect(0.91, 0, threshold=0.5, required_frames=2)
