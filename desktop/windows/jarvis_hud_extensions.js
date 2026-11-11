@@ -52,17 +52,10 @@
   const createVisionTask=async(factory,options)=>{try{return await factory({...options,baseOptions:{...options.baseOptions,delegate:'GPU'}});}catch(gpuError){console.warn('JARVIS GPU delegate unavailable; retrying on CPU',gpuError);return await factory({...options,baseOptions:{...options.baseOptions,delegate:'CPU'}});}};
   const setStatus=s=>{status.textContent=s;};
   const clickHudTarget=hand=>{
-    const candidates=[...document.querySelectorAll('[data-hud]')].filter(el=>
-      el.getClientRects().length&&!el.disabled&&el.getAttribute('aria-disabled')!=='true'
-    );
-    if(!candidates.length)return false;
     const tip=hand[8],x=(1-tip.x)*window.innerWidth,y=tip.y*window.innerHeight;
-    candidates.sort((a,b)=>{
-      const score=el=>{const r=el.getBoundingClientRect();return Math.hypot(r.left+r.width/2-x,r.top+r.height/2-y);};
-      return score(a)-score(b);
-    });
-    const target=candidates[0],r=target.getBoundingClientRect();
-    if(Math.hypot(r.left+r.width/2-x,r.top+r.height/2-y)>Math.max(110,Math.hypot(r.width,r.height)))return false;
+    const hit=document.elementFromPoint(x,y);
+    const target=hit?.closest?.('[data-hud]');
+    if(!target||!target.getClientRects().length||target.disabled||target.getAttribute('aria-disabled')==='true')return false;
     target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y}));
     return true;
   };
