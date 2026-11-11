@@ -200,7 +200,6 @@ def get_top_processes(limit: int = 5, psutil_module=None) -> str:
                     continue
                 rows.append((memory, cpu, pid, name[:48]))
             except (AttributeError, KeyError, TypeError, ValueError, OSError):
-                # Processes can exit or become inaccessible during enumeration.
                 continue
     except Exception as exc:
         return f"Process information unavailable: {exc}"
