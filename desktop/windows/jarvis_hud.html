@@ -182,24 +182,32 @@ html,body{background:#020b14}
 .date-widget,.battery-widget,.orb-outer-ring{filter:drop-shadow(0 0 5px rgba(0,229,255,.28))}
 .nav-item span,.f-label span,.file-row{text-shadow:0 0 4px rgba(0,229,255,.22)}
 
-/* ===== PURE BLACK HUD THEME ===== */
-html,body{background:#000!important}
+/* ===== TRUE BLACK HUD THEME: remove external full-frame wallpaper layer ===== */
+:root{
+  --dark:#020609;
+  --line:rgba(0,229,255,.22);
+}
+html,body,.hud-container{background:#000!important}
 .hud-inner{
+  background:#000!important;
   background-color:#000!important;
   background-image:
-    linear-gradient(rgba(0,229,255,.035) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(0,229,255,.035) 1px,transparent 1px),
-    url("wallpaper.jpg")!important;
-  box-shadow:inset 0 0 55px rgba(0,0,0,.9),0 0 22px rgba(0,229,255,.06);
+    linear-gradient(rgba(0,229,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,229,255,.025) 1px,transparent 1px)!important;
+  background-size:30px 30px,30px 30px!important;
+  background-position:0 0,0 0!important;
+  box-shadow:none!important;
 }
-.orb-mid-ring{background:radial-gradient(circle,#020b10 30%,#000 78%)}
-.orb-inner-detail{background:radial-gradient(circle,#2fd8ff 5%,#07506c 55%,#000 100%)}
-#jx-toast{background:rgba(0,0,0,.97)}
-#jx-modal{background:rgba(0,0,0,.88)}
-#jx-modal form{background:#000}
-#jx-modal input,#jx-settings input,#jx-settings select{background:#050505}
-#jx-settings{background:rgba(0,0,0,.94)}
-#jx-settings .jx-settings-card{background:linear-gradient(145deg,#050505,#000)}
+/* The helmet is a separate embedded image element, so it remains visible. */
+.helmet{background-color:transparent!important}
+.orb-mid-ring{background:radial-gradient(circle,#020609 30%,#000 78%)!important}
+.orb-inner-detail{background:radial-gradient(circle,#2fd8ff 5%,#06384a 55%,#000 100%)!important}
+#jx-toast{background:rgba(0,0,0,.98)!important}
+#jx-modal{background:rgba(0,0,0,.94)!important}
+#jx-modal form{background:#000!important}
+#jx-modal input,#jx-settings input,#jx-settings select{background:#030303!important}
+#jx-settings{background:rgba(0,0,0,.97)!important}
+#jx-settings .jx-settings-card{background:linear-gradient(145deg,#030303,#000)!important}
 
 @media(prefers-reduced-motion:reduce){.hud-inner::after,.orb-outer-ring,.orb-segments-1,.orb-segments-2,.orb-core,.waveform div,.eq div{animation:none!important}}
 
