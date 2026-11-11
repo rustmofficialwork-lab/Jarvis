@@ -1460,7 +1460,6 @@ class JarvisDesktop:
                         )
                     frame = np.frombuffer(raw, dtype=np.int16)
                     recent_audio.append(raw_chunk)
-                    recent_audio.append(raw_chunk)
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
                     activated, streak = update_wakeword_activation(
@@ -2398,8 +2397,6 @@ class JarvisDesktop:
             self.events.put(("status", "Listening locally for “Jarvis”."))
             last_activation = 0.0
             activation_frames = 0
-            from collections import deque
-            recent_audio = deque(maxlen=40)  # 3.2 seconds at 80 ms per frame
             while not self.stop_event.is_set():
                 try:
                     if stream is None:
@@ -2419,7 +2416,6 @@ class JarvisDesktop:
                             stream.close()
                         finally:
                             stream = None
-                        recent_audio.clear()
                         self.events.put(("status", "Wake microphone returned empty audio. Reconnecting…"))
                         self.stop_event.wait(1)
                         continue
@@ -2443,24 +2439,45 @@ class JarvisDesktop:
                     activation_frames = 0
                     last_activation = now
 
-                    # Require a local speaker match before opening the command pipeline.
-                    owner_audio = b"".join(recent_audio)
-                    recent_audio.clear()
-                    verified_owner, _score = verify_pcm_bytes(
-                        owner_audio, speaker_encoder, owner_profile
-                    )
-                    if not verified_owner:
-                        self.events.put(("status", "Wake word ignored — owner voice was not verified."))
-                        continue
-
-                    # Release the detector stream before SpeechRecognition opens
-                    # the same microphone for the user's actual command.
+                    # The wake word itself is too brief for a useful speaker embedding.
+                    # Capture a separate 3.2-second utterance before command capture.
                     try:
                         stream.stop_stream()
                     finally:
                         stream.close()
                         stream = None
-                    self.events.put(("status", "Jarvis detected — speak your command now."))
+                    self.events.put(("status", "Jarvis detected — say a short phrase to verify your voice."))
+                    verification_stream = None
+                    verification_chunks = []
+                    try:
+                        verification_stream = audio.open(
+                            format=pyaudio.paInt16, channels=1, rate=16000,
+                            input=True, frames_per_buffer=chunk_size,
+                        )
+                        for _ in range(40):
+                            if self.stop_event.is_set():
+                                break
+                            verification_chunk = verification_stream.read(
+                                chunk_size, exception_on_overflow=False
+                            )
+                            if len(verification_chunk) != chunk_size * 2:
+                                raise RuntimeError("Incomplete owner voice verification audio frame.")
+                            verification_chunks.append(verification_chunk)
+                    finally:
+                        if verification_stream is not None:
+                            try:
+                                verification_stream.stop_stream()
+                            finally:
+                                verification_stream.close()
+                    if self.stop_event.is_set():
+                        break
+                    verified_owner, _score = verify_pcm_bytes(
+                        b"".join(verification_chunks), speaker_encoder, owner_profile
+                    )
+                    if not verified_owner:
+                        self.events.put(("status", "Voice not verified — wake request ignored. Say Jarvis again to retry."))
+                        continue
+                    self.events.put(("status", "Owner voice verified — speak your command now."))
                     recognizer = configure_voice_recognizer(sr.Recognizer())
                     try:
                         with sr.Microphone() as source:
