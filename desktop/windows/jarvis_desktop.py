@@ -3479,7 +3479,7 @@ class JarvisWebBridge:
         elif battery_text == "AC POWER":
             battery_text = "AC"
         uptime_seconds = metrics.get("uptime_seconds")
-        uptime = _format_uptime(uptime_seconds) if uptime_seconds is not None else "Unavailable"
+        uptime = safe_read(lambda: _format_uptime(uptime_seconds), "Unavailable") if uptime_seconds is not None else "Unavailable"
 
         result = {
             "status": "J.A.R.V.I.S. ONLINE",
