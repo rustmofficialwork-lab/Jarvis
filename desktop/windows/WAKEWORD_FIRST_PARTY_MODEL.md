@@ -37,6 +37,26 @@ py install_first_party_wakeword.py --model "$HOME\Downloads\jarvis_first_party.o
 
 The installer places the model in the JARVIS AppData wake-word directory. Restart Voice Listening; the custom model is preferred automatically. The model runs locally after installation.
 
+## Reproducible evaluation CLI
+
+The repository includes `evaluate_first_party_wakeword.py`. It loads the candidate model through the same openWakeWord ONNX runtime used by the desktop app and measures clip-level recall plus negative-audio false activations per hour.
+
+Create *held-out* folders (never copied from training clips), each containing mono 16 kHz 16-bit PCM WAV files:
+
+```text
+evaluation/
+  positive/   # independent intentional "Jarvis" attempts; one attempt per clip
+  negative/   # continuous representative speech/noise without "Jarvis"
+```
+
+Run from `desktop/windows` after installing the desktop requirements:
+
+```powershell
+py evaluate_first_party_wakeword.py --model "$HOME\Downloads\jarvis_first_party.onnx" --positive-dir evaluation\positive --negative-dir evaluation\negative --threshold 0.5 --output evaluation-report.json
+```
+
+The report records recall, misses, negative audio hours, false activation events, and false activations/hour. Run the same held-out set at a small threshold sweep only during validation; freeze the selected threshold before the final test. The CLI default of 0.5 is a starting measurement point, not a calibrated production setting. The evaluation tool uses an event cooldown to avoid counting every consecutive high-score frame as a separate activation; the desktop app's own two-frame/cooldown logic is not identical, so final acceptance still requires testing the integrated Windows microphone path.
+
 ## Required release evaluation
 
 Do not mark the model production-ready until all of these are recorded:
