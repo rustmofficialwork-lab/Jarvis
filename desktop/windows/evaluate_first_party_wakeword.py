@@ -60,6 +60,8 @@ def score_clip(model_path: Path, wav_path: Path, threshold: float,
     scores: list[float] = []
     last_activation = -math.inf
     activations = 0
+    consecutive = 0
+    armed = True
     for offset in range(0, len(pcm), FRAME_SAMPLES):
         frame = pcm[offset:offset + FRAME_SAMPLES]
         if frame.size < FRAME_SAMPLES:
@@ -67,14 +69,21 @@ def score_clip(model_path: Path, wav_path: Path, threshold: float,
         score = _score_from_prediction(model.predict(frame))
         scores.append(score)
         frame_time = offset / SAMPLE_RATE
-        if score >= threshold and frame_time - last_activation >= cooldown_seconds:
-            activations += 1
-            last_activation = frame_time
+        if score >= threshold:
+            consecutive += 1
+            if consecutive >= 2 and armed:
+                if frame_time - last_activation >= cooldown_seconds:
+                    activations += 1
+                    last_activation = frame_time
+                armed = False
+        else:
+            consecutive = 0
+            armed = True
     return {
         "file": wav_path.name,
         "duration_seconds": round(duration, 3),
         "max_score": round(max(scores), 6),
-        "detected": max(scores) >= threshold,
+        "detected": activations > 0,
         "activation_events": activations,
     }
 
