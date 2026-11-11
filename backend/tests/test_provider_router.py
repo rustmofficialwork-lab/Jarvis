@@ -62,6 +62,44 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ProviderConfigurationError):
             load_providers({"JARVIS_AI_PROVIDERS": "{not-json"})
 
+    def test_rejects_more_than_five_configured_providers(self):
+        entries = [
+            {
+                "name": f"provider-{index}",
+                "base_url": f"https://provider-{index}.example/v1/chat/completions",
+                "api_key_env": f"KEY_{index}",
+                "model": "test-model",
+            }
+            for index in range(6)
+        ]
+        with self.assertRaisesRegex(ProviderConfigurationError, "At most 5"):
+            load_providers({"JARVIS_AI_PROVIDERS": json.dumps(entries)})
+
+    def test_rejects_invalid_api_key_environment_variable_name(self):
+        env = {
+            "JARVIS_AI_PROVIDERS": (
+                '[{"name":"one","base_url":"https://one.example/v1/chat/completions",'
+                '"api_key_env":"BAD-KEY-NAME","model":"model-one"}]'
+            ),
+            "BAD-KEY-NAME": "secret",
+        }
+        with self.assertRaisesRegex(ProviderConfigurationError, "environment variable name"):
+            load_providers(env)
+
+    def test_rejects_duplicate_provider_names_case_insensitively(self):
+        entries = [
+            {
+                "name": name,
+                "base_url": f"https://provider-{index}.example/v1/chat/completions",
+                "api_key_env": f"KEY_{index}",
+                "model": "test-model",
+            }
+            for index, name in enumerate(("Primary", "primary"))
+        ]
+        env = {"JARVIS_AI_PROVIDERS": json.dumps(entries), "KEY_0": "a", "KEY_1": "b"}
+        with self.assertRaisesRegex(ProviderConfigurationError, "unique"):
+            load_providers(env)
+
     def test_rejects_provider_url_credentials_and_malformed_https_urls(self):
         for url in (
             "https://user:password@provider.example/v1/chat/completions",
@@ -132,6 +170,26 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
         expected = b'{"choices":[{"message":{"role":"assistant","content":"ok"}}]}'
         responses = [
             FakeResponse(200, [b"upstream proxy error page"]),
+            FakeResponse(200, [expected]),
+        ]
+
+        def factory(**kwargs):
+            return FakeClient(responses)
+
+        result = await request_with_failover(
+            {"messages": [{"role": "user", "content": "hello"}]},
+            timeout=5,
+            max_response_bytes=1024,
+            environ=env,
+            client_factory=factory,
+        )
+        self.assertEqual(result, expected)
+
+    async def test_retries_empty_message_response_then_succeeds(self):
+        env = self._two_provider_environment()
+        expected = b'{"choices":[{"message":{"role":"assistant","content":"ok"}}]}'
+        responses = [
+            FakeResponse(200, [b'{"choices":[{"message":{}}]}']),
             FakeResponse(200, [expected]),
         ]
 
