@@ -20,10 +20,11 @@ Windows CI compiles Python source, runs the desktop unit tests, packages the por
 
 ## Wake word and voice
 
-- Wake-word detection uses the local openWakeWord runtime and a separate Jarvis ONNX model. It does **not** use a Picovoice AccessKey.
-- The current Jarvis ONNX model is not bundled in the repository. Complete **Set up wake word** in JARVIS and review the model publisher's license before downloading it.
-- The first activation may also download openWakeWord's shared feature models. After the required files are present, wake-word inference runs locally.
-- Speech transcription uses the configured online recognizer with the project's optional local Vosk fallback. Wake-word detection and speech transcription are separate stages.
+- Wake-word detection uses the local openWakeWord runtime. JARVIS prefers the custom-trained model at `%APPDATA%\\JARVISDesktop\\wakewords\\jarvis_first_party.onnx` when installed; otherwise it falls back to the separately licensed community Jarvis model.
+- A custom first-party classifier must be trained using [WAKEWORD_FIRST_PARTY_MODEL.md](desktop/windows/WAKEWORD_FIRST_PARTY_MODEL.md) and imported with `py install_first_party_wakeword.py --model PATH --confirm`. No trained first-party model binary is checked into this repository yet.
+- The voice setup wizard supports explicit local owner voice enrollment. The derived ECAPA profile is kept in Windows Credential Manager and checked after wake-word detection, before command capture. See [OWNER_VOICE_SETUP.md](desktop/windows/OWNER_VOICE_SETUP.md).
+- The speaker model is downloaded only during the explicit enrollment action; subsequent verification runs locally through ONNX Runtime. Voice matching is not liveness detection or strong authentication.
+- Speech transcription uses the configured online recognizer with the project's optional local Vosk fallback. Wake-word detection, owner verification, and speech transcription are separate stages.
 - To list microphones and test a specific Windows input device, see [JARVIS_WAKEWORD_SETUP.md](desktop/windows/JARVIS_WAKEWORD_SETUP.md). Hardware behavior must be tested on the target PC; CI cannot verify a real microphone.
 
 ## Shared backend and limitations
