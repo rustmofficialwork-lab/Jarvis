@@ -129,6 +129,24 @@ class BackendApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 429, response.text)
         self.assertIn("Retry-After", response.headers)
 
+    def test_daily_rate_limit_returns_accurate_retry_after(self) -> None:
+        peer_ip = "testclient"
+        now = 10_000.0
+        _legacy_chat_attempts[peer_ip].clear()
+        _legacy_chat_attempts[peer_ip].extend([now - 100] * 600)
+        self.addCleanup(_legacy_chat_attempts.pop, peer_ip, None)
+        with patch("app.main.time.monotonic", return_value=now):
+            response = self.client.post(
+                "/v1/chat/completions",
+                headers=self.headers,
+                json={
+                    "model": "openrouter/free",
+                    "messages": [{"role": "user", "content": "Hello"}],
+                },
+            )
+        self.assertEqual(response.status_code, 429, response.text)
+        self.assertEqual(response.headers.get("Retry-After"), "86300")
+
     def test_chat_requires_a_valid_bearer_token(self) -> None:
         payload = {"model": "openrouter/free", "messages": [{"role": "user", "content": "hi"}]}
         for headers in ({}, {"Authorization": "Bearer wrong-token"}):
