@@ -370,9 +370,20 @@ setInterval(updateClock,1000);updateClock();
     const w=bounds.width,h=bounds.height;
     if(!(w>0)||!(h>0))return;
 
-    // Use a top-left transform origin and calculate the offset from the full
-    // 1600x865 visual bounds. This keeps the 14px overflow below the 851px
-    // design box centered and visible instead of clipping the bottom gauge.
+    // Portrait phones get a landscape HUD rotated to fill the available
+    // screen, preserving the original 1600x865 layout without shrinking it
+    // into a tiny letterboxed strip. Landscape and desktop remain unchanged.
+    const portraitPhone=w<h&&w<900;
+    if(portraitPhone){
+      const scale=Math.min(h/DESIGN_WIDTH,w/DESIGN_HEIGHT);
+      design.style.left='50%';
+      design.style.top='50%';
+      design.style.transformOrigin='center center';
+      design.style.transform='translate(-50%, -50%) rotate(90deg) scale('+scale+')';
+      return;
+    }
+
+    // Standard contain-fit for landscape phones, tablets and desktop.
     const scale=Math.min(w/DESIGN_WIDTH,h/DESIGN_HEIGHT);
     const offsetX=(w-DESIGN_WIDTH*scale)/2;
     const offsetY=(h-DESIGN_HEIGHT*scale)/2;
