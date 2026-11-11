@@ -1460,6 +1460,7 @@ class JarvisDesktop:
                         )
                     frame = np.frombuffer(raw, dtype=np.int16)
                     recent_audio.append(raw_chunk)
+                    recent_audio.append(raw_chunk)
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
                     activated, streak = update_wakeword_activation(
