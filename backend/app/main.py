@@ -98,28 +98,47 @@ def _issue_device_token(device_id: str, now: int | None = None) -> tuple[str, in
 
 def _verify_device_token(token: str, now: int | None = None) -> str | None:
     secret = _device_token_secret()
-    if not secret or len(token) > 4096 or not token.startswith("jdt1."):
+    if not secret or not isinstance(token, str) or len(token) > 4096:
         return None
     try:
-        prefix, payload_part, signature = token.split(".", 2)
-        if prefix != "jdt1":
+        parts = token.split(".")
+        if len(parts) != 3 or parts[0] != "jdt1":
             return None
+        _, payload_part, signature = parts
         expected = _b64url(hmac.new(
             secret, payload_part.encode("ascii"), hashlib.sha256
         ).digest())
         if not hmac.compare_digest(signature, expected):
             return None
         padded = payload_part + "=" * (-len(payload_part) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
-        current = int(time.time()) if now is None else int(now)
-        if (payload.get("iss") != "jarvis-backend"
-                or payload.get("aud") != "jarvis-desktop"
-                or not isinstance(payload.get("sub"), str)
-                or payload.get("exp", 0) <= current
-                or payload.get("iat", current + 1) > current + 60):
+        payload_bytes = base64.b64decode(
+            padded.encode("ascii"), altchars=b"-_", validate=True
+        )
+        payload = json.loads(payload_bytes)
+        if not isinstance(payload, dict):
             return None
-        return payload["sub"]
-    except (ValueError, TypeError, KeyError, json.JSONDecodeError, binascii.Error):
+        current = int(time.time()) if now is None else int(now)
+        subject = payload.get("sub")
+        issued_at = payload.get("iat")
+        expires_at = payload.get("exp")
+        if (
+            payload.get("iss") != "jarvis-backend"
+            or payload.get("aud") != "jarvis-desktop"
+            or not isinstance(subject, str)
+            or not isinstance(issued_at, int)
+            or isinstance(issued_at, bool)
+            or not isinstance(expires_at, int)
+            or isinstance(expires_at, bool)
+            or expires_at <= current
+            or expires_at <= issued_at
+            or issued_at > current + 60
+        ):
+            return None
+        # Tokens are issued only for canonical installation UUIDs.
+        if str(UUID(subject)) != subject:
+            return None
+        return subject
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError, binascii.Error, UnicodeError):
         return None
 
 
