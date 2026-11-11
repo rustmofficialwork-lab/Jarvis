@@ -2329,5 +2329,23 @@ class HudShortcutWiringTests(unittest.TestCase):
 
 
 
+
+class HudLiveDataMappingTests(unittest.TestCase):
+    def test_live_hud_does_not_show_fabricated_hardware_or_network_values(self):
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        for sample in (
+            "INTEL CORE i5", "NVIDIA GEFORCE", "JioFiber",
+            "192.168.1.100", "120 Mbps", "80 Mbps", "Atmospheric",
+        ):
+            with self.subTest(sample=sample):
+                self.assertNotIn(sample, hud)
+        self.assertIn("data.cpuName", hud)
+        self.assertIn("data.gpu", hud)
+        self.assertIn("data.isp", hud)
+        self.assertIn("data.temperature_value", hud)
+        self.assertIn("CPU sensor<br>Unavailable", hud)
+
+
+
 if __name__ == "__main__":
     unittest.main()
