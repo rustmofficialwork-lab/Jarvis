@@ -3424,10 +3424,15 @@ class JarvisWebBridge:
             self._dashboard_refreshing = False
 
     def _collect_dashboard(self):
-        """Read hardware sensors; called only by the background dashboard worker."""
+        """Build the HUD snapshot from the shared system-monitor collector."""
+        import platform
+        import socket
         import time
+        import psutil
+        from system_monitor import collect_system_metrics, _format_bytes, _format_uptime, format_battery_status
 
         now = time.monotonic()
+        metrics = collect_system_metrics(psutil)
 
         def safe_read(callback, fallback=None):
             try:
@@ -3435,28 +3440,9 @@ class JarvisWebBridge:
             except Exception:
                 return fallback
 
-        result = {"status": "J.A.R.V.I.S. ONLINE"}
-        try:
-            import platform
-            import psutil
-            import socket
-        except Exception:
-            result["status"] = "System readings unavailable"
-            return result
-
-        # Prime CPU sampling on the first pass; subsequent snapshots remain non-blocking.
-        cpu = safe_read(lambda: psutil.cpu_percent(interval=None))
-        memory = safe_read(psutil.virtual_memory)
-        disk = safe_read(lambda: psutil.disk_usage(str(Path.home().anchor or "/")))
-        battery = safe_read(psutil.sensors_battery, "unavailable")
-        interfaces = safe_read(psutil.net_if_stats)
         addresses = safe_read(psutil.net_if_addrs, {})
         counters = safe_read(lambda: psutil.net_io_counters())
-        network_connected = (
-            any(item.isup for name, item in interfaces.items()
-                if name.casefold() not in {"lo", "loopback"})
-            if interfaces is not None else None
-        )
+        network_connected = metrics.get("network_online")
         ip_address = safe_read(
             lambda: next(
                 (address.address for items in addresses.values()
@@ -3467,55 +3453,61 @@ class JarvisWebBridge:
             ),
             "Unavailable",
         )
+
         download_rate = upload_rate = None
         if counters is not None:
             previous = getattr(self, "_network_sample", None)
             if previous is not None:
                 previous_at, previous_sent, previous_recv = previous
                 elapsed = now - previous_at
-                if elapsed > 0 and counters.bytes_sent >= previous_sent and counters.bytes_recv >= previous_recv:
+                if (elapsed > 0 and counters.bytes_sent >= previous_sent
+                        and counters.bytes_recv >= previous_recv):
                     upload_rate = (counters.bytes_sent - previous_sent) * 8 / elapsed / 1_000_000
                     download_rate = (counters.bytes_recv - previous_recv) * 8 / elapsed / 1_000_000
             self._network_sample = (now, counters.bytes_sent, counters.bytes_recv)
 
-        disk_percent = safe_read(lambda: float(disk.percent)) if disk is not None else None
-        temperature_value = None
-        try:
-            from system_monitor import read_cpu_temperature
-            temperature_value = safe_read(lambda: read_cpu_temperature(psutil))
-        except Exception:
-            pass
-        result.update({
+        cpu = metrics.get("cpu_percent")
+        memory_total = metrics.get("memory_total")
+        memory_used = metrics.get("memory_used")
+        disk_total = metrics.get("disk_total")
+        disk_free = metrics.get("disk_free")
+        disk_percent = metrics.get("disk_percent")
+        temperature_value = metrics.get("cpu_temperature")
+        battery_text = format_battery_status(metrics.get("battery"))
+        if battery_text == "N/A":
+            battery_text = "Unavailable"
+        elif battery_text == "AC POWER":
+            battery_text = "AC"
+        uptime_seconds = metrics.get("uptime_seconds")
+        uptime = _format_uptime(uptime_seconds) if uptime_seconds is not None else "Unavailable"
+
+        result = {
+            "status": "J.A.R.V.I.S. ONLINE",
             "cpu": f"{cpu:.0f}%" if cpu is not None else "N/A",
-            "memory": f"{memory.percent:.0f}%" if memory is not None else "N/A",
+            "memory": (
+                f"{metrics['memory_percent']:.0f}%"
+                if metrics.get("memory_percent") is not None else "N/A"
+            ),
             "ram": (
-                f"{memory.used / (1024**3):.1f}/{memory.total / (1024**3):.1f} GB"
-                if memory is not None else "N/A"
+                f"{memory_used / (1024**3):.1f}/{memory_total / (1024**3):.1f} GB"
+                if memory_used is not None and memory_total is not None else "N/A"
             ),
             "disk": (
-                f"{disk.free / (1024**3):.0f} GB free / {disk.total / (1024**3):.0f} GB"
-                if disk is not None else "N/A"
+                f"{disk_free / (1024**3):.0f} GB free / {disk_total / (1024**3):.0f} GB"
+                if disk_free is not None and disk_total is not None else "N/A"
             ),
             "disk_percent": f"{disk_percent:.0f}%" if disk_percent is not None else "N/A",
             "disk_percent_value": disk_percent,
-            "disk_total": f"{disk.total / (1024**3):.0f} GB" if disk is not None else "N/A",
-            "disk_free": f"{disk.free / (1024**3):.0f} GB" if disk is not None else "N/A",
+            "disk_total": _format_bytes(disk_total),
+            "disk_free": _format_bytes(disk_free),
             "os": safe_read(lambda: f"{platform.system()} {platform.release()}", "Unavailable"),
             "architecture": safe_read(platform.machine, "Unavailable"),
             "cpuName": safe_read(
                 lambda: platform.processor() or f"{os.cpu_count()} logical cores",
                 "Unavailable",
             ),
-            "uptime": safe_read(
-                lambda: str(__import__("datetime").timedelta(
-                    seconds=int(time.time() - psutil.boot_time())
-                )),
-                "Unavailable",
-            ),
-            "battery": (
-                "Unavailable" if battery == "unavailable" else
-                f"{battery.percent:.0f}%" if battery and battery.percent is not None else "AC"
-            ),
+            "uptime": uptime,
+            "battery": battery_text,
             "network": (
                 "Unavailable" if network_connected is None else
                 "Connected" if network_connected else "Offline"
@@ -3527,8 +3519,8 @@ class JarvisWebBridge:
             "gpu": "N/A",
             "temperature": f"CPU {temperature_value:.0f}°C" if temperature_value is not None else "N/A",
             "temperature_value": float(temperature_value) if temperature_value is not None else None,
-        })
-        if cpu is None or memory is None or disk is None:
+        }
+        if cpu is None or metrics.get("memory_percent") is None or disk_percent is None:
             result["status"] = "Some system readings unavailable"
         return result
 
