@@ -339,7 +339,8 @@ async def chat_completions(
     if not isinstance(messages, list) or not messages or len(messages) > 60:
         raise HTTPException(status_code=422, detail="Provide between 1 and 60 messages.")
     for item in messages:
-        if not isinstance(item, dict) or item.get("role") not in {"system", "user", "assistant", "tool"}:
+        role = item.get("role") if isinstance(item, dict) else None
+        if not isinstance(role, str) or role not in {"system", "user", "assistant", "tool"}:
             raise HTTPException(status_code=422, detail="Invalid chat message.")
     model = payload.get("model") or DEFAULT_MODEL
     if not isinstance(model, str) or not model.strip() or len(model) > 200:
