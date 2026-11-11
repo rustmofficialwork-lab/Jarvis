@@ -56,6 +56,21 @@ def _valid_provider_url(url: str) -> bool:
     )
 
 
+def _is_chat_completion_response(body: bytes) -> bool:
+    """Reject malformed/non-chat success bodies so a healthy fallback can answer."""
+    try:
+        payload = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return False
+    first = choices[0]
+    return isinstance(first, dict) and isinstance(first.get("message"), dict)
+
+
 def load_providers(environ: dict[str, str] | None = None) -> list[Provider]:
     """Load ordered providers; preserve the existing OpenRouter-only setup."""
     env = os.environ if environ is None else environ
@@ -108,7 +123,7 @@ async def request_with_failover(
     environ: dict[str, str] | None = None,
     client_factory=None,
 ) -> bytes:
-    """Try configured providers in order and return the first bounded successful body."""
+    """Try configured providers in order and return the first bounded valid response."""
     providers = load_providers(environ)
     # Resolve at call time so tests and application-level HTTP client overrides work.
     make_client = client_factory or httpx.AsyncClient
@@ -140,6 +155,12 @@ async def request_with_failover(
                         raise ProviderUnavailable("The AI provider rejected the request.")
                     chunks: list[bytes] = []
                     total = 0
+                    for chunk in response.aiter_bytes():
+                        # aiohttp/httpx async iterators are asynchronous; this loop
+                        # body is replaced below by the bounded async iteration.
+                        del chunk
+                    chunks = []
+                    total = 0
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
                         if total > max_response_bytes:
@@ -147,7 +168,10 @@ async def request_with_failover(
                             break
                         chunks.append(chunk)
                     else:
-                        return b"".join(chunks)
+                        result = b"".join(chunks)
+                        if _is_chat_completion_response(result):
+                            return result
+                        failures.append("invalid-response")
                     continue
         except httpx.TimeoutException:
             failures.append("timeout")
@@ -157,6 +181,6 @@ async def request_with_failover(
         raise ProviderUnavailable("AI provider rate limit reached.", status_code=429)
     if failures and all(reason == "auth-rejected" for reason in failures):
         raise ProviderUnavailable("AI provider credentials were rejected.")
-    if failures and all(reason in {"temporarily-unavailable", "timeout", "network-error", "response-too-large"} for reason in failures):
+    if failures and all(reason in {"temporarily-unavailable", "timeout", "network-error", "response-too-large", "invalid-response"} for reason in failures):
         raise ProviderUnavailable("AI provider is temporarily unavailable.")
     raise ProviderUnavailable("All configured AI providers are temporarily unavailable.")

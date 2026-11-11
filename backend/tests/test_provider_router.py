@@ -1,6 +1,5 @@
+import json
 import unittest
-
-import httpx
 
 from app.provider_router import (
     ProviderConfigurationError,
@@ -73,7 +72,7 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(url=url):
                 env = {
                     "JARVIS_AI_PROVIDERS": (
-                        '[{"name":"one","base_url":' + __import__("json").dumps(url) +
+                        '[{"name":"one","base_url":' + json.dumps(url) +
                         ',"api_key_env":"ONE_KEY","model":"model-one"}]'
                     ),
                     "ONE_KEY": "secret",
@@ -81,8 +80,9 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(ProviderConfigurationError):
                     load_providers(env)
 
-    async def test_retries_rate_limited_provider_then_succeeds(self):
-        env = {
+    @staticmethod
+    def _two_provider_environment():
+        return {
             "JARVIS_AI_PROVIDERS": (
                 '[{"name":"one","base_url":"https://one.example/v1/chat/completions",'
                 '"api_key_env":"ONE_KEY","model":"model-one"},'
@@ -92,9 +92,47 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
             "ONE_KEY": "secret-one",
             "TWO_KEY": "secret-two",
         }
+
+    async def test_retries_rate_limited_provider_then_succeeds(self):
+        env = self._two_provider_environment()
+        expected = b'{"choices":[{"message":{"role":"assistant","content":"ok"}}]}'
+        responses = [FakeResponse(429), FakeResponse(200, [expected])]
+
+        def factory(**kwargs):
+            return FakeClient(responses)
+
+        result = await request_with_failover(
+            {"messages": [{"role": "user", "content": "hello"}]},
+            timeout=5,
+            max_response_bytes=1024,
+            environ=env,
+            client_factory=factory,
+        )
+        self.assertEqual(result, expected)
+
+    async def test_retries_provider_specific_missing_model_then_succeeds(self):
+        env = self._two_provider_environment()
+        expected = b'{"choices":[{"message":{"role":"assistant","content":"ok"}}]}'
+        responses = [FakeResponse(404), FakeResponse(200, [expected])]
+
+        def factory(**kwargs):
+            return FakeClient(responses)
+
+        result = await request_with_failover(
+            {"messages": [{"role": "user", "content": "hello"}]},
+            timeout=5,
+            max_response_bytes=1024,
+            environ=env,
+            client_factory=factory,
+        )
+        self.assertEqual(result, expected)
+
+    async def test_retries_malformed_success_response_then_succeeds(self):
+        env = self._two_provider_environment()
+        expected = b'{"choices":[{"message":{"role":"assistant","content":"ok"}}]}'
         responses = [
-            FakeResponse(429),
-            FakeResponse(200, [b'{"choices":[]}']),
+            FakeResponse(200, [b"upstream proxy error page"]),
+            FakeResponse(200, [expected]),
         ]
 
         def factory(**kwargs):
@@ -107,32 +145,28 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
             environ=env,
             client_factory=factory,
         )
-        self.assertEqual(result, b'{"choices":[]}')
+        self.assertEqual(result, expected)
 
-    async def test_retries_provider_specific_missing_model_then_succeeds(self):
+    async def test_rejects_malformed_success_when_no_fallback_is_configured(self):
         env = {
             "JARVIS_AI_PROVIDERS": (
                 '[{"name":"one","base_url":"https://one.example/v1/chat/completions",'
-                '"api_key_env":"ONE_KEY","model":"model-one"},'
-                '{"name":"two","base_url":"https://two.example/v1/chat/completions",'
-                '"api_key_env":"TWO_KEY","model":"model-two"}]'
+                '"api_key_env":"ONE_KEY","model":"model-one"}]'
             ),
             "ONE_KEY": "secret-one",
-            "TWO_KEY": "secret-two",
         }
-        responses = [FakeResponse(404), FakeResponse(200, [b'{"ok":true}'])]
 
         def factory(**kwargs):
-            return FakeClient(responses)
+            return FakeClient([FakeResponse(200, [b"not-json"])])
 
-        result = await request_with_failover(
-            {"messages": [{"role": "user", "content": "hello"}]},
-            timeout=5,
-            max_response_bytes=1024,
-            environ=env,
-            client_factory=factory,
-        )
-        self.assertEqual(result, b'{"ok":true}')
+        with self.assertRaisesRegex(ProviderUnavailable, "temporarily unavailable"):
+            await request_with_failover(
+                {"messages": [{"role": "user", "content": "hello"}]},
+                timeout=5,
+                max_response_bytes=1024,
+                environ=env,
+                client_factory=factory,
+            )
 
     async def test_stops_on_non_retryable_bad_request(self):
         env = {
