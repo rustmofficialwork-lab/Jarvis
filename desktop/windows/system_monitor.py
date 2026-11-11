@@ -107,11 +107,13 @@ def get_system_status(psutil_module=None, now=None) -> str:
     elif battery is None:
         battery_text = "No battery detected"
     else:
-        battery_text = format_battery_status(battery)
-        if battery_text == "AC POWER":
+        battery_percent = _finite_percent(_safe_read(lambda: battery.percent))
+        if battery_percent is None:
             battery_text = "Unavailable"
-        elif battery_text != "N/A" and " • " in battery_text:
-            battery_text = battery_text.replace(" • ", " (") + ")"
+        else:
+            battery_text = f"{battery_percent:.0f}%" + (
+                " (charging)" if getattr(battery, "power_plugged", False) else ""
+            )
 
     network = metrics["network_online"]
     network_text = "Online" if network is True else "Offline" if network is False else "Unavailable"
