@@ -61,7 +61,11 @@
       await cameraPromise;
     }else if(cameraPromise){await cameraPromise;}
     cameraUsers++;video.srcObject=stream;
-    try{await video.play();}catch(error){cameraUsers=Math.max(0,cameraUsers-1);video.srcObject=null;throw error;}
+    try{await video.play();}catch(error){
+      cameraUsers=Math.max(0,cameraUsers-1);video.srcObject=null;
+      if(cameraUsers===0&&stream){stream.getTracks().forEach(track=>track.stop());stream=null;}
+      throw error;
+    }
     return stream;
   };
   const releaseCamera=video=>{video.srcObject=null;cameraUsers=Math.max(0,cameraUsers-1);if(cameraUsers===0&&stream){stream.getTracks().forEach(track=>track.stop());stream=null;}};
