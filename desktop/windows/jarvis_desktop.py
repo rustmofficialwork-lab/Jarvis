@@ -2388,7 +2388,8 @@ class JarvisDesktop:
 
             owner_profile = load_owner_profile()
             if owner_profile is None:
-                self.events.put(("status", "Owner voice is not enrolled. Open Voice Setup and enroll your voice locally."))
+                self.events.put(("owner_voice_setup_required", None))
+                self.events.put(("status", "Owner voice is not enrolled. Complete local voice setup to enable wake activation."))
                 return
             self.events.put(("status", "Loading local owner voice verification…"))
             speaker_encoder = load_encoder(OWNER_VOICE_MODEL_DIR, allow_download=False)
@@ -3315,6 +3316,9 @@ class JarvisDesktop:
                 elif kind == "wakeword_setup_required":
                     self._set_status("Jarvis wake-word model is missing. Opening the one-time setup…")
                     self._open_wakeword_setup()
+                elif kind == "owner_voice_setup_required":
+                    self._set_status("Owner voice profile is missing. Opening local voice setup…")
+                    self._show_voice_setup_wizard()
                 elif kind == "status":
                     self._set_status(value)
                 elif kind == "voice_command":
