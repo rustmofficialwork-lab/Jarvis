@@ -154,7 +154,7 @@ def prepare_openwakeword_assets(
     # A custom-trained ONNX file is already present; only the shared feature
     # extractors are needed. The legacy publisher model is selected by its name.
     model_names = (
-        [] if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name
+        ["__jarvis_custom__"] if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name
         else [Path(model_path).stem]
     )
     openwakeword_module.utils.download_models(
