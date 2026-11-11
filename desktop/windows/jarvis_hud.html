@@ -299,19 +299,19 @@ html,body{background:#020b14}
 <svg width="402" height="146"><polygon points="1,1 200,1 212,16 391,16 401,26 401,135 391,145 1,145"/></svg>
 <h4>SYSTEM INFORMATION</h4>
 <div class="col" style="left:15px">
-<div class="data-row"><span>CPU</span><span class="val">INTEL CORE i5<br>3.20 GHz</span></div>
-<div class="data-row"><span>RAM</span><span class="val">8.00 GB</span></div>
-<div class="data-row"><span>GPU</span><span class="val">NVIDIA GEFORCE<br>GTX 1650</span></div>
+<div class="data-row"><span>CPU</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>RAM</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>GPU</span><span class="val">N/A</span></div>
 </div>
 <div class="divider" style="left:135px;top:30px;height:100px"></div>
 <div class="col" style="left:148px">
-<div class="data-row"><span>Operating System</span><span class="val">WINDOWS 11<br>PROFESSIONAL</span></div>
-<div class="data-row"><span>Architecture</span><span class="val">64-BIT</span></div>
+<div class="data-row"><span>Operating System</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>Architecture</span><span class="val">Loading…</span></div>
 </div>
 <div class="divider" style="left:285px;top:30px;height:100px"></div>
 <div class="col" style="left:298px">
-<div class="data-row"><span>Uptime</span><span class="val">2:15:32</span></div>
-<div class="data-row"><span>Temperature</span><span class="val">CPU 46°C<br>GPU 52°C</span></div>
+<div class="data-row"><span>Uptime</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>Temperature</span><span class="val">Loading…</span></div>
 </div>
 </div>
 
@@ -325,24 +325,24 @@ html,body{background:#020b14}
 </div>
 <div class="divider" style="left:152px;top:14px;height:100px"></div>
 <div class="stat-box col" style="left:161px"><h4>NETWORK DETAILS</h4>
-<div class="data-row"><span>- ISP :</span><span class="val">JioFiber</span></div>
-<div class="data-row"><span>- IP :</span><span class="val">192.168.1.100</span></div>
-<div class="data-row"><span>- DOWNLOAD :</span><span class="val">120 Mbps</span></div>
-<div class="data-row"><span>- UPLOAD :</span><span class="val">80 Mbps</span></div>
+<div class="data-row"><span>- ISP :</span><span class="val">N/A</span></div>
+<div class="data-row"><span>- IP :</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>- DOWNLOAD :</span><span class="val">Measuring…</span></div>
+<div class="data-row"><span>- UPLOAD :</span><span class="val">Measuring…</span></div>
 </div>
 <div class="divider" style="left:305px;top:14px;height:100px"></div>
 <div class="stat-box col" style="left:315px"><h4>SYSTEM STATUS</h4>
-<div class="data-row"><span>- BATTERY :</span><span class="val">98%</span></div>
-<div class="data-row"><span>- CPU :</span><span class="val">16%</span></div>
-<div class="data-row"><span>- RAM :</span><span class="val">3.4/8.0 GB</span></div>
-<div class="data-row"><span>- DISK :</span><span class="val">68%</span></div>
+<div class="data-row"><span>- BATTERY :</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>- CPU :</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>- RAM :</span><span class="val">Loading…</span></div>
+<div class="data-row"><span>- DISK :</span><span class="val">Loading…</span></div>
 </div>
 </div>
 
 <div class="back-btn"><i class="fa-solid fa-arrow-right"></i></div>
 <div class="temp-widget">
-<div class="temp-text"><h4>CPU Temp</h4><p>16°C</p><p>Atmospheric<br>Roughly<br>Clear</p></div>
-<div class="temp-circle">16°</div>
+<div class="temp-text"><h4>CPU Temp</h4><p>Loading…</p><p>CPU sensor<br>Waiting for live data</p></div>
+<div class="temp-circle">—</div>
 </div>
 <div class="jarvis-widget"><div class="jarvis-header"><h3>Jarvis</h3><div class="waveform"></div></div></div>
 <div class="tri-l" style="top:210px"></div><div class="tri-l" style="top:233px"></div>
@@ -621,6 +621,8 @@ setInterval(updateClock,1000);updateClock();
       const graph=document.querySelector('.mini-top-graph');
       if(tempText)tempText.textContent=data.temperature||'N/A';
       if(tempCircle)tempCircle.textContent=data.temperature_value!=null?Math.round(data.temperature_value)+'°':'N/A';
+      const tempMeta=document.querySelector('.temp-text p:nth-of-type(2)');
+      if(tempMeta)tempMeta.innerHTML=data.temperature_value!=null?'Local CPU sensor<br>Live reading':'CPU sensor<br>Unavailable';
       if(graph){
         const bars=[...graph.querySelectorAll('.mtg-bar')];
         const hasTemp=data.temperature_value!=null&&Number.isFinite(Number(data.temperature_value));
