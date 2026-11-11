@@ -7,7 +7,10 @@ import wave
 from pathlib import Path
 from types import SimpleNamespace
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 from owner_voice_verification import (
     DEFAULT_COSINE_THRESHOLD,
@@ -49,6 +52,7 @@ class MemoryKeyring:
         self.values.pop((service, username), None)
 
 
+@unittest.skipUnless(np is not None, "NumPy is installed with the optional voice runtime")
 class OwnerVoiceVerificationTests(unittest.TestCase):
     def _write_clip(self, path: Path):
         with wave.open(str(path), "wb") as output:
