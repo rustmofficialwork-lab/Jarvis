@@ -25,8 +25,8 @@ body{display:flex;justify-content:center;align-items:center;height:100dvh;font-f
 h1,h2,h3,h4{font-family:var(--head);font-weight:400;color:var(--hi)}
 
 /* clickable things */
-.file-row,.nav-item,.f-label,.app-row,.hex-btn,.power-controls i,.back-btn,.quick-item,.desk-icon{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-.file-row:active,.nav-item:active,.f-label:active,.app-row:active,.power-controls i:active,.back-btn:active,.desk-icon:active{transform:scale(.95)}
+.file-row,.nav-item,.f-label,.power-controls i,.back-btn,.quick-item,.desk-icon{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+.file-row:active,.nav-item:active,.f-label:active,.power-controls i:active,.back-btn:active,.desk-icon:active{transform:scale(.95)}
 [data-hud]:focus-visible{outline:2px solid var(--hi);outline-offset:2px}
 
 /* ===== LEFT ===== */
@@ -104,13 +104,6 @@ h1,h2,h3,h4{font-family:var(--head);font-weight:400;color:var(--hi)}
 .sq{left:620px;top:404px;width:12px;height:12px;background:#d6f6ff}
 
 /* ===== APPS ===== */
-.app-list{position:absolute;left:895px;top:130px;width:130px;height:395px;padding-top:22px;border-left:2px solid var(--cyan);display:flex;flex-direction:column;gap:1.8px;font-size:1.05rem;z-index:12}
-.app-row{display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 4px 0 20px;color:#fff;border-bottom:1px solid rgba(31,209,255,.25);transition:.3s}
-.app-row:hover{background:rgba(31,209,255,.15)}
-.app-row span{display:flex;align-items:center;gap:9px;white-space:nowrap}
-.app-row span i{width:20px;text-align:center;font-size:1.05rem;color:var(--hi)}
-.app-row .dot{width:20px;height:20px;border:2px solid var(--cyan);border-radius:50%;background:rgba(31,209,255,.2);box-shadow:inset 0 0 6px var(--cyan);margin-right:-22px;transition:.3s}
-.app-row:hover .dot{background:var(--hi);box-shadow:var(--glow)}
 
 /* ===== BOTTOM PANELS ===== */
 .panel{position:absolute;z-index:10}
@@ -134,27 +127,6 @@ h1,h2,h3,h4{font-family:var(--head);font-weight:400;color:var(--hi)}
 /* ===== RIGHT ===== */
 .back-btn{position:absolute;left:1543px;top:5px;width:46px;height:46px;border-radius:50%;border:2px solid #fff;display:flex;justify-content:center;align-items:center;color:#fff;font-size:1.3rem;z-index:20;box-shadow:0 0 8px var(--cyan);transition:.3s}
 .back-btn:hover{background:rgba(31,209,255,.25)}
-.temp-widget{position:absolute;left:1320px;top:52px;display:flex;align-items:flex-start;gap:12px;z-index:10}
-.temp-text{width:100px;text-align:right;color:#fff}
-.temp-text h4{font:600 1rem var(--ui);color:#e6f9ff}
-.temp-text p{font-size:.95rem;color:#fff;margin-top:6px}
-.temp-text p+p{font-size:.78rem;margin-top:22px;line-height:1.25;color:#cdf6ff}
-.temp-circle{width:156px;height:156px;border-radius:50%;border:4px solid var(--dark);display:flex;align-items:center;justify-content:center;font:800 3.4rem var(--head);color:#fff;position:relative;text-shadow:0 0 10px var(--cyan)}
-.temp-circle::before{content:"";position:absolute;inset:-4px;border-radius:50%;border:8px solid transparent;border-top-color:var(--cyan);border-left-color:var(--cyan);border-bottom-color:var(--cyan);transform:rotate(-20deg);filter:drop-shadow(0 0 8px var(--cyan))}
-.jarvis-widget{position:absolute;left:1350px;top:205px;width:230px;pointer-events:none;z-index:11}
-.jarvis-header h3{font:600 1.35rem var(--ui);color:#fff;margin-left:98px}
-.jarvis-header{border-bottom:2px solid var(--cyan);height:32px;position:relative}
-.waveform{position:absolute;left:96px;top:46px;height:18px;width:106px;display:flex;align-items:center;gap:2px}
-.waveform div{width:2px;background:var(--cyan);animation:eqBounce 1s ease-in-out infinite alternate}
-.tri-l{position:absolute;left:1577px;width:12px;height:16px;background:var(--cyan);clip-path:polygon(100% 0,0 50%,100% 100%)}
-.quotes{left:1390px;top:278px;width:165px;color:#fff;font-size:.88rem;line-height:1.12}
-.quotes p{margin-bottom:3px}
-.quotes small{display:block;text-align:right;font-size:.88rem;margin-bottom:12px;color:#e6f9ff}
-.scroll{left:1566px;top:258px;width:13px;height:270px;background:linear-gradient(var(--cyan),#0a8fc0);box-shadow:var(--glow)}
-.hex-btn{position:absolute;top:541px;width:15px;height:15px;background:var(--cyan);box-shadow:var(--glow);z-index:10}
-.hex-btn::after{content:"";position:absolute;inset:-12px}
-.hex-btn i{display:none}
-.hex-btn:hover{background:#fff}
 .desk-icon{position:absolute;width:110px;text-align:center;color:#fff;font:600 1.05rem/1.15 var(--ui);z-index:10}
 .desk-icon i{display:block;font-size:3rem;margin-bottom:6px}
 
@@ -209,8 +181,8 @@ html,body{background:#020b14}
   animation:hudScan 8s linear infinite;
 }
 @keyframes hudScan{from{background-position:0 0}to{background-position:0 120px}}
-.date-widget,.battery-widget,.cpu-widget,.temp-circle,.orb-outer-ring{filter:drop-shadow(0 0 5px rgba(0,229,255,.28))}
-.nav-item span,.f-label span,.app-row,.file-row,.quotes{text-shadow:0 0 4px rgba(0,229,255,.22)}
+.date-widget,.battery-widget,.cpu-widget,.orb-outer-ring{filter:drop-shadow(0 0 5px rgba(0,229,255,.28))}
+.nav-item span,.f-label span,.file-row{text-shadow:0 0 4px rgba(0,229,255,.22)}
 @media(prefers-reduced-motion:reduce){.hud-inner::after,.orb-outer-ring,.orb-segments-1,.orb-segments-2,.orb-core,.waveform div,.eq div{animation:none!important}}
 
 </style>
@@ -226,7 +198,6 @@ html,body{background:#020b14}
 <path d="M626 412 V462"/><path d="M626 505 V640"/>
 <path d="M505 492 H616"/><path d="M505 546 H616"/><path d="M505 596 H616"/><path d="M505 640 H616"/>
 <path class="thin" d="M60 625 H300"/><path class="thin" d="M72 374 H420"/>
-<path class="flow" d="M895 130 V525"/>
 <path class="thin" d="M1420 68 L1452 86"/>
 <circle cx="464" cy="95" r="10"/><circle cx="626" cy="640" r="3"/>
 </svg>
@@ -281,20 +252,6 @@ html,body{background:#020b14}
 <div class="f-label" style="left:484px;top:565px"><i class="fa-regular fa-trash-can"></i><span>Recycle Bin</span></div>
 </div>
 
-<div class="app-list">
-<div class="app-row"><span><i class="fa-solid fa-envelope"></i> gmail</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-whatsapp"></i> whatsapp</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-discord"></i> discord</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-x-twitter"></i> twitter</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-facebook-f"></i> facebook</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-instagram"></i> instagram</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-youtube"></i> youtube</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-steam"></i> steam</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-solid fa-n"></i> notion</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-brands fa-spotify"></i> spotify</span><div class="dot"></div></div>
-<div class="app-row"><span><i class="fa-solid fa-robot"></i> chatgpt</span><div class="dot"></div></div>
-</div>
-
 <div class="panel stat-box p1" style="left:650px;top:548px;width:402px;height:146px">
 <svg width="402" height="146"><polygon points="1,1 200,1 212,16 391,16 401,26 401,135 391,145 1,145"/></svg>
 <h4>SYSTEM INFORMATION</h4>
@@ -340,20 +297,6 @@ html,body{background:#020b14}
 </div>
 
 <div class="back-btn"><i class="fa-solid fa-arrow-right"></i></div>
-<div class="temp-widget">
-<div class="temp-text"><h4>CPU Temp</h4><p>Loading…</p><p>CPU sensor<br>Waiting for live data</p></div>
-<div class="temp-circle">—</div>
-</div>
-<div class="jarvis-widget"><div class="jarvis-header"><h3>Jarvis</h3><div class="waveform"></div></div></div>
-<div class="tri-l" style="top:210px"></div><div class="tri-l" style="top:233px"></div>
-<div class="abs quotes">
-<p>"The future is not a gift, it is an achievement."</p><small>— Tony Stark</small>
-<p>"Sometimes you gotta run before you can walk."</p><small>— Tony Stark</small>
-<p>"I'm not a hero. I'm just a guy who runs a company."</p><small>— Tony Stark</small>
-<p>"Genius, billionaire, playboy, philanthropist."</p><small>— Tony Stark</small>
-</div>
-<div class="abs scroll"></div>
-<div class="hex-btn" style="left:1380px"><i></i></div><div class="hex-btn" style="left:1429px"><i></i></div><div class="hex-btn" style="left:1481px"><i></i></div><div class="hex-btn" style="left:1532px"><i></i></div>
 
 
 </div>
@@ -364,7 +307,6 @@ html,body{background:#020b14}
 (()=>{
   const fill=(sel,n,css)=>{const box=document.querySelector(sel);for(let i=0;i<n;i++){const b=document.createElement('div');b.style.cssText=css(i);box.appendChild(b);}};
   fill('.eq',16,i=>'height:'+(12+Math.random()*88)+'%;animation-duration:'+(1+Math.random()*2.2)+'s');
-  fill('.waveform',48,i=>'height:'+(15+Math.random()*85)+'%;animation-duration:'+(.5+Math.random())+'s');
 })();
 </script>
 <script>
@@ -435,7 +377,6 @@ setInterval(updateClock,1000);updateClock();
     catch(err){console.warn('JARVIS HUD action failed: '+name,err);return false;}
   };
   const OFFLINE='JARVIS desktop bridge is not connected';
-  const APPS={gmail:'https://mail.google.com/',whatsapp:'https://web.whatsapp.com/',discord:'https://discord.com/app',twitter:'https://x.com/',facebook:'https://www.facebook.com/',instagram:'https://www.instagram.com/',youtube:'https://www.youtube.com/',steam:'https://store.steampowered.com/',notion:'https://www.notion.so/',spotify:'https://open.spotify.com/',chatgpt:'https://chatgpt.com/'};
   const FOLDERS={documents:'Documents',downloads:'Downloads',pictures:'Pictures',images:'Pictures',music:'Music',videos:'Videos','this pc':'This PC',storage:'This PC',network:'Network','recycle bin':'Recycle Bin'};
   const TOOLS={'control panel':'control_panel','device manager':'device_manager','task manager':'task_manager',run:'run'};
 
@@ -550,7 +491,6 @@ setInterval(updateClock,1000);updateClock();
     const k=Object.keys(FOLDERS).find(f=>txt(el).includes(f));
     if(k)mark(el,'Open '+FOLDERS[k],{folder:FOLDERS[k]});
   });
-  $$('.app-row').forEach(el=>{const n=txt(el).split(' ')[0];if(APPS[n])mark(el,'Open '+n,{app:n});});
   [['status','System status'],['find','Find a file'],['settings','Settings'],['reminders','Show reminders']]
     .forEach(([a,n],i)=>{const b=$$('.hex-btn')[i];if(b)mark(b,n,{action:a});});
   [['play','Play'],['stop','Stop'],['next','Next track'],['prev','Previous track']]
