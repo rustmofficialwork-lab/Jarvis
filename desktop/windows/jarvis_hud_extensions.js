@@ -46,13 +46,27 @@
       status.textContent='3D hologram ready · Camera off';
     }).catch(err=>{console.warn('JARVIS Three.js hologram unavailable; starting native canvas fallback',err);const ctx=canvas.getContext('2d');if(!ctx){status.textContent='Hologram unavailable · HUD remains active';return;}let active=true,angle=0;const resize=()=>{const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);};const observer=new ResizeObserver(resize);observer.observe(orb);resize();const draw=()=>{if(!active)return;const w=canvas.clientWidth,h=canvas.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)*.34;ctx.clearRect(0,0,w,h);angle+=.012;for(let ring=0;ring<3;ring++){ctx.beginPath();ctx.ellipse(cx,cy,r*(1-ring*.19),r*(.34+ring*.12),angle*(ring%2?-.7:1),0,Math.PI*2);ctx.strokeStyle=ring===1?'rgba(255,138,50,.8)':'rgba(0,220,255,.78)';ctx.lineWidth=1.5;ctx.shadowBlur=12;ctx.shadowColor=ctx.strokeStyle;ctx.stroke();}ctx.beginPath();ctx.arc(cx,cy,r*.16,0,Math.PI*2);ctx.fillStyle='rgba(0,220,255,.22)';ctx.fill();ctx.strokeStyle='#8eeaff';ctx.stroke();ctx.shadowBlur=0;requestAnimationFrame(draw);};draw();window.addEventListener('pagehide',()=>{active=false;observer.disconnect();},{once:true});status.textContent='Hologram ready · native canvas fallback · Camera off';});
   }
-  let stream=null,cameraUsers=0,cameraPromise=null,landmarker=null,raf=0,lastSwipe=0,lastPinch=false,lastFist=false,lastX=null,lastGestureAt=0,hologramRig=null,faceDetector=null,faceRaf=0,facePreview=null;
+  let stream=null,cameraUsers=0,cameraPromise=null,landmarker=null,raf=0,lastSwipe=0,lastPinch=false,lastFist=false,swipeStartX=null,swipeStartAt=0,lastGestureAt=0,hologramRig=null,faceDetector=null,faceRaf=0,facePreview=null;
   const acquireCamera=async video=>{if(!stream){if(!cameraPromise)cameraPromise=navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false}).then(value=>(stream=value,value)).finally(()=>{cameraPromise=null;});await cameraPromise;}else if(cameraPromise){await cameraPromise;}cameraUsers++;video.srcObject=stream;await video.play();return stream;};
   const releaseCamera=video=>{video.srcObject=null;cameraUsers=Math.max(0,cameraUsers-1);if(cameraUsers===0&&stream){stream.getTracks().forEach(track=>track.stop());stream=null;}};
   const createVisionTask=async(factory,options)=>{try{return await factory({...options,baseOptions:{...options.baseOptions,delegate:'GPU'}});}catch(gpuError){console.warn('JARVIS GPU delegate unavailable; retrying on CPU',gpuError);return await factory({...options,baseOptions:{...options.baseOptions,delegate:'CPU'}});}};
   const setStatus=s=>{status.textContent=s;};
-  const clickHudTarget=hand=>{const candidates=[...document.querySelectorAll('[data-hud]')].filter(el=>el.getClientRects().length);if(!candidates.length)return;const tip=hand[8],x=(1-tip.x)*window.innerWidth,y=tip.y*window.innerHeight;candidates.sort((a,b)=>{const score=el=>{const r=el.getBoundingClientRect();return Math.hypot(r.left+r.width/2-x,r.top+r.height/2-y);};return score(a)-score(b);});const target=candidates[0],r=target.getBoundingClientRect();if(Math.hypot(r.left+r.width/2-x,r.top+r.height/2-y)>Math.max(110,Math.hypot(r.width,r.height)))return;target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y}));};
-  const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;lastX=null;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus(facePreview.srcObject?'Face presence active · camera in use':'3D hologram ready · Camera off');};
+  const clickHudTarget=hand=>{
+    const candidates=[...document.querySelectorAll('[data-hud]')].filter(el=>
+      el.getClientRects().length&&!el.disabled&&el.getAttribute('aria-disabled')!=='true'
+    );
+    if(!candidates.length)return false;
+    const tip=hand[8],x=(1-tip.x)*window.innerWidth,y=tip.y*window.innerHeight;
+    candidates.sort((a,b)=>{
+      const score=el=>{const r=el.getBoundingClientRect();return Math.hypot(r.left+r.width/2-x,r.top+r.height/2-y);};
+      return score(a)-score(b);
+    });
+    const target=candidates[0],r=target.getBoundingClientRect();
+    if(Math.hypot(r.left+r.width/2-x,r.top+r.height/2-y)>Math.max(110,Math.hypot(r.width,r.height)))return false;
+    target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y}));
+    return true;
+  };
+  const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;swipeStartX=null;swipeStartAt=0;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus(facePreview.srcObject?'Face presence active · camera in use':'3D hologram ready · Camera off');};
   facePreview=document.createElement('video');facePreview.muted=true;facePreview.autoplay=true;facePreview.playsInline=true;facePreview.style.cssText='position:fixed;right:18px;bottom:64px;width:180px;display:none;opacity:.01;pointer-events:none';document.body.appendChild(facePreview);
   let facePresent=false;
   const stopFace=()=>{cancelAnimationFrame(faceRaf);faceRaf=0;if(facePreview.srcObject){releaseCamera(facePreview);}facePreview.style.display='none';faceDetector?.close?.();faceDetector=null;facePresent=false;hud?.classList.remove('jx-face-present');faceToggle.setAttribute('aria-pressed','false');faceToggle.textContent='FACE PRESENCE';setStatus(stream?'Gestures active':'3D hologram ready · Camera off');};
@@ -60,8 +74,29 @@
   const startFace=async()=>{if(!navigator.mediaDevices?.getUserMedia){setStatus('Camera unavailable in this WebView');return;}faceToggle.disabled=true;try{setStatus('Requesting camera permission for face presence…');await acquireCamera(facePreview);facePreview.style.display='block';const vision=await loadVisionRuntime();const fileset=await loadVisionFileset(vision);faceDetector=await createVisionTask(opts=>vision.FaceDetector.createFromOptions(fileset,opts),{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'},runningMode:'VIDEO',minDetectionConfidence:.65});faceToggle.setAttribute('aria-pressed','true');faceToggle.textContent='STOP FACE CHECK';setStatus('Face presence active · identity is not verified');faceRaf=requestAnimationFrame(faceFrame);}catch(err){console.warn('JARVIS face presence setup failed',err);stopFace();setStatus(err?.name==='NotAllowedError'?'Camera permission denied':'Face detector unavailable · check internet, camera and WebView');}finally{faceToggle.disabled=false;}};
   faceToggle.addEventListener('click',()=>{if(facePreview.srcObject)stopFace();else void startFace();});
   const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-  const detect=results=>{const hand=results.landmarks?.[0];if(!hand)return;const pinch=dist(hand[4],hand[8])<.045,fist=[8,12,16,20].every(i=>hand[i].y>hand[i-2].y),now=performance.now(),wrist=hand[0];if(pinch&&!lastPinch&&now-lastGestureAt>650){clickHudTarget(hand);lastGestureAt=now;setStatus('Gesture: pinch click');}if(fist&&!lastFist&&now-lastGestureAt>650){hud?.classList.toggle('jx-gesture-active');lastGestureAt=now;setStatus('Gesture: fist · hologram pulse');}if(lastX!==null&&Math.abs(wrist.x-lastX)>.20&&now-lastSwipe>900){lastSwipe=now;if(hologramRig)hologramRig.rotation.y+=(wrist.x>lastX?-.65:.65);setStatus('Gesture: swipe · hologram rotated');}lastPinch=pinch;lastFist=fist;lastX=wrist.x;};
+  const detect=results=>{
+    const hand=results.landmarks?.[0],now=performance.now();
+    if(!hand){lastPinch=false;lastFist=false;swipeStartX=null;swipeStartAt=0;return;}
+    const wrist=hand[0],palmWidth=Math.max(.001,dist(hand[0],hand[9]));
+    const pinch=dist(hand[4],hand[8])<Math.max(.025,palmWidth*.32);
+    const fist=[8,12,16,20].every(i=>dist(hand[i],wrist)<dist(hand[i-2],wrist)*.92);
+    if(pinch&&!lastPinch&&now-lastGestureAt>650){
+      if(clickHudTarget(hand)){lastGestureAt=now;setStatus('Gesture: pinch · HUD action triggered');}
+      else setStatus('Pinch detected · move hand closer to a HUD control');
+    }
+    if(fist&&!lastFist&&now-lastGestureAt>650){
+      hud?.classList.toggle('jx-gesture-active');lastGestureAt=now;setStatus('Gesture: fist · hologram pulse');
+    }
+    if(swipeStartX===null){swipeStartX=wrist.x;swipeStartAt=now;}
+    if(now-swipeStartAt>700){swipeStartX=wrist.x;swipeStartAt=now;}
+    const swipeDelta=wrist.x-swipeStartX;
+    if(Math.abs(swipeDelta)>=.16&&now-lastSwipe>900){
+      lastSwipe=now;swipeStartX=wrist.x;swipeStartAt=now;
+      if(hologramRig){hologramRig.rotation.y+=(swipeDelta>0?-.65:.65);setStatus('Gesture: swipe · hologram rotated');}
+    }
+    lastPinch=pinch;lastFist=fist;
+  };
   const frame=()=>{if(!landmarker||preview.readyState<2){raf=requestAnimationFrame(frame);return;}try{detect(landmarker.detectForVideo(preview,performance.now()));}catch(err){console.warn('Gesture frame skipped',err);}raf=requestAnimationFrame(frame);};
-  const start=async()=>{if(!navigator.mediaDevices?.getUserMedia){setStatus('Camera unavailable in this WebView');return;}toggle.disabled=true;try{setStatus('Requesting camera permission…');await acquireCamera(preview);preview.style.display='block';setStatus('Loading hand-tracking model…');const vision=await loadVisionRuntime();const fileset=await loadVisionFileset(vision);landmarker=await createVisionTask(opts=>vision.HandLandmarker.createFromOptions(fileset,opts),{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'},runningMode:'VIDEO',numHands:1});lastX=null;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','true');toggle.textContent='DISABLE GESTURES';setStatus('Gestures active · pinch click · fist pulse · swipe');raf=requestAnimationFrame(frame);}catch(err){console.warn('JARVIS gesture setup failed',err);stop();setStatus(err?.name==='NotAllowedError'?'Camera permission denied':'Gesture setup failed · check internet, camera and WebView');}finally{toggle.disabled=false;}};
+  const start=async()=>{if(!navigator.mediaDevices?.getUserMedia){setStatus('Camera unavailable in this WebView');return;}toggle.disabled=true;try{setStatus('Requesting camera permission…');await acquireCamera(preview);preview.style.display='block';setStatus('Loading hand-tracking model…');const vision=await loadVisionRuntime();const fileset=await loadVisionFileset(vision);landmarker=await createVisionTask(opts=>vision.HandLandmarker.createFromOptions(fileset,opts),{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'},runningMode:'VIDEO',numHands:1});swipeStartX=null;swipeStartAt=0;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','true');toggle.textContent='DISABLE GESTURES';setStatus('Gestures active · pinch click · fist pulse · swipe');raf=requestAnimationFrame(frame);}catch(err){console.warn('JARVIS gesture setup failed',err);stop();setStatus(err?.name==='NotAllowedError'?'Camera permission denied':'Gesture setup failed · check internet, camera and WebView');}finally{toggle.disabled=false;}};
   toggle.addEventListener('click',()=>{if(preview.srcObject)stop();else void start();});window.addEventListener('beforeunload',()=>{stop();stopFace();},{once:true});
 })();
