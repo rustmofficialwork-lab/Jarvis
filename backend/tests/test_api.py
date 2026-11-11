@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import time
 import unittest
 import uuid
 from unittest.mock import patch
@@ -15,7 +16,10 @@ os.environ["JARVIS_CLIENT_TOKEN"] = "test-token-that-is-long-enough-123456"
 os.environ["OPENROUTER_API_KEY"] = "test-upstream-key"
 os.environ["JARVIS_DEVICE_TOKEN_SECRET"] = "test-device-token-secret-that-is-long-enough-123"
 
-from app.main import UPSTREAM_URL, _read_request_body_limited, app, require_client_token  # noqa: E402
+from app.main import (  # noqa: E402
+    UPSTREAM_URL, _chat_attempts, _legacy_chat_attempts,
+    _read_request_body_limited, app, require_client_token,
+)
 
 
 class _FakeUpstreamResponse:
@@ -104,6 +108,23 @@ class BackendApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
         self.assertNotIn("OPENROUTER_API_KEY", response.text)
+
+    def test_legacy_shared_token_is_rate_limited_by_peer_ip(self) -> None:
+        peer_ip = "testclient"
+        now = time.monotonic()
+        _legacy_chat_attempts[peer_ip].clear()
+        _legacy_chat_attempts[peer_ip].extend([now - 1] * 30)
+        self.addCleanup(_legacy_chat_attempts.pop, peer_ip, None)
+        response = self.client.post(
+            "/v1/chat/completions",
+            headers=self.headers,
+            json={
+                "model": "openrouter/free",
+                "messages": [{"role": "user", "content": "Hello"}],
+            },
+        )
+        self.assertEqual(response.status_code, 429, response.text)
+        self.assertIn("Retry-After", response.headers)
 
     def test_chat_requires_a_valid_bearer_token(self) -> None:
         payload = {"model": "openrouter/free", "messages": [{"role": "user", "content": "hi"}]}
