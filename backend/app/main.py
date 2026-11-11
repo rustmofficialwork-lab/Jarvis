@@ -6,6 +6,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import math
 import os
 import time
 from collections import defaultdict, deque
@@ -185,7 +186,7 @@ async def _enforce_window_limit(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=detail,
-            headers={"Retry-After": str(max(1, int(window - (now - bucket[0]))))},
+            headers={"Retry-After": str(max(1, math.ceil(window - (now - bucket[0]))))},
         )
     bucket.append(now)
 
@@ -299,8 +300,18 @@ async def chat_completions(
         while bucket and bucket[0] <= now - CHAT_DAY_SECONDS:
             bucket.popleft()
         minute_count = sum(1 for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS)
-        if minute_count >= minute_limit or len(bucket) >= day_limit:
-            retry_after = CHAT_WINDOW_SECONDS if minute_count >= minute_limit else CHAT_DAY_SECONDS
+        if minute_count >= minute_limit:
+            oldest_minute_request = next(
+                stamp for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS
+            )
+            retry_after = max(
+                1, math.ceil(CHAT_WINDOW_SECONDS - (now - oldest_minute_request))
+            )
+        elif len(bucket) >= day_limit:
+            retry_after = max(1, math.ceil(CHAT_DAY_SECONDS - (now - bucket[0])))
+        else:
+            retry_after = None
+        if retry_after is not None:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="JARVIS usage limit reached. Please try again later.",
