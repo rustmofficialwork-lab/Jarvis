@@ -58,6 +58,10 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
         }
         self.assertEqual(load_providers(env), [])
 
+    def test_rejects_deeply_nested_provider_configuration(self):
+        with self.assertRaises(ProviderConfigurationError):
+            load_providers({"JARVIS_AI_PROVIDERS": "[" * 1100 + "0" + "]" * 1100})
+
     def test_rejects_invalid_provider_configuration(self):
         with self.assertRaises(ProviderConfigurationError):
             load_providers({"JARVIS_AI_PROVIDERS": "{not-json"})
