@@ -138,7 +138,7 @@ def _verify_device_token(token: str, now: int | None = None) -> str | None:
         if str(UUID(subject)) != subject:
             return None
         return subject
-    except (ValueError, TypeError, KeyError, json.JSONDecodeError, binascii.Error, UnicodeError):
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError, binascii.Error, UnicodeError, RecursionError):
         return None
 
 
@@ -204,7 +204,7 @@ async def register_device(request: Request) -> Response:
     )
     try:
         payload = json.loads(raw_body)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         raise HTTPException(status_code=400, detail="Request body must be valid JSON.")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="Request body must be a JSON object.")
@@ -320,7 +320,7 @@ async def chat_completions(
     )
     try:
         payload: dict[str, Any] = json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
         raise HTTPException(status_code=400, detail="Request body must be valid JSON.")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="Request body must be a JSON object.")
