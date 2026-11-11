@@ -373,9 +373,15 @@ setInterval(updateClock,1000);updateClock();
     // Portrait phones get a landscape HUD rotated to fill the available
     // screen, preserving the original 1600x865 layout without shrinking it
     // into a tiny letterboxed strip. Landscape and desktop remain unchanged.
-    const portraitPhone=w<h&&w<900;
+    // Detect portrait from both the rendered container and the browser's
+    // orientation media query. Some Android browsers report a layout width
+    // above 900 CSS px even when the physical screen is in portrait.
+    const portraitPhone=(w<h)||(window.matchMedia&&window.matchMedia('(orientation: portrait)').matches);
     if(portraitPhone){
-      const scale=Math.min(h/DESIGN_WIDTH,w/DESIGN_HEIGHT);
+      const viewport=window.visualViewport;
+      const vw=Math.min(w,viewport&&viewport.width?viewport.width:w);
+      const vh=Math.min(h,viewport&&viewport.height?viewport.height:h);
+      const scale=Math.min(vh/DESIGN_WIDTH,vw/DESIGN_HEIGHT);
       design.style.left='50%';
       design.style.top='50%';
       design.style.transformOrigin='center center';
