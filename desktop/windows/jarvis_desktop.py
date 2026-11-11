@@ -230,8 +230,18 @@ def install_first_party_wakeword_model(source_path: Path,
     try:
         import onnxruntime as ort
         session = ort.InferenceSession(str(source), providers=["CPUExecutionProvider"])
-        if not session.get_inputs() or not session.get_outputs():
+        inputs = session.get_inputs()
+        outputs = session.get_outputs()
+        if not inputs or not outputs:
             raise ValueError("The ONNX model has no usable inputs or outputs.")
+        input_shape = inputs[0].shape
+        output_shape = outputs[0].shape
+        if (len(input_shape) != 3 or input_shape[-2:] != [16, 96]
+                or not output_shape or output_shape[-1] != 1):
+            raise ValueError(
+                "The ONNX file is not an openWakeWord classifier "
+                "(expected input [batch, 16, 96] and one score output)."
+            )
     except ImportError as exc:
         raise RuntimeError("ONNX Runtime is missing. Reinstall JARVIS voice dependencies.") from exc
     destination.parent.mkdir(parents=True, exist_ok=True)
