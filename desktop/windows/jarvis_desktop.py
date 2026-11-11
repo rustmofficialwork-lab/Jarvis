@@ -221,6 +221,22 @@ def update_wakeword_activation(
     return count >= required_frames, count
 
 
+WAKEWORD_SETUP_REQUIRED_ACTIVATIONS = 3
+
+
+def wakeword_setup_test_passed(activations: int, required: int = WAKEWORD_SETUP_REQUIRED_ACTIVATIONS) -> bool:
+    """Only pass onboarding after the number of spoken wake-word repetitions requested."""
+    if required < 1:
+        raise ValueError("required must be at least one.")
+    if isinstance(activations, bool):
+        return False
+    try:
+        count = int(activations)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return count >= required
+
+
 MICROPHONE_CONSENT_VERSION = 1
 
 
@@ -1339,7 +1355,7 @@ class JarvisDesktop:
                 deadline = time.monotonic() + 18
                 streak = 0
                 last_activation = 0.0
-                while time.monotonic() < deadline and result["activations"] < 3:
+                while time.monotonic() < deadline and result["activations"] < WAKEWORD_SETUP_REQUIRED_ACTIVATIONS:
                     raw = stream.read(1280, exception_on_overflow=False)
                     if len(raw) != 2560:
                         raise RuntimeError(
@@ -1356,7 +1372,7 @@ class JarvisDesktop:
                         result["activations"] += 1
                         last_activation = now
                         streak = 0
-                result["ok"] = result["activations"] > 0
+                result["ok"] = wakeword_setup_test_passed(result["activations"])
             except Exception as exc:
                 result["error"] = str(exc)
             finally:
@@ -3099,10 +3115,10 @@ class JarvisDesktop:
                     if self.voice_setup_window is not None:
                         try:
                             activations = int(value.get("activations", 0))
-                            if value.get("ok") and activations > 0:
+                            if value.get("ok") and wakeword_setup_test_passed(activations):
                                 self.voice_setup_test_passed = True
                                 self.voice_setup_test_var.set(
-                                    f"3. Wake word detected ({activations} activation(s))."
+                                    f"3. Wake word detected {activations}/{WAKEWORD_SETUP_REQUIRED_ACTIVATIONS} times."
                                 )
                                 self.voice_setup_status_var.set("VOICE TEST PASSED — SETUP READY")
                                 self.voice_setup_finish_button.configure(state="normal")
@@ -3112,7 +3128,7 @@ class JarvisDesktop:
                                 message = (
                                     f"3. Wake word not detected. {detail}"
                                     if detail else
-                                    "3. No detection yet. Check mic level and try saying “Jarvis” again."
+                                    f"3. Detected {activations}/{WAKEWORD_SETUP_REQUIRED_ACTIVATIONS}. Say “Jarvis” clearly until all three detections register."
                                 )
                                 self.voice_setup_test_var.set(message)
                                 self.voice_setup_status_var.set("VOICE TEST NEEDS ANOTHER TRY")
