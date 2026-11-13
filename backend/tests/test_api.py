@@ -21,7 +21,8 @@ os.environ["JARVIS_DEVICE_TOKEN_SECRET"] = "test-device-token-secret-that-is-lon
 
 from app.main import (  # noqa: E402
     UPSTREAM_URL, _chat_attempts, _legacy_chat_attempts, _b64url,
-    _read_request_body_limited, _verify_device_token, app, require_client_token,
+    _read_request_body_limited, _verify_device_token, _enforce_shared_rate_limits,
+    app, require_client_token,
 )
 
 
@@ -96,6 +97,53 @@ class RequestBodyLimitTests(unittest.IsolatedAsyncioTestCase):
         body = await _read_request_body_limited(request, 5, detail="too large")
         self.assertEqual(body, b"")
         self.assertEqual(request.consumed, 0)
+
+
+class SharedRateLimitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_shared_limiter_uses_one_atomic_redis_script_for_all_windows(self):
+        class FakeRedis:
+            def __init__(self):
+                self.calls = []
+            async def eval(self, script, number_of_keys, *args):
+                self.calls.append((script, number_of_keys, args))
+                return [1, 0]
+
+        redis = FakeRedis()
+        with patch("app.main._get_rate_limit_redis", return_value=redis):
+            allowed = await _enforce_shared_rate_limits(
+                "chat-device", "device-123", [(60, 8), (86400, 120)], "limited"
+            )
+        self.assertTrue(allowed)
+        self.assertEqual(len(redis.calls), 1)
+        script, number_of_keys, args = redis.calls[0]
+        self.assertIn("ZREMRANGEBYSCORE", script)
+        self.assertEqual(number_of_keys, 2)
+        self.assertEqual(args[2:], ("60", "8", "86400", "120"))
+
+    async def test_shared_limiter_returns_retry_after_when_redis_blocks(self):
+        class FakeRedis:
+            async def eval(self, *_args):
+                return [0, 37]
+
+        with patch("app.main._get_rate_limit_redis", return_value=FakeRedis()):
+            with self.assertRaises(HTTPException) as raised:
+                await _enforce_shared_rate_limits(
+                    "registration", "192.0.2.1", [(3600, 10)], "too many"
+                )
+        self.assertEqual(raised.exception.status_code, 429)
+        self.assertEqual(raised.exception.headers["Retry-After"], "37")
+
+    async def test_shared_limiter_fails_closed_when_redis_is_unavailable(self):
+        class BrokenRedis:
+            async def eval(self, *_args):
+                raise OSError("connection failed")
+
+        with patch("app.main._get_rate_limit_redis", return_value=BrokenRedis()):
+            with self.assertRaises(HTTPException) as raised:
+                await _enforce_shared_rate_limits(
+                    "chat-device", "device-123", [(60, 8)], "limited"
+                )
+        self.assertEqual(raised.exception.status_code, 503)
 
 
 class BackendApiTests(unittest.TestCase):
