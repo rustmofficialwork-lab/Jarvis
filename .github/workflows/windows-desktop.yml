@@ -53,8 +53,8 @@ jobs:
         run: node --test desktop/windows/test_jarvis_gesture_logic.cjs
       - name: Compile Python source
         run: python -m compileall -q desktop/windows
-      - name: Install PDF parser for document tests
-        run: python -m pip install pypdf Pillow
+      - name: Install desktop runtime dependencies for unit tests
+        run: python -m pip install -r desktop/windows/requirements.txt
       - name: Run desktop unit tests
         run: python -m unittest discover -s desktop/windows -p "test_*.py"
 
