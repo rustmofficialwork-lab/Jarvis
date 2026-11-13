@@ -22,14 +22,30 @@
     }
   };
   const style = document.createElement('style');
-  style.textContent = '#jx-extensions{position:fixed;right:18px;bottom:18px;z-index:260;display:flex;gap:8px;align-items:center;font:600 13px Rajdhani,sans-serif}#jx-extensions button{background:rgba(2,20,32,.94);border:1px solid #00e5ff;color:#a4f4ff;padding:9px 13px;cursor:pointer}#jx-extensions button[aria-pressed=true]{background:rgba(0,229,255,.24);box-shadow:0 0 12px #00bfe5}#jx-ext-status{max-width:220px;color:#a4f4ff;background:rgba(2,20,32,.88);padding:7px 10px;border-left:2px solid #00e5ff}#jx-camera-preview{position:fixed;right:18px;bottom:64px;width:180px;aspect-ratio:4/3;object-fit:cover;z-index:259;border:1px solid #00e5ff;transform:scaleX(-1);display:none;background:#020b14}#jx-holo-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}.hud-inner.jx-gesture-active .orb-wrapper{filter:drop-shadow(0 0 20px rgba(0,229,255,.9))}@media(max-width:700px){#jx-extensions{right:8px;bottom:8px;flex-wrap:wrap;justify-content:flex-end}#jx-ext-status{max-width:145px}#jx-camera-preview{right:8px;bottom:92px;width:132px}}@media(prefers-reduced-motion:reduce){#jx-holo-canvas{display:none}}';
+  style.textContent = `
+    #jx-extensions{position:fixed;right:18px;bottom:18px;z-index:260;display:flex;gap:8px;align-items:center;padding:8px;border:1px solid rgba(31,209,255,.48);border-radius:10px;background:linear-gradient(145deg,rgba(4,25,39,.96),rgba(2,10,19,.94));box-shadow:0 0 18px rgba(0,190,235,.16),inset 0 0 14px rgba(0,190,235,.06);backdrop-filter:blur(10px);font:600 13px Rajdhani,sans-serif}
+    #jx-extensions button{min-height:34px;border:1px solid rgba(31,209,255,.65);border-radius:5px;background:rgba(5,36,54,.88);color:#baf4ff;padding:7px 11px;font:700 11px Orbitron,sans-serif;letter-spacing:.35px;cursor:pointer;transition:background .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+    #jx-extensions button:hover:not(:disabled){background:rgba(0,190,235,.2);border-color:#8eeaff;box-shadow:0 0 12px rgba(0,210,255,.3);transform:translateY(-1px)}
+    #jx-extensions button:active:not(:disabled){transform:translateY(0) scale(.98)}
+    #jx-extensions button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+    #jx-extensions button[aria-pressed=true]{background:linear-gradient(135deg,rgba(0,190,235,.32),rgba(0,90,130,.35));border-color:#8eeaff;box-shadow:inset 0 0 10px rgba(0,210,255,.16),0 0 10px rgba(0,190,235,.2)}
+    #jx-extensions button:disabled{opacity:.55;cursor:wait}
+    #jx-ext-status{position:relative;max-width:220px;min-width:135px;padding:6px 9px 6px 17px;color:#c9f7ff;background:rgba(0,10,18,.58);border-left:1px solid rgba(31,209,255,.3);font:600 12px Rajdhani,sans-serif;line-height:1.2}
+    #jx-ext-status:before{content:"";position:absolute;left:6px;top:50%;width:5px;height:5px;border-radius:50%;background:#2dffb0;box-shadow:0 0 7px #2dffb0;transform:translateY(-50%)}
+    #jx-camera-preview{position:fixed;right:18px;bottom:72px;width:180px;aspect-ratio:4/3;object-fit:cover;z-index:259;border:1px solid #31d9ff;border-radius:8px;box-shadow:0 0 18px rgba(0,190,235,.24);transform:scaleX(-1);display:none;background:#020b14}
+    #jx-holo-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+    .hud-inner.jx-gesture-active .orb-wrapper{filter:drop-shadow(0 0 20px rgba(0,229,255,.9))}
+    @media(max-width:700px){#jx-extensions{right:8px;bottom:8px;gap:5px;max-width:calc(100vw - 16px);flex-wrap:wrap;justify-content:flex-end;padding:6px}#jx-extensions button{font-size:10px;padding:6px 8px}#jx-ext-status{max-width:145px;min-width:110px;font-size:11px}#jx-camera-preview{right:8px;bottom:104px;width:132px}}
+    @media(prefers-reduced-motion:reduce){#jx-holo-canvas{display:none}#jx-extensions button{transition:none}}
+  `;
   document.head.appendChild(style);
   const controls=document.createElement('div');controls.id='jx-extensions';
   controls.innerHTML='<span id="jx-ext-status" role="status">3D hologram ready · Camera off</span><button id="jx-gesture-toggle" type="button" aria-pressed="false">ENABLE GESTURES</button><button id="jx-face-toggle" type="button" aria-pressed="false">FACE PRESENCE</button>';
   document.body.appendChild(controls);
   const preview=document.createElement('video');preview.id='jx-camera-preview';preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Local hand gesture camera preview');document.body.appendChild(preview);
   const status=document.getElementById('jx-ext-status'),toggle=document.getElementById('jx-gesture-toggle'),faceToggle=document.getElementById('jx-face-toggle'),hud=document.querySelector('.hud-inner'),orb=document.querySelector('.orb-wrapper');
-  if(orb){
+  const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
+  if(orb&&!reducedMotion){
     const canvas=document.createElement('canvas');canvas.id='jx-holo-canvas';orb.appendChild(canvas);
     import(new URL('three.module.js', vendorBase).href).catch(localError=>{console.warn('JARVIS bundled Three.js unavailable; trying CDN fallback',localError);return import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');}).then(({WebGLRenderer,Scene,PerspectiveCamera,TorusKnotGeometry,Mesh,MeshBasicMaterial,Group,AmbientLight,Clock})=>{
       if(!canvas.isConnected)return;
