@@ -62,7 +62,7 @@
       status.textContent='3D hologram ready · Camera off';
     }).catch(err=>{console.warn('JARVIS Three.js hologram unavailable; starting native canvas fallback',err);const ctx=canvas.getContext('2d');if(!ctx){status.textContent='Hologram unavailable · HUD remains active';return;}let active=true,angle=0;const resize=()=>{const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);};const observer=new ResizeObserver(resize);observer.observe(orb);resize();const draw=()=>{if(!active)return;const w=canvas.clientWidth,h=canvas.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)*.34;ctx.clearRect(0,0,w,h);angle+=.012;for(let ring=0;ring<3;ring++){ctx.beginPath();ctx.ellipse(cx,cy,r*(1-ring*.19),r*(.34+ring*.12),angle*(ring%2?-.7:1),0,Math.PI*2);ctx.strokeStyle=ring===1?'rgba(255,138,50,.8)':'rgba(0,220,255,.78)';ctx.lineWidth=1.5;ctx.shadowBlur=12;ctx.shadowColor=ctx.strokeStyle;ctx.stroke();}ctx.beginPath();ctx.arc(cx,cy,r*.16,0,Math.PI*2);ctx.fillStyle='rgba(0,220,255,.22)';ctx.fill();ctx.strokeStyle='#8eeaff';ctx.stroke();ctx.shadowBlur=0;requestAnimationFrame(draw);};draw();window.addEventListener('pagehide',()=>{active=false;observer.disconnect();},{once:true});status.textContent='Hologram ready · native canvas fallback · Camera off';});
   }
-  let stream=null,cameraUsers=0,cameraPromise=null,landmarker=null,raf=0,lastSwipe=0,lastPinch=false,lastFist=false,swipeStartX=null,swipeStartAt=0,lastGestureAt=0,hologramRig=null,faceDetector=null,faceRaf=0,facePreview=null;
+  let stream=null,cameraUsers=0,cameraPromise=null,landmarker=null,raf=0,lastPinch=false,lastFist=false,lastGestureAt=0,hologramRig=null,faceDetector=null,faceRaf=0,facePreview=null;
   const acquireCamera=async video=>{
     if(!stream){
       if(!cameraPromise){
@@ -110,7 +110,7 @@
     target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:point.x,clientY:point.y}));
     return true;
   };
-  const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;swipeStartX=null;swipeStartAt=0;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus(facePreview.srcObject?'Face presence active · camera in use':'3D hologram ready · Camera off');};
+  const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus(facePreview.srcObject?'Face presence active · camera in use':'3D hologram ready · Camera off');};
   facePreview=document.createElement('video');facePreview.muted=true;facePreview.autoplay=true;facePreview.playsInline=true;facePreview.style.cssText='position:fixed;right:18px;bottom:64px;width:180px;display:none;opacity:.01;pointer-events:none';document.body.appendChild(facePreview);
   let facePresent=false;
   const stopFace=()=>{cancelAnimationFrame(faceRaf);faceRaf=0;if(facePreview.srcObject){releaseCamera(facePreview);}facePreview.style.display='none';faceDetector?.close?.();faceDetector=null;facePresent=false;hud?.classList.remove('jx-face-present');faceToggle.setAttribute('aria-pressed','false');faceToggle.textContent='FACE PRESENCE';setStatus(stream?'Gestures active':'3D hologram ready · Camera off');};
@@ -132,7 +132,6 @@
     const swipe=gesture.updateSwipe(hand[0].x,now,swipeState);
     swipeState=swipe.state;
     if(swipe.direction){
-      lastSwipe=now;
       if(hologramRig){hologramRig.rotation.y+=(swipe.direction>0?-.65:.65);setStatus('Gesture: swipe · hologram rotated');}
     }
     lastPinch=pinch;lastFist=fist;
