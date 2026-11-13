@@ -13,3 +13,6 @@ vosk>=0.3.45,<1
 pypdf>=5,<7
 pywebview>=5.4,<7
 huggingface_hub>=0.26,<1
+# Required by local ECAPA speaker verification (owner_voice_verification.py).
+numpy>=1.26,<2
+onnxruntime>=1.17,<2
