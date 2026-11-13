@@ -246,14 +246,17 @@ html,body,.hud-container{background:#000!important}
 
 @media(prefers-reduced-motion:reduce){.hud-inner::after,.orb-outer-ring,.orb-segments-1,.orb-segments-2,.orb-core,.waveform div,.eq div,.helmet::before{animation:none!important}}
 
-/* ===== Helmet framing correction: fill the marked right-side gap ===== */
+/* ===== Reference composition: full-height helmet crop at the right edge ===== */
 .helmet{
-  left:1240px !important;
-  background-size:125% 100% !important;
-  background-position:left center !important;
+  left:1125px !important;
+  width:600px !important;
+  height:851px !important;
+  background-size:100% 100% !important;
+  background-position:center center !important;
   background-repeat:no-repeat !important;
-  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 12%,#000 100%) !important;
-  mask-image:linear-gradient(90deg,transparent 0,#000 12%,#000 100%) !important;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 8%,#000 100%) !important;
+  mask-image:linear-gradient(90deg,transparent 0,#000 8%,#000 100%) !important;
+  clip-path:inset(0 0 0 0) !important;
 }
 .helmet::after{content:none !important;display:none !important}
 
