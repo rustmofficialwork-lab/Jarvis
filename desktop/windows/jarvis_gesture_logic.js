@@ -23,16 +23,25 @@
     const maxDuration = Number.isFinite(options.maxDuration) ? options.maxDuration : 650;
     const cooldown = Number.isFinite(options.cooldown) ? options.cooldown : 900;
     if (!Number.isFinite(x) || !Number.isFinite(now)) return { direction: 0, state };
-    if (state.startX == null || now - state.startAt > maxDuration) {
-      return { direction: 0, state: { ...state, startX: x, startAt: now } };
+    const safeState = state && typeof state === 'object' ? state : emptySwipeState();
+    const startX = Number.isFinite(safeState.startX) ? safeState.startX : null;
+    const startAt = Number.isFinite(safeState.startAt) ? safeState.startAt : now;
+    const lastAt = Number.isFinite(safeState.lastAt) ? safeState.lastAt : -Infinity;
+    const nextState = { ...safeState, startX, startAt, lastAt };
+
+    if (startX == null || now < startAt || now - startAt > maxDuration) {
+      return { direction: 0, state: { ...nextState, startX: x, startAt: now } };
     }
-    const delta = x - state.startX;
-    if (Math.abs(delta) < minDelta || now - (state.lastAt ?? -Infinity) < cooldown) {
-      return { direction: 0, state };
+    // Keep refreshing the baseline during cooldown so movement made while the
+    // gesture is locked out cannot fire late when the cooldown expires.
+    if (now - lastAt < cooldown) {
+      return { direction: 0, state: { ...nextState, startX: x, startAt: now } };
     }
+    const delta = x - startX;
+    if (Math.abs(delta) < minDelta) return { direction: 0, state: nextState };
     return {
       direction: delta > 0 ? 1 : -1,
-      state: { ...state, startX: x, startAt: now, lastAt: now }
+      state: { ...nextState, startX: x, startAt: now, lastAt: now }
     };
   };
   const emptySwipeState = () => ({ startX: null, startAt: 0, lastAt: -Infinity });
