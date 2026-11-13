@@ -16,7 +16,7 @@ pip install -r requirements.txt
 python jarvis_desktop.py
 ```
 
-Windows CI compiles Python source, runs the desktop unit tests, packages the portable `desktop/windows/dist/JARVIS/` application folder, builds the Inno Setup installer, uploads both artifacts, and publishes the rolling `jarvis-latest` prerelease on successful pushes to `main`. These checks do not exercise microphone hardware or validate live backend credentials.
+Windows CI compiles Python source, runs the desktop unit tests, packages the portable `desktop/windows/dist/JARVIS/` application folder, builds the Inno Setup installer, optionally signs artifacts when the `WINDOWS_SIGNING_CERT_BASE64` and `WINDOWS_SIGNING_CERT_PASSWORD` repository secrets are configured, uploads both artifacts, and publishes the rolling `jarvis-latest` prerelease on successful pushes to `main`. See [CODE_SIGNING.md](desktop/windows/CODE_SIGNING.md). These checks do not exercise microphone hardware or validate live backend credentials.
 
 ## Wake word and voice
 
