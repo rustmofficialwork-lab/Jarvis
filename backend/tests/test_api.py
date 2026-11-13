@@ -118,7 +118,7 @@ class SharedRateLimitTests(unittest.IsolatedAsyncioTestCase):
         script, number_of_keys, args = redis.calls[0]
         self.assertIn("ZREMRANGEBYSCORE", script)
         self.assertEqual(number_of_keys, 2)
-        self.assertEqual(args[2:], ("60", "8", "86400", "120"))
+        self.assertEqual(args[4:], ("60", "8", "86400", "120"))
 
     async def test_shared_limiter_returns_retry_after_when_redis_blocks(self):
         class FakeRedis:
