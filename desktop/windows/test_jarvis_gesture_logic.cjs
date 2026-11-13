@@ -60,3 +60,26 @@ test('slow drift outside the swipe window does not activate', () => {
   assert.equal(result.direction, 0);
   assert.equal(result.state.startX, 0.8);
 });
+
+
+test('movement during swipe cooldown cannot trigger late after cooldown expires', () => {
+  let state = logic.emptySwipeState();
+  state = logic.updateSwipe(0.2, 1000, state).state;
+  let result = logic.updateSwipe(0.55, 1200, state);
+  assert.equal(result.direction, 0);
+  state = result.state;
+  result = logic.updateSwipe(0.55, 2050, state);
+  assert.equal(result.direction, 0);
+  state = result.state;
+  result = logic.updateSwipe(0.8, 2200, state);
+  assert.equal(result.direction, 1);
+});
+
+test('swipe helper safely recovers from malformed state and non-monotonic timestamps', () => {
+  let result = logic.updateSwipe(0.4, 1000, null);
+  assert.equal(result.direction, 0);
+  assert.equal(result.state.startX, 0.4);
+  result = logic.updateSwipe(0.8, 900, result.state);
+  assert.equal(result.direction, 0);
+  assert.equal(result.state.startX, 0.8);
+});
