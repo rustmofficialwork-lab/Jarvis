@@ -40,10 +40,10 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 - `GET /health` — public minimal health response.
 - `POST /v1/devices/register` — accepts a random per-installation UUID and returns a signed, 30-day device credential. Registration is rate-limited by network address.
-- `POST /v1/chat/completions` — requires a valid signed device credential or a legacy `JARVIS_CLIENT_TOKEN`; accepts an OpenAI-compatible JSON object with 1–60 messages and forwards it to the configured provider chain. Signed device credentials are limited to 8 requests/minute and 120 requests/day per running backend process. Legacy shared-token clients remain supported and are throttled per direct peer IP at 30 requests/minute and 600 requests/day.
+- `POST /v1/chat/completions` — requires a valid signed device credential or a legacy `JARVIS_CLIENT_TOKEN`; accepts an OpenAI-compatible JSON object with 1–60 messages and forwards it to the configured provider chain. Signed device credentials are limited to 8 requests/minute and 120 requests/day. Legacy shared-token clients remain supported and are throttled per direct peer IP at 30 requests/minute and 600 requests/day.
 - Interactive API docs are disabled.
 
-Requests are size-limited. Upstream calls have a bounded timeout and response-size cap. Registration and chat rate-limit counters are held in process memory: they reset on restart and are not shared between multiple backend workers/instances. For horizontally scaled production deployments, use a shared rate-limit store before relying on these limits as a hard global quota. Streaming is intentionally disabled; the desktop client consumes a complete JSON response. Provider errors are normalized so secrets and upstream internals are not relayed.
+Requests are size-limited. Upstream calls have a bounded timeout and response-size cap. When `REDIS_URL` points to a Redis-compatible Redis/Valkey service, registration and chat limits are enforced atomically across backend workers/instances. If `REDIS_URL` is unset, the backend falls back to in-process counters for local single-process development; those counters reset on restart and are not shared. If Redis is configured but unreachable, rate-limited endpoints fail closed with HTTP 503 instead of silently bypassing the shared limits. Configure the same private Redis URL on every backend instance. Streaming is intentionally disabled; the desktop client consumes a complete JSON response. Provider errors are normalized so secrets and upstream internals are not relayed.
 
 ## Personal memory
 
@@ -51,7 +51,7 @@ Personal memories are stored locally by each Windows desktop installation in the
 
 ## Deployment
 
-The Docker image starts Uvicorn on port 8000 and runs as an unprivileged `jarvis` user. Configure `JARVIS_DEVICE_TOKEN_SECRET` and `OPENROUTER_API_KEY` as secret environment variables in the hosting dashboard; the Render Blueprint generates the device signing secret. `JARVIS_CLIENT_TOKEN` remains available for older desktop clients. No database volume is required for backend chat because the backend does not persist chat or memory data.
+The Docker image starts Uvicorn on port 8000 and runs as an unprivileged `jarvis` user. Configure `JARVIS_DEVICE_TOKEN_SECRET` and `OPENROUTER_API_KEY` as secret environment variables in the hosting dashboard; the Render Blueprint generates the device signing secret. For multi-instance rate limiting, provision a Redis-compatible service in the same private network/region and set `REDIS_URL` on the backend service. Keep this URL private and do not commit it. `JARVIS_CLIENT_TOKEN` remains available for older desktop clients. No database volume is required for backend chat because the backend does not persist chat or memory data.
 
 ## Tests
 
