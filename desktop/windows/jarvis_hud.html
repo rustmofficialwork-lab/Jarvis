@@ -123,7 +123,7 @@ h1,h2,h3,h4{font-family:var(--head);font-weight:400;color:var(--hi)}
 .quick-item:active{background:rgba(31,209,255,.35)}
 
 /* ===== RIGHT ===== */
-.back-btn{position:absolute;left:1543px;top:5px;width:46px;height:46px;border-radius:50%;border:2px solid #fff;display:flex;justify-content:center;align-items:center;color:#fff;font-size:1.3rem;z-index:20;box-shadow:0 0 8px var(--cyan);transition:.3s}
+.back-btn{position:absolute;left:1505px;top:15px;width:46px;height:46px;border-radius:50%;border:2px solid #fff;display:flex;justify-content:center;align-items:center;color:#fff;font-size:1.3rem;z-index:20;box-shadow:0 0 8px var(--cyan);transition:.3s}
 .back-btn:hover{background:rgba(31,209,255,.25)}
 .desk-icon{position:absolute;width:110px;text-align:center;color:#fff;font:600 1.05rem/1.15 var(--ui);z-index:10}
 .desk-icon i{display:block;font-size:3rem;margin-bottom:6px}
@@ -194,44 +194,27 @@ html,body,.hud-container{background:#000!important}
   background-image:none!important;
   box-shadow:none!important;
 }
-/* Keep the embedded helmet's visual treatment and reference-image placement in one rule. */
+/* Match the supplied 16:9 reference: natural helmet crop, full-height right panel. */
+.hud-inner{height:900px!important}
 .helmet{
   position:absolute;
   isolation:isolate;
   background-color:transparent!important;
-  filter:drop-shadow(0 0 9px rgba(0,190,235,.24)) drop-shadow(0 0 24px rgba(0,120,180,.12));
-  will-change:filter;
+  filter:none!important;
+  will-change:auto;
   left:1125px!important;
+  top:0!important;
   width:600px!important;
-  height:851px!important;
-  background-size:100% 100%!important;
+  height:900px!important;
+  background-size:cover!important;
   background-position:center center!important;
   background-repeat:no-repeat!important;
-  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 8%,#000 100%)!important;
-  mask-image:linear-gradient(90deg,transparent 0,#000 8%,#000 100%)!important;
-  clip-path:inset(0 0 0 0)!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+  clip-path:none!important;
 }
-.helmet::before{
-  content:"";
-  position:absolute;
-  z-index:1;
-  inset:0;
-  pointer-events:none;
-  background:
-    linear-gradient(112deg,transparent 28%,rgba(100,235,255,.10) 43%,rgba(190,250,255,.20) 49%,rgba(50,190,255,.08) 55%,transparent 68%),
-    radial-gradient(ellipse at 53% 34%,rgba(0,195,255,.10),transparent 58%);
-  background-size:240% 100%,100% 100%;
-  background-position:140% 0,center;
-  mix-blend-mode:screen;
-  opacity:.72;
-  animation:helmetLightSweep 11s ease-in-out infinite;
-}
-@keyframes helmetLightSweep{
-  0%,18%{background-position:140% 0,center;opacity:.28}
-  55%{background-position:-45% 0,center;opacity:.72}
-  78%,100%{background-position:-45% 0,center;opacity:.28}
-}
-/* No pseudo-element overlay: preserve the full helmet artwork. */
+.helmet::before{content:none!important;display:none!important}
+.helmet::after{content:none!important;display:none!important}
 
 .orb-mid-ring{background:radial-gradient(circle,#020609 30%,#000 78%)!important}
 .orb-inner-detail{background:radial-gradient(circle,#2fd8ff 5%,#06384a 55%,#000 100%)!important}
@@ -386,9 +369,8 @@ setInterval(updateClock,1000);updateClock();
   const container=document.querySelector('.hud-container');
   const design=document.querySelector('.hud-inner');
   let frame=0;
-  // The design box is 1600x851, while its lowest fixed-position gauge ends
-  // at y=865. Fit that complete visual bound, not just the CSS box.
-  const DESIGN_WIDTH=1600, DESIGN_HEIGHT=865;
+  // The reference HUD is designed on a 1600x900 (16:9) canvas.
+  const DESIGN_WIDTH=1600, DESIGN_HEIGHT=900;
   const scaleHUD=()=>{
     if(!container||!design)return;
     const bounds=container.getBoundingClientRect();
