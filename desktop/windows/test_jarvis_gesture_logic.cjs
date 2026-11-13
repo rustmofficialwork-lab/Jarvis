@@ -66,11 +66,18 @@ test('movement during swipe cooldown cannot trigger late after cooldown expires'
   let state = logic.emptySwipeState();
   state = logic.updateSwipe(0.2, 1000, state).state;
   let result = logic.updateSwipe(0.55, 1200, state);
+  assert.equal(result.direction, 1);
+  state = result.state;
+
+  // Movement while locked out refreshes the baseline instead of queuing a swipe.
+  result = logic.updateSwipe(0.55, 1500, state);
   assert.equal(result.direction, 0);
   state = result.state;
   result = logic.updateSwipe(0.55, 2050, state);
   assert.equal(result.direction, 0);
   state = result.state;
+
+  // A fresh movement after cooldown is allowed.
   result = logic.updateSwipe(0.8, 2200, state);
   assert.equal(result.direction, 1);
 });
