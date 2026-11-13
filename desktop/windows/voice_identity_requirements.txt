@@ -1,1 +1,5 @@
+# Optional owner-speaker verification setup dependencies.
+# Keep NumPy below 2 until the pinned ECAPA ONNX model/runtime is validated with NumPy 2.
+numpy>=1.26,<2
+onnxruntime>=1.17,<2
 huggingface_hub>=0.26,<1
