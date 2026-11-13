@@ -206,12 +206,13 @@ html,body,.hud-container{background:#000!important}
   top:0!important;
   width:600px!important;
   height:900px!important;
-  background-size:cover!important;
-  background-position:center center!important;
+  /* Fit the complete portrait artwork to the HUD height, then trim its unwanted far-right strip. */
+  background-size:100% 100%!important;
+  background-position:left center!important;
   background-repeat:no-repeat!important;
   -webkit-mask-image:none!important;
   mask-image:none!important;
-  clip-path:none!important;
+  clip-path:inset(0 25% 0 0)!important;
 }
 .helmet::before{content:none!important;display:none!important}
 .helmet::after{content:none!important;display:none!important}
