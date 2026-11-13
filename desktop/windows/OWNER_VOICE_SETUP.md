@@ -16,7 +16,7 @@ At runtime, the wake listener first detects “Jarvis”, then asks the speaker 
 4. Read the prompts naturally while JARVIS records the eight samples.
 5. Complete the wake-word test and finish setup.
 
-If the optional download helper is needed, run from `desktop/windows`:
+To install the optional owner-voice model download and inference dependencies, run from `desktop/windows`:
 
 ```powershell
 py -m pip install -r voice_identity_requirements.txt
