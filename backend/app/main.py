@@ -12,7 +12,7 @@ import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 from .provider_router import ProviderConfigurationError, ProviderUnavailable, request_with_failover
@@ -64,6 +64,100 @@ _rate_lock = asyncio.Lock()
 _registration_attempts: dict[str, deque[float]] = defaultdict(deque)
 _chat_attempts: dict[str, deque[float]] = defaultdict(deque)
 _legacy_chat_attempts: dict[str, deque[float]] = defaultdict(deque)
+_redis_client = None
+_redis_client_url = ""
+
+_REDIS_RATE_LIMIT_SCRIPT = """
+local now = tonumber(ARGV[1])
+local member = ARGV[2]
+local retry_after = 0
+for i, key in ipairs(KEYS) do
+    local window = tonumber(ARGV[2 * i + 1])
+    local maximum = tonumber(ARGV[2 * i + 2])
+    redis.call("ZREMRANGEBYSCORE", key, "-inf", now - window)
+    local count = redis.call("ZCARD", key)
+    if count >= maximum then
+        local oldest = redis.call("ZRANGE", key, 0, 0, "WITHSCORES")
+        if oldest[2] then
+            local wait = math.max(1, math.ceil(window - (now - tonumber(oldest[2]))))
+            if wait > retry_after then retry_after = wait end
+        end
+    end
+end
+if retry_after > 0 then return {0, retry_after} end
+for i, key in ipairs(KEYS) do
+    local window = tonumber(ARGV[2 * i + 1])
+    redis.call("ZADD", key, now, member)
+    redis.call("PEXPIRE", key, (window + 5) * 1000)
+end
+return {1, 0}
+"""
+
+
+def _get_rate_limit_redis():
+    """Return a shared Redis-compatible client when REDIS_URL is configured.
+
+    If configured but unavailable, callers fail closed instead of silently
+    reverting to per-process limits and weakening protection across instances.
+    """
+    global _redis_client, _redis_client_url
+    url = os.getenv("REDIS_URL", "").strip()
+    if not url:
+        return None
+    if not url.startswith(("redis://", "rediss://")):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Shared rate limiting is misconfigured.",
+        )
+    if _redis_client is None or _redis_client_url != url:
+        try:
+            from redis.asyncio import Redis
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Shared rate limiting dependency is unavailable.",
+            ) from exc
+        _redis_client = Redis.from_url(
+            url, decode_responses=True, socket_connect_timeout=2,
+            socket_timeout=2, health_check_interval=30,
+        )
+        _redis_client_url = url
+    return _redis_client
+
+
+async def _enforce_shared_rate_limits(
+    namespace: str, rate_key: str, limits: list[tuple[int, int]], detail: str
+) -> bool:
+    """Atomically enforce multiple rolling windows across backend instances.
+
+    Returns False only when REDIS_URL is unset, allowing the documented
+    single-process in-memory development fallback.
+    """
+    client = _get_rate_limit_redis()
+    if client is None:
+        return False
+    keys = [f"jarvis:rate:{namespace}:{rate_key}:{window}" for window, _ in limits]
+    arguments: list[str] = [str(time.time()), uuid4().hex]
+    for window, maximum in limits:
+        arguments.extend((str(window), str(maximum)))
+    try:
+        result = await client.eval(
+            _REDIS_RATE_LIMIT_SCRIPT, len(keys), *keys, *arguments
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Shared rate limiting is temporarily unavailable.",
+        ) from exc
+    allowed = int(result[0]) == 1
+    if not allowed:
+        retry_after = max(1, int(result[1]))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=detail,
+            headers={"Retry-After": str(retry_after)},
+        )
+    return True
 
 
 def _device_token_secret() -> bytes:
@@ -253,18 +347,24 @@ async def register_device(request: Request) -> Response:
     forwarded = request.headers.get("x-forwarded-for", "")
     forwarded_ip = forwarded.rsplit(",", 1)[-1].strip() if forwarded else ""
     client_ip = forwarded_ip or (request.client.host if request.client else "unknown")
-    now = time.monotonic()
-    async with _rate_lock:
-        _prune_rate_buckets(
-            _registration_attempts, now=now, window=REGISTRATION_WINDOW_SECONDS
-        )
-        await _enforce_window_limit(
-            _registration_attempts[client_ip],
-            now=now,
-            window=REGISTRATION_WINDOW_SECONDS,
-            maximum=REGISTRATION_MAX_ATTEMPTS,
-            detail="Too many device registrations from this network. Try again later.",
-        )
+    shared = await _enforce_shared_rate_limits(
+        "registration", client_ip,
+        [(REGISTRATION_WINDOW_SECONDS, REGISTRATION_MAX_ATTEMPTS)],
+        "Too many device registrations from this network. Try again later.",
+    )
+    if not shared:
+        now = time.monotonic()
+        async with _rate_lock:
+            _prune_rate_buckets(
+                _registration_attempts, now=now, window=REGISTRATION_WINDOW_SECONDS
+            )
+            await _enforce_window_limit(
+                _registration_attempts[client_ip],
+                now=now,
+                window=REGISTRATION_WINDOW_SECONDS,
+                maximum=REGISTRATION_MAX_ATTEMPTS,
+                detail="Too many device registrations from this network. Try again later.",
+            )
     token, expires_at = _issue_device_token(device_id)
     return Response(
         content=json.dumps({"access_token": token, "token_type": "Bearer",
@@ -323,30 +423,37 @@ async def chat_completions(
         rate_key = request.client.host if request.client else "unknown"
         minute_limit = LEGACY_CHAT_MAX_REQUESTS_PER_WINDOW
         day_limit = LEGACY_CHAT_MAX_REQUESTS_PER_DAY
-    async with _rate_lock:
-        _prune_rate_buckets(buckets, now=now, window=CHAT_DAY_SECONDS)
-        bucket = buckets[rate_key]
-        while bucket and bucket[0] <= now - CHAT_DAY_SECONDS:
-            bucket.popleft()
-        minute_count = sum(1 for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS)
-        if minute_count >= minute_limit:
-            oldest_minute_request = next(
-                stamp for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS
-            )
-            retry_after = max(
-                1, math.ceil(CHAT_WINDOW_SECONDS - (now - oldest_minute_request))
-            )
-        elif len(bucket) >= day_limit:
-            retry_after = max(1, math.ceil(CHAT_DAY_SECONDS - (now - bucket[0])))
-        else:
-            retry_after = None
-        if retry_after is not None:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="JARVIS usage limit reached. Please try again later.",
-                headers={"Retry-After": str(retry_after)},
-            )
-        bucket.append(now)
+    shared = await _enforce_shared_rate_limits(
+        "chat-device" if device_id is not None else "chat-legacy",
+        rate_key,
+        [(CHAT_WINDOW_SECONDS, minute_limit), (CHAT_DAY_SECONDS, day_limit)],
+        "JARVIS usage limit reached. Please try again later.",
+    )
+    if not shared:
+        async with _rate_lock:
+            _prune_rate_buckets(buckets, now=now, window=CHAT_DAY_SECONDS)
+            bucket = buckets[rate_key]
+            while bucket and bucket[0] <= now - CHAT_DAY_SECONDS:
+                bucket.popleft()
+            minute_count = sum(1 for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS)
+            if minute_count >= minute_limit:
+                oldest_minute_request = next(
+                    stamp for stamp in bucket if stamp > now - CHAT_WINDOW_SECONDS
+                )
+                retry_after = max(
+                    1, math.ceil(CHAT_WINDOW_SECONDS - (now - oldest_minute_request))
+                )
+            elif len(bucket) >= day_limit:
+                retry_after = max(1, math.ceil(CHAT_DAY_SECONDS - (now - bucket[0])))
+            else:
+                retry_after = None
+            if retry_after is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="JARVIS usage limit reached. Please try again later.",
+                    headers={"Retry-After": str(retry_after)},
+                )
+            bucket.append(now)
 
     length = request.headers.get("content-length")
     if length:
