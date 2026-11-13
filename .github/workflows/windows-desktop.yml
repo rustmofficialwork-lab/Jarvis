@@ -167,117 +167,25 @@ jobs:
 
           $certificatePath = Join-Path $env:RUNNER_TEMP "jarvis-signing.pfx"
           try {
-            [IO.File]::WriteAllBytes(
-              $certificatePath,
-              [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERT_BASE64)
-            )
+            [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERT_BASE64))
             $sdkRoot = Join-Path $env:ProgramFiles(x86) "Windows Kits\10\bin"
-            $signTool = Get-ChildItem -Path $sdkRoot -Filter signtool.exe -Recurse -ErrorAction Stop |
-              Where-Object { $_.FullName -match '\\x64\\signtool\.exe
-        uses: actions/upload-artifact@v7
-        with:
-          name: JARVIS-Windows-Installer-x64
-          path: desktop/windows/dist-installer/JARVIS-Setup-x64.exe
-          if-no-files-found: error
+            $signTool = $null
+            $candidates = Get-ChildItem -Path $sdkRoot -Filter signtool.exe -Recurse -ErrorAction Stop
+            foreach ($candidate in $candidates) {
+              if ($candidate.FullName.ToLowerInvariant().EndsWith("\x64\signtool.exe")) {
+                $signTool = $candidate
+              }
+            }
+            if (-not $signTool) { throw "Windows SDK x64 signtool.exe was not found." }
 
-      - name: Package portable release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "desktop/windows/dist/JARVIS/*" -DestinationPath "desktop/windows/dist-installer/JARVIS-Portable-x64.zip" -CompressionLevel Optimal
-
-      - name: Create SHA-256 checksums
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          $files = @(
-            "desktop/windows/dist-installer/JARVIS-Portable-x64.zip",
-            "desktop/windows/dist-installer/JARVIS-Setup-x64.exe"
-          )
-          $lines = foreach ($file in $files) {
-            $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
-            "$hash  $([System.IO.Path]::GetFileName($file))"
-          }
-          $lines | Out-File -FilePath SHA256SUMS.txt -Encoding ascii
-
-      - name: Point rolling release tag at this build
-        id: update_rolling_tag
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          gh api --method PATCH "repos/$env:GITHUB_REPOSITORY/git/refs/tags/jarvis-latest" -f sha="$env:GITHUB_SHA" -F force=true
-
-      - name: Remove obsolete standalone executable from rolling release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          $assets = gh release view jarvis-latest --json assets --jq '.assets[].name'
-          if ($assets -contains "JARVIS.exe") {
-            gh release delete-asset jarvis-latest JARVIS.exe --yes
-            if ($LASTEXITCODE -ne 0) { throw "Could not remove obsolete JARVIS.exe release asset." }
-          }
-
-      - name: Publish latest Windows downloads
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.update_rolling_tag.outcome == 'success'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: jarvis-latest
-          target_commitish: main
-          name: JARVIS Latest Windows Build
-          body: |
-            Latest successful Windows desktop build from the main branch.
-            Version: ${{ env.JARVIS_VERSION }}
-            Installer: JARVIS-Setup-x64.exe
-            Portable build: JARVIS-Portable-x64.zip (extract the complete folder and run JARVIS.exe)
-            The release is updated by the Windows Desktop workflow.
-          prerelease: true
-          make_latest: false
-          overwrite_files: true
-          files: |
-            desktop/windows/dist-installer/JARVIS-Setup-x64.exe
-            desktop/windows/dist-installer/JARVIS-Portable-x64.zip
-            SHA256SUMS.txt
-
-
-  backend-checks:
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - name: Install backend dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
-      - name: Run backend unit tests
-        run: python -m unittest discover -s tests -v
-      - name: Compile backend Python
-        run: python -m compileall -q app tests
- } |
-              Sort-Object FullName -Descending |
-              Select-Object -First 1
-            if (-not $signTool) { throw "Windows SDK signtool.exe was not found." }
-
-            $targets = @(
-              Get-ChildItem "desktop/windows/dist/JARVIS" -Recurse -File |
-                Where-Object { $_.Extension -in @(".exe", ".dll", ".pyd") } |
-                ForEach-Object { $_.FullName }
-              (Join-Path $PWD "desktop/windows/dist-installer/JARVIS-Setup-x64.exe")
-            )
+            $targets = New-Object System.Collections.Generic.List[string]
+            $binaryFiles = Get-ChildItem "desktop/windows/dist/JARVIS" -Recurse -File
+            foreach ($file in $binaryFiles) {
+              if ($file.Extension -in @(".exe", ".dll", ".pyd")) {
+                $targets.Add($file.FullName)
+              }
+            }
+            $targets.Add((Join-Path $PWD "desktop/windows/dist-installer/JARVIS-Setup-x64.exe"))
             foreach ($target in $targets) {
               & $signTool.FullName sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f $certificatePath /p $env:WINDOWS_SIGNING_CERT_PASSWORD $target
               if ($LASTEXITCODE -ne 0) { throw "Code signing failed for $target." }
