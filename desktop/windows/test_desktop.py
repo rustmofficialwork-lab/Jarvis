@@ -2479,8 +2479,6 @@ class HudLiveDataMappingTests(unittest.TestCase):
             "put('v-wifi', 'Wi-Fi ' + (data.network || 'N/A'))",
             "putAt(929, 616, data.temperature)",
             "putAt(779, 740, '- IP : ' + (data.ip || 'N/A'))",
-        self.assertNotIn("v-dl", runtime)
-        self.assertNotIn("data.upload", runtime)
             "putAt(942, 724, '- CPU : ' + (data.cpu || 'N/A'))",
             "putAt(942, 757, '- DISK : ' + (data.disk_percent || 'N/A'))",
             "data.disk_percent_value",
@@ -2488,6 +2486,8 @@ class HudLiveDataMappingTests(unittest.TestCase):
         ):
             with self.subTest(expression=expression):
                 self.assertIn(expression, runtime)
+        self.assertNotIn("v-dl", runtime)
+        self.assertNotIn("data.upload", runtime)
 
     def test_system_status_panel_omits_duplicate_battery_row_but_keeps_main_battery_widget(self):
         hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
