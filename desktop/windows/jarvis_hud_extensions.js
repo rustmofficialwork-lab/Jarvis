@@ -23,19 +23,21 @@
   };
   const style = document.createElement('style');
   style.textContent = `
-    #jx-extensions{position:fixed;right:18px;bottom:18px;z-index:260;display:flex;gap:8px;align-items:center;padding:8px;border:1px solid rgba(31,209,255,.48);border-radius:10px;background:#000;box-shadow:0 0 18px rgba(0,190,235,.16),inset 0 0 14px rgba(0,190,235,.06);backdrop-filter:blur(10px);font:600 13px Rajdhani,sans-serif}
-    #jx-extensions button{min-height:34px;border:1px solid rgba(31,209,255,.65);border-radius:5px;background:#000;color:#baf4ff;padding:7px 11px;font:700 11px Orbitron,sans-serif;letter-spacing:.35px;cursor:pointer;transition:background .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}
-    #jx-extensions button:hover:not(:disabled){background:rgba(0,190,235,.2);border-color:#8eeaff;box-shadow:0 0 12px rgba(0,210,255,.3);transform:translateY(-1px)}
-    #jx-extensions button:active:not(:disabled){transform:translateY(0) scale(.98)}
+    /* Match the original HUD: black glass, Rajdhani type, cyan edge-light. */
+    #jx-extensions{position:fixed;right:24px;bottom:24px;z-index:260;display:flex;gap:9px;align-items:center;flex-wrap:nowrap;max-width:calc(100vw - 32px);padding:9px 11px;border:1px solid rgba(25,211,255,.58);border-left:3px solid #19d3ff;border-radius:2px;background:rgba(0,8,14,.88);box-shadow:0 0 12px rgba(25,211,255,.18),inset 0 0 12px rgba(25,211,255,.05);backdrop-filter:blur(5px);font:600 14px Rajdhani,"Segoe UI",sans-serif}
+    #jx-extensions:before{content:"";position:absolute;left:0;right:0;top:-3px;height:1px;background:linear-gradient(90deg,transparent,#19d3ff 18%,#19d3ff 82%,transparent);opacity:.8}
+    #jx-extensions button{min-height:32px;border:1px solid rgba(25,211,255,.78);border-radius:1px;background:rgba(0,0,0,.72);color:#e8fbff;padding:6px 12px;font:600 14px Rajdhani,"Segoe UI",sans-serif;letter-spacing:.55px;text-transform:uppercase;cursor:pointer;text-shadow:0 0 7px rgba(25,211,255,.45);transition:background .18s ease,border-color .18s ease,box-shadow .18s ease}
+    #jx-extensions button:hover:not(:disabled){background:rgba(25,211,255,.14);border-color:#e6fcff;box-shadow:0 0 10px rgba(25,211,255,.3)}
+    #jx-extensions button:active:not(:disabled){background:rgba(25,211,255,.24)}
     #jx-extensions button:focus-visible{outline:2px solid #fff;outline-offset:3px}
-    #jx-extensions button[aria-pressed=true]{background:#000;border-color:#8eeaff;box-shadow:inset 0 0 10px rgba(0,210,255,.16),0 0 10px rgba(0,190,235,.2)}
+    #jx-extensions button[aria-pressed=true]{color:#fff;border-color:#8eeeff;background:rgba(0,170,205,.18);box-shadow:inset 0 0 9px rgba(25,211,255,.16),0 0 9px rgba(25,211,255,.2)}
     #jx-extensions button:disabled{opacity:.55;cursor:wait}
-    #jx-ext-status{position:relative;max-width:220px;min-width:135px;padding:6px 9px 6px 17px;color:#c9f7ff;background:#000;border-left:1px solid rgba(31,209,255,.3);font:600 12px Rajdhani,sans-serif;line-height:1.2}
-    #jx-ext-status:before{content:"";position:absolute;left:6px;top:50%;width:5px;height:5px;border-radius:50%;background:#2dffb0;box-shadow:0 0 7px #2dffb0;transform:translateY(-50%)}
-    #jx-camera-preview{position:fixed;right:18px;bottom:72px;width:180px;aspect-ratio:4/3;object-fit:cover;z-index:259;border:1px solid #31d9ff;border-radius:8px;box-shadow:0 0 18px rgba(0,190,235,.24);transform:scaleX(-1);display:none;background:#000}
+    #jx-ext-status{position:relative;max-width:210px;min-width:130px;padding:3px 4px 3px 15px;color:#c8f7ff;border-left:1px solid rgba(25,211,255,.28);font:600 13px Rajdhani,"Segoe UI",sans-serif;line-height:1.2}
+    #jx-ext-status:before{content:"";position:absolute;left:4px;top:50%;width:5px;height:5px;border-radius:50%;background:#19d3ff;box-shadow:0 0 7px #19d3ff;transform:translateY(-50%)}
+    #jx-camera-preview{position:fixed;right:24px;bottom:78px;width:180px;aspect-ratio:4/3;object-fit:cover;z-index:259;border:1px solid #19d3ff;border-radius:1px;box-shadow:0 0 14px rgba(25,211,255,.22);transform:scaleX(-1);display:none;background:#000}
     #jx-holo-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
     .hud-inner.jx-gesture-active .orb-wrapper{filter:drop-shadow(0 0 20px rgba(0,229,255,.9))}
-    @media(max-width:700px){#jx-extensions{right:8px;bottom:8px;gap:5px;max-width:calc(100vw - 16px);flex-wrap:wrap;justify-content:flex-end;padding:6px}#jx-extensions button{font-size:10px;padding:6px 8px}#jx-ext-status{max-width:145px;min-width:110px;font-size:11px}#jx-camera-preview{right:8px;bottom:104px;width:132px}}
+    @media(max-width:700px){#jx-extensions{right:8px;bottom:8px;gap:5px;max-width:calc(100vw - 16px);flex-wrap:wrap;padding:6px}#jx-extensions button{font-size:12px;padding:5px 8px}#jx-ext-status{max-width:135px;min-width:95px;font-size:11px}#jx-camera-preview{right:8px;bottom:105px;width:132px}}
     @media(prefers-reduced-motion:reduce){#jx-holo-canvas{display:none}#jx-extensions button{transition:none}}
   `;
   document.head.appendChild(style);
