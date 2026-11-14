@@ -1,5 +1,6 @@
 """Tests for local PC status reporting."""
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -27,7 +28,7 @@ class FakePsutil:
 
 
 class SystemMonitorTests(unittest.TestCase):
-    @unittest.mock.patch("system_monitor.read_windows_power_status", return_value=None)
+    @patch("system_monitor.read_windows_power_status", return_value=None)
     def test_status_contains_live_metrics(self, _native_power):
         result = get_system_status(FakePsutil(), now=lambda: datetime.fromtimestamp(1000 + 90061))
         self.assertIn("CPU usage: 23%", result)
