@@ -3765,23 +3765,36 @@ def run_web_hud():
     )
     bridge.window = window
 
-    runtime_path = Path(__file__).with_name("jarvis_hud_runtime.js")
-    if not runtime_path.exists() and getattr(sys, "frozen", False):
-        runtime_path = Path(sys._MEIPASS) / "jarvis_hud_runtime.js"
-    if not runtime_path.exists():
-        raise FileNotFoundError(f"JARVIS HUD runtime adapter not found: {runtime_path}")
-    runtime_source = runtime_path.read_text(encoding="utf-8")
+    def read_hud_asset(filename):
+        asset_path = Path(__file__).with_name(filename)
+        if not asset_path.exists() and getattr(sys, "frozen", False):
+            asset_path = Path(sys._MEIPASS) / filename
+        if not asset_path.exists():
+            raise FileNotFoundError(f"JARVIS HUD asset not found: {asset_path}")
+        return asset_path.read_text(encoding="utf-8")
 
-    def inject_hud_runtime(*_args):
-        try:
-            window.evaluate_js(runtime_source)
-            logger.info("External HUD runtime adapter injected")
-        except Exception:
-            logger.exception("Could not inject the external HUD runtime adapter")
+    # Load the gesture API before the extension that consumes it. Keep each
+    # asset external so the original HUD HTML remains byte-for-byte unchanged.
+    gesture_logic_source = read_hud_asset("jarvis_gesture_logic.js")
+    extensions_source = read_hud_asset("jarvis_hud_extensions.js")
+    runtime_source = read_hud_asset("jarvis_hud_runtime.js")
 
-    # Keep the uploaded 116 KB HTML artwork byte-for-byte unchanged. Runtime
-    # bindings and click actions are layered on after the WebView document loads.
-    window.events.loaded += inject_hud_runtime
+    def inject_hud_assets(*_args):
+        for label, source in (
+            ("gesture logic", gesture_logic_source),
+            ("HUD extensions", extensions_source),
+            ("runtime adapter", runtime_source),
+        ):
+            try:
+                window.evaluate_js(source)
+                logger.info("External HUD %s injected", label)
+            except Exception:
+                logger.exception("Could not inject external HUD %s", label)
+
+    # Keep the uploaded 116 KB HTML artwork byte-for-byte unchanged. Gesture
+    # controls, hologram, runtime bindings and click actions are layered on
+    # after the WebView document loads.
+    window.events.loaded += inject_hud_assets
     logger.info("HUD window created; entering webview event loop")
     webview.start(debug=False)
     logger.info("HUD window closed normally")
