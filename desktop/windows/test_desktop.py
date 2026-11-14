@@ -219,6 +219,31 @@ class WakewordSetupTests(unittest.TestCase):
             self.assertFalse(model_path.exists())
 
 
+    def test_service_status_recognizes_installed_first_party_wakeword_model(self):
+        import tempfile
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.ai_api_key = ""
+        app.device_token = ""
+        app.settings = {}
+        app.memory_store = SimpleNamespace(list=lambda: [])
+
+        with tempfile.TemporaryDirectory() as temporary:
+            model = Path(temporary) / "jarvis_first_party.onnx"
+            model.write_bytes(b"model")
+            with (
+                patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=model),
+                patch("importlib.util.find_spec", return_value=object()),
+            ):
+                statuses = app._get_service_statuses()
+
+        voice_status = next(item for item in statuses if item[0] == "VOICE ENGINE")
+        self.assertTrue(voice_status[1])
+        self.assertEqual(voice_status[2], "LOCAL WAKE WORD READY")
+
+
 class DocumentHistoryPrivacyTests(unittest.TestCase):
     def test_document_text_is_not_persisted_in_chat_history(self):
         document = {
