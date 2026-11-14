@@ -42,6 +42,38 @@ def read_cpu_temperature(psutil_module):
     return None
 
 
+def read_windows_power_status():
+    """Read Windows' native power state; return None when the API is unavailable."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+
+        class SYSTEM_POWER_STATUS(ctypes.Structure):
+            _fields_ = [
+                ("ACLineStatus", ctypes.c_byte),
+                ("BatteryFlag", ctypes.c_byte),
+                ("BatteryLifePercent", ctypes.c_byte),
+                ("SystemStatusFlag", ctypes.c_byte),
+                ("BatteryLifeTime", ctypes.c_ulong),
+                ("BatteryFullLifeTime", ctypes.c_ulong),
+            ]
+
+        status = SYSTEM_POWER_STATUS()
+        if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)):
+            return None
+        if status.BatteryFlag == 128:
+            return {"battery_present": False, "percent": None, "charging": None}
+        percent = status.BatteryLifePercent
+        return {
+            "battery_present": percent != 255,
+            "percent": percent if percent <= 100 else None,
+            "charging": bool(status.BatteryFlag & 8),
+        }
+    except Exception:
+        return None
+
+
 def collect_system_metrics(psutil_module=None) -> dict:
     """Read each hardware metric once; shared by the HUD and spoken PC-status command."""
     if psutil_module is None:
@@ -49,6 +81,20 @@ def collect_system_metrics(psutil_module=None) -> dict:
 
     drive = os.environ.get("SystemDrive", "C:") + chr(92)
     battery = _safe_read(psutil_module.sensors_battery, "N/A")
+    windows_power = read_windows_power_status()
+    if windows_power is not None:
+        if not windows_power["battery_present"]:
+            battery = None
+        elif windows_power["percent"] is not None:
+            # Prefer Windows' native percentage when available; it avoids stale or
+            # misreported psutil readings on some Windows power-management drivers.
+            from types import SimpleNamespace
+            original_seconds = _safe_read(lambda: battery.secsleft) if battery not in (None, "N/A") else None
+            battery = SimpleNamespace(
+                percent=windows_power["percent"],
+                power_plugged=windows_power["charging"],
+                secsleft=original_seconds,
+            )
     memory = _safe_read(psutil_module.virtual_memory)
     disk = _safe_read(lambda: psutil_module.disk_usage(drive))
     battery_seconds = _safe_read(lambda: battery.secsleft) if battery not in (None, "N/A") else None
@@ -70,6 +116,7 @@ def collect_system_metrics(psutil_module=None) -> dict:
         "disk_free": _safe_read(lambda: disk.free) if disk is not None else None,
         "battery": battery,
         "battery_seconds": battery_seconds,
+        "windows_power": windows_power,
         "uptime_seconds": _safe_read(lambda: __import__("time").time() - psutil_module.boot_time()),
         "cpu_temperature": temperature,
         "network_online": network_online,
