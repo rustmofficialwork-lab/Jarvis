@@ -2471,17 +2471,28 @@ class HudLiveDataMappingTests(unittest.TestCase):
             "put('v-arch', data.architecture)",
             "put('v-up', data.uptime)",
             "put('v-dl', '- DOWNLOAD : ' + (data.download || 'Measuring…'))",
-            "put('v-sb', '- BATTERY : ' + (data.battery || 'N/A'))",
             "put('v-sr', '- RAM : ' + (data.memory || 'N/A'))",
             "put('v-wifi', 'Wi-Fi ' + (data.network || 'N/A'))",
             "putAt(929, 616, data.temperature)",
             "putAt(779, 740, '- IP : ' + (data.ip || 'N/A'))",
-            "putAt(942, 773, '- DISK : ' + (data.disk_percent || 'N/A'))",
+            "putAt(942, 724, '- CPU : ' + (data.cpu || 'N/A'))",
+            "putAt(942, 757, '- DISK : ' + (data.disk_percent || 'N/A'))",
             "data.disk_percent_value",
             "data.cpuName",
         ):
             with self.subTest(expression=expression):
                 self.assertIn(expression, runtime)
+
+    def test_system_status_panel_omits_duplicate_battery_row_but_keeps_main_battery_widget(self):
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        self.assertNotIn("v-sb", hud)
+        self.assertNotIn("- BATTERY : LOADING...", hud)
+        self.assertNotIn("put('v-sb'", runtime)
+        self.assertIn('id="bat"', hud)
+        self.assertIn('x="942" y="724">- CPU', hud)
+        self.assertIn('id="v-sr" x="942" y="740">- RAM', hud)
+        self.assertIn('x="942" y="757">- DISK', hud)
 
     def test_runtime_state_updates_the_existing_svg_core_without_replacing_artwork(self):
         runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
