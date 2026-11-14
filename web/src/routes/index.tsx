@@ -7,7 +7,10 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "JARVIS — Personal AI Assistant" },
-      { name: "description", content: "Download JARVIS, your personal AI desktop assistant for Windows." },
+      {
+        name: "description",
+        content: "Download JARVIS, your personal AI desktop assistant for Windows.",
+      },
     ],
   }),
   component: Home,
@@ -17,11 +20,20 @@ function Home() {
   return (
     <main className="min-h-screen bg-[#07111b] text-slate-100">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <a href="/" className="text-xl font-semibold tracking-[0.2em] text-cyan-300">JARVIS</a>
-        <span className="text-xs tracking-[0.18em] text-slate-400">PERSONAL AI ASSISTANT</span>
+        <a
+          href="/"
+          className="text-xl font-semibold tracking-[0.2em] text-cyan-300"
+        >
+          JARVIS
+        </a>
+        <span className="text-xs tracking-[0.18em] text-slate-400">
+          PERSONAL AI ASSISTANT
+        </span>
       </header>
       <section className="mx-auto flex min-h-[70vh] max-w-5xl flex-col justify-center px-6 py-16">
-        <p className="mb-5 text-sm font-semibold tracking-[0.25em] text-cyan-300">YOUR DESKTOP AI</p>
+        <p className="mb-5 text-sm font-semibold tracking-[0.25em] text-cyan-300">
+          YOUR DESKTOP AI
+        </p>
         <h1 className="max-w-3xl text-5xl font-semibold leading-tight tracking-tight sm:text-6xl">
           Meet your personal AI assistant.
         </h1>
