@@ -38,6 +38,20 @@ class BrainCoreTests(unittest.TestCase):
         self.assertFalse(negated.allowed)
         self.assertFalse(question.allowed)
 
+    def test_website_navigation_requires_the_named_site_and_direct_intent(self):
+        allowed = authorize_tool_call(
+            "open_website", {"url": "https://www.youtube.com"}, "Please open YouTube"
+        )
+        denied = authorize_tool_call(
+            "open_website", {"url": "https://attacker.example"}, "Please open YouTube"
+        )
+        informational = authorize_tool_call(
+            "open_website", {"url": "https://www.youtube.com"}, "How do I open YouTube?"
+        )
+        self.assertTrue(allowed.allowed)
+        self.assertFalse(denied.allowed)
+        self.assertFalse(informational.allowed)
+
     def test_sensitive_actions_never_run_from_model_tool_call(self):
         decision = authorize_tool_call("send_money", {"amount": 100}, "Send 100")
         self.assertFalse(decision.allowed)
