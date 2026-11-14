@@ -1297,8 +1297,8 @@ class JarvisDesktop:
 
 
     def _begin_first_launch_voice_setup(self):
-        """Offer guided voice onboarding once, after the main HUD has settled."""
-        if self.settings.get("voice_setup_completed") or self.voice_setup_window is not None:
+        """Request device consents on upgrade even when voice onboarding was completed earlier."""
+        if self.voice_setup_window is not None:
             return
         if microphone_consent_required(self.settings):
             self._first_launch_permission_setup()
@@ -1317,6 +1317,8 @@ class JarvisDesktop:
                 self._set_status("Camera consent saved. Webcam remains off until ENABLE GESTURES is pressed.")
             else:
                 self._set_status("Camera permission declined. Webcam remains off; other HUD features remain available.")
+        if self.settings.get("voice_setup_completed"):
+            return
         if not self.settings.get("microphone_consent_granted"):
             self._set_status("Voice setup skipped: microphone permission was not granted.")
             return
