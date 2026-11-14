@@ -80,8 +80,7 @@ TOOL_DEFINITIONS = [
                 "additionalProperties": False,
             },
         },
-    },,
-
+    },
     {
         "type": "function",
         "function": {
