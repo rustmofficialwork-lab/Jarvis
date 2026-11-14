@@ -752,8 +752,6 @@ WAKE_ACTIVATION_PHRASES = (
     "Aapka JARVIS active hai. Boliye.",
     "Ji, main taiyaar hoon. Bataiye.",
     "Yes, I'm listening. Go ahead.",
-    "हाँ, मैं सुन रहा हूँ। बताइए।",
-    "जी, बताइए। मैं तैयार हूँ।",
 )
 
 
@@ -999,10 +997,10 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
         raise ValueError("Please set the AI model and API key in Settings.")
 
     language_hint = (
-        "Use Hinglish (Hindi + English in Roman script) as JARVIS's default response language, "
-        "even when the user writes a short message in English. If the user explicitly asks for "
-        "pure Hindi or writes Hindi in Devanagari, reply in Hindi (Devanagari). If the user "
-        "clearly asks for English, reply in English. Understand Hindi, English, and Hinglish."
+        "JARVIS supports only two response languages: Hinglish (Hindi + English in Roman script) "
+        "and English. Use Hinglish by default and when the user speaks/writes Hinglish or Hindi. "
+        "Switch to English when the user speaks/writes English or explicitly requests English. "
+        "Do not generate Hindi in Devanagari; keep Hindi words in Roman script."
     )
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "system", "content": language_hint}]
@@ -1212,10 +1210,10 @@ def local_chat_completion(prompt: str, history: list[dict],
     if model != LOCAL_AI_MODEL:
         raise ValueError("The configured offline model is not supported.")
     language_hint = (
-        "Use Hinglish (Hindi + English in Roman script) as JARVIS's default response language, "
-        "even when the user writes a short message in English. If the user explicitly asks for "
-        "pure Hindi or writes Hindi in Devanagari, reply in Hindi (Devanagari). If the user "
-        "clearly asks for English, reply in English. Understand Hindi, English, and Hinglish."
+        "JARVIS supports only two response languages: Hinglish (Hindi + English in Roman script) "
+        "and English. Use Hinglish by default and when the user speaks/writes Hinglish or Hindi. "
+        "Switch to English when the user speaks/writes English or explicitly requests English. "
+        "Do not generate Hindi in Devanagari; keep Hindi words in Roman script."
     )
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT + " You are running in OFFLINE mode. "
