@@ -57,11 +57,21 @@
   gestureToggle.style.cssText='position:fixed;z-index:261;width:112px;min-height:26px;padding:3px 5px;font-size:11px;letter-spacing:.25px;transform:translate(-50%,-50%);';
   document.body.appendChild(gestureToggle);
   const positionGestureToggle=()=>{
-    const svg=document.querySelector('svg.scene, .row svg, .stack svg');
+    // The HUD switches between scene, row and stack SVG layouts by aspect
+    // ratio. Pick the visible SVG whose viewBox actually contains the anchor.
+    const anchorX=504,anchorY=699;
+    const svg=[...document.querySelectorAll('svg.scene, .row svg, .stack svg')].find(candidate=>{
+      const rect=candidate.getBoundingClientRect();
+      const viewBox=candidate.viewBox?.baseVal;
+      const matrix=candidate.getScreenCTM?.();
+      return matrix&&rect.width>0&&rect.height>0&&viewBox
+        &&anchorX>=viewBox.x&&anchorX<=viewBox.x+viewBox.width
+        &&anchorY>=viewBox.y&&anchorY<=viewBox.y+viewBox.height;
+    });
     const matrix=svg?.getScreenCTM?.();
-    if(!matrix){gestureToggle.style.visibility='hidden';return;}
+    if(!svg||!matrix){gestureToggle.style.visibility='hidden';return;}
     const point=svg.createSVGPoint();
-    point.x=504; point.y=699;
+    point.x=anchorX; point.y=anchorY;
     const screen=point.matrixTransform(matrix);
     gestureToggle.style.left=screen.x+'px';
     gestureToggle.style.top=screen.y+'px';
