@@ -50,6 +50,45 @@ class SafeToolTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     execute_tool("get_top_processes", arguments)
 
+    def test_user_file_tools_list_search_and_read_only_safe_text(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            for folder in ("Desktop", "Documents", "Downloads"):
+                (home / folder).mkdir()
+            (home / "Documents" / "notes.txt").write_text("JARVIS project notes", encoding="utf-8")
+            (home / "Documents" / "photo.png").write_bytes(b"not text")
+            with patch("pathlib.Path.home", return_value=home):
+                listed = execute_tool("list_user_files", {"folder": "Documents"})
+                self.assertIn("notes.txt", listed)
+                found = execute_tool("search_user_files", {"folder": "Documents", "query": "notes"})
+                self.assertEqual(found, "notes.txt")
+                self.assertEqual(execute_tool("read_user_text_file", {
+                    "folder": "Documents", "filename": "notes.txt"
+                }), "JARVIS project notes")
+                with self.assertRaises(ValueError):
+                    execute_tool("read_user_text_file", {
+                        "folder": "Documents", "filename": "photo.png"
+                    })
+
+    def test_user_file_tools_reject_traversal_and_secret_files(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            (home / "Downloads").mkdir()
+            (home / "secret.env").write_text("TOKEN=not-for-ai", encoding="utf-8")
+            with patch("pathlib.Path.home", return_value=home):
+                with self.assertRaises(ValueError):
+                    execute_tool("read_user_text_file", {
+                        "folder": "Downloads", "filename": "../secret.env"
+                    })
+                with self.assertRaises(ValueError):
+                    execute_tool("read_user_text_file", {
+                        "folder": "Downloads", "filename": "secret.env"
+                    })
+
     def test_unknown_tool_is_rejected(self):
         with self.assertRaises(ValueError):
             execute_tool("run_shell", {})
