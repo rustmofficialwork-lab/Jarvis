@@ -20,15 +20,10 @@ function Home() {
   return (
     <main className="min-h-screen bg-[#07111b] text-slate-100">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <a
-          href="/"
-          className="text-xl font-semibold tracking-[0.2em] text-cyan-300"
-        >
+        <a href="/" className="text-xl font-semibold tracking-[0.2em] text-cyan-300">
           JARVIS
         </a>
-        <span className="text-xs tracking-[0.18em] text-slate-400">
-          PERSONAL AI ASSISTANT
-        </span>
+        <span className="text-xs tracking-[0.18em] text-slate-400">PERSONAL AI ASSISTANT</span>
       </header>
       <section className="mx-auto flex min-h-[70vh] max-w-5xl flex-col justify-center px-6 py-16">
         <p className="mb-5 text-sm font-semibold tracking-[0.25em] text-cyan-300">
@@ -38,8 +33,8 @@ function Home() {
           Meet your personal AI assistant.
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-          A focused Windows desktop assistant for conversations, voice commands,
-          reminders, memory, and everyday system tasks.
+          A focused Windows desktop assistant for conversations, voice commands, reminders,
+          memory, and everyday system tasks.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-4">
           <a
