@@ -2619,5 +2619,82 @@ class HybridAiTests(unittest.TestCase):
                 jarvis_desktop.local_chat_completion("hello", [])
 
 
+    def test_cloud_failure_falls_back_to_local_and_next_request_recovers_online(self):
+        from types import SimpleNamespace
+        import queue
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT, "model": jarvis_desktop.DEFAULT_MODEL}
+        app.ai_api_key = ""
+        app.device_token = "device-token"
+        app.history = []
+        app.events = queue.Queue()
+        app.memory_store = SimpleNamespace(context=lambda query: [])
+        app._ensure_device_token = lambda force=False: "device-token"
+
+        with (
+            patch.object(jarvis_desktop, "handle_online_command", return_value=None),
+            patch.object(jarvis_desktop, "chat_completion", side_effect=[
+                RuntimeError("cloud unavailable"), "Cloud is back"
+            ]) as cloud,
+            patch.object(jarvis_desktop, "local_chat_completion", return_value="Offline answer") as local,
+        ):
+            self.assertEqual(app._get_online_reply("hello"), "Offline answer")
+            self.assertEqual(app._get_online_reply("hello again"), "Cloud is back")
+
+        self.assertEqual(cloud.call_count, 2)
+        local.assert_called_once()
+        statuses = [app.events.get_nowait()[1], app.events.get_nowait()[1]]
+        self.assertTrue(any("OFFLINE MODE" in status for status in statuses))
+        self.assertTrue(any("ONLINE MODE" in status for status in statuses))
+
+    def test_local_fallback_does_not_duplicate_cloud_provider_routing(self):
+        source = Path(jarvis_desktop.__file__).read_text(encoding="utf-8")
+        self.assertIn("chat_completion(", source)
+        self.assertIn("local_chat_completion(", source)
+        self.assertNotIn("GROQ_API_KEY", source)
+        self.assertNotIn("OPENROUTER_API_KEY", source)
+
+    def test_ollama_service_autostart_uses_loopback_and_hidden_process(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+
+        process = SimpleNamespace(poll=lambda: None)
+        with (
+            patch.object(jarvis_desktop, "_find_ollama_executable", return_value="C:/Ollama/ollama.exe"),
+            patch.object(jarvis_desktop.urllib.request, "build_opener") as build_opener,
+            patch.object(jarvis_desktop.subprocess, "Popen", return_value=process) as popen,
+            patch.object(jarvis_desktop.time, "sleep"),
+        ):
+            opener = SimpleNamespace(open=lambda *args, **kwargs: (_ for _ in ()).throw(
+                jarvis_desktop.urllib.error.URLError("not ready")
+            ))
+            # First probe fails; subsequent readiness probes succeed.
+            opener.open = lambda url, timeout=1: (
+                (_ for _ in ()).throw(jarvis_desktop.urllib.error.URLError("not ready"))
+                if getattr(opener, "calls", 0) == 0
+                else SimpleNamespace(__enter__=lambda self: self, __exit__=lambda *args: False)
+            )
+            def probe(url, timeout=1):
+                opener.calls = getattr(opener, "calls", 0) + 1
+                if opener.calls <= 1:
+                    raise jarvis_desktop.urllib.error.URLError("not ready")
+                class Response:
+                    def __enter__(self): return self
+                    def __exit__(self, *args): return False
+                return Response()
+            opener.open = probe
+            build_opener.return_value = opener
+            jarvis_desktop._OLLAMA_PROCESS = None
+            jarvis_desktop._start_ollama_service()
+
+        args = popen.call_args
+        self.assertEqual(args.args[0], ["C:/Ollama/ollama.exe", "serve"])
+        self.assertEqual(args.kwargs["stdin"], jarvis_desktop.subprocess.DEVNULL)
+        self.assertEqual(args.kwargs["stdout"], jarvis_desktop.subprocess.DEVNULL)
+        self.assertEqual(args.kwargs["stderr"], jarvis_desktop.subprocess.DEVNULL)
+
+
+
 if __name__ == "__main__":
     unittest.main()
