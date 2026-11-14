@@ -23,7 +23,7 @@ CloseApplications=yes
 RestartApplications=no
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Files]
 Source: "..\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -33,7 +33,7 @@ Name: "{group}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"
 Name: "{autodesktop}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\JARVIS.exe"; Description: "Launch JARVIS Desktop"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\JARVIS.exe"; Description: "Launch JARVIS Desktop"; Flags: postinstall nowait skipifnotsilent
 
 [UninstallRun]
 Filename: "{app}\JARVIS.exe"; Parameters: "--cleanup-uninstall"; RunOnceId: "CleanupReminderTasks"; Flags: runhidden waituntilterminated skipifdoesntexist
