@@ -21,10 +21,13 @@ class WakewordActivationAnnouncementTests(unittest.TestCase):
             )
         speak.assert_called_once_with("At your service.", stop_event)
 
-    def test_wake_activation_has_multiple_distinct_phrases(self):
+    def test_wake_activation_has_hinglish_hindi_and_english_phrases(self):
         phrases = jarvis_desktop.WAKE_ACTIVATION_PHRASES
-        self.assertGreaterEqual(len(phrases), 6)
+        self.assertGreaterEqual(len(phrases), 8)
         self.assertEqual(len(phrases), len(set(phrases)))
+        self.assertTrue(any("Boliye" in phrase for phrase in phrases))
+        self.assertTrue(any("हाँ" in phrase for phrase in phrases))
+        self.assertTrue(any("listening" in phrase for phrase in phrases))
 
 
 class WakewordSetupTests(unittest.TestCase):
