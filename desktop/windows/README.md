@@ -10,6 +10,7 @@ On first launch, JARVIS shows separate foreground consent prompts for microphone
 - Python 3.11 (recommended)
 - Microphone and speakers/headphones (microphone access is optional until you enable voice setup; Windows controls the permission)
 - Internet for online AI responses and the one-time download of offline speech models
+- Optional offline AI: Ollama plus the one-time `llama3.2:3b` model download (about 2 GB); run `setup_offline_ai.ps1` from this folder while online
 - Either a custom-trained JARVIS ONNX wake-word model or the licensed community Jarvis fallback installed through the in-app **Set up wake word** flow ([details](JARVIS_WAKEWORD_SETUP.md)); custom-model training and import are documented in [WAKEWORD_FIRST_PARTY_MODEL.md](WAKEWORD_FIRST_PARTY_MODEL.md)
 - Internet access for automatic JARVIS backend enrollment and online AI replies
 
@@ -25,6 +26,18 @@ The **FACE PRESENCE** control is a separate opt-in camera feature. It runs Media
 
 Voice examples include “Jarvis Chrome kholo”, “Google Chrome kholo”, “volume kam kar do”, and “awaaz badhao”. Local desktop actions remain restricted to the fixed allowlist.
 
+
+## Hybrid online and offline AI
+
+JARVIS prefers its secured cloud AI gateway while internet and the configured providers are available. If the online command/provider request fails, it automatically tries the local Ollama runtime at `127.0.0.1:11434`. The offline model is `llama3.2:3b`; local requests use a 2,048-token context and a bounded reply length to reduce memory pressure on 8 GB laptops. Local prompts are sent only to the loopback Ollama service and are not routed through the JARVIS cloud backend. Offline AI does not provide live web search, weather, current news, or cloud-only tools.
+
+**One-time setup (while connected to the internet):**
+
+1. Download or clone this repository and open PowerShell in `desktop/windows`.
+2. Run `powershell -ExecutionPolicy Bypass -File .\\setup_offline_ai.ps1`. The script installs Ollama with WinGet if needed, starts the local service, and downloads `llama3.2:3b` (approximately 2 GB).
+3. Open JARVIS. It continues to use online AI when available and falls back to the local model when the online route is unavailable.
+
+The local model is not bundled in the JARVIS installer, so it is downloaded once per PC. If the model has not been downloaded, JARVIS reports the exact setup command instead of silently pretending offline AI is ready. The 3B model is a lightweight fallback; response quality and speed are lower than cloud AI and depend on available RAM/CPU. Close other memory-heavy apps if an 8 GB PC struggles.
 
 ## Offline reminders
 
@@ -109,7 +122,7 @@ The application is written to `dist\\JARVIS\\` (run `dist\\JARVIS\\JARVIS.exe`).
 ## Current scope and limitations
 
 - This Windows edition has its own UI, settings, voice loop, and local chat history. It does not sync its history or settings with the separate Android edition.
-- Speech recognition supports online Google transcription with local Vosk fallback. JARVIS automatically prepares the selected small model in the background while online; Hindi (India), English (India), and English (US) have separate offline models. Hindi/Hinglish recognition quality depends on the selected model and accent; mixed-language accuracy is not guaranteed. AI replies and web/AI features still require internet. AI API responses are capped at 2 MB to prevent unexpectedly large payloads from exhausting desktop memory. Use STOP SPEECH on the dashboard or Stop speaking in the tray menu to interrupt spoken replies.
+- Speech recognition supports online Google transcription with local Vosk fallback. JARVIS automatically prepares the selected small model in the background while online; Hindi (India), English (India), and English (US) have separate offline models. Hindi/Hinglish recognition quality depends on the selected model and accent; mixed-language accuracy is not guaranteed. Cloud AI replies and live web/AI features require internet; after the one-time Ollama model download, general AI chat can fall back to the local model without internet. AI API responses are capped at 2 MB to prevent unexpectedly large payloads from exhausting desktop memory. Use STOP SPEECH on the dashboard or Stop speaking in the tray menu to interrupt spoken replies.
 - Test the microphone and wake word on the actual Windows laptop before relying on continuous listening.
 
 
