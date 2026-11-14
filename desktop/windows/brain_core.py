@@ -25,9 +25,11 @@ READ_ONLY_TOOLS = frozenset({
     "get_system_status",
     "get_top_processes",
     "get_available_capabilities",
-    "list_user_files",
-    "search_user_files",
-    "read_user_text_file",
+})
+# Personal file access is read-only but still privacy-sensitive: it must be
+# grounded in a direct file-related request, not merely a model suggestion.
+USER_DIRECTED_FILE_TOOLS = frozenset({
+    "list_user_files", "search_user_files", "read_user_text_file",
 })
 USER_DIRECTED_TOOLS = frozenset({"open_app", "open_website"})
 # Exact domain aliases prevent deceptive hosts such as youtube.com.attacker.invalid.
@@ -81,6 +83,30 @@ def _explicit_action(prompt: str) -> bool:
     return bool(direct or hinglish)
 
 
+def _explicit_file_request(tool: str, prompt: str) -> bool:
+    """Require a direct, non-negated request before inspecting personal files."""
+    text = str(prompt or "").strip().casefold()
+    if re.search(
+        r"\b(don't|do not|never|avoid|mat|nahi|nahin)\b.{0,60}\b"
+        r"(read|open|list|search|find|locate|inspect|check|summarize|"
+        r"analyze|show|display)\b",
+        text,
+    ):
+        return False
+
+    object_pattern = r"(?:my\s+)?(?:files?|folders?|documents?|downloads?|desktop)"
+    if tool == "list_user_files":
+        action_pattern = r"(?:list|show|display)"
+    elif tool == "search_user_files":
+        action_pattern = r"(?:search|find|locate|look\s+for)"
+    else:
+        action_pattern = r"(?:read|open|inspect|check|summarize|analyze|what(?:'s|\s+is)\s+in)"
+    return bool(
+        re.search(rf"\b{action_pattern}\b.{{0,50}}\b{object_pattern}\b", text)
+        or re.search(rf"\b{object_pattern}\b.{{0,50}}\b{action_pattern}\b", text)
+    )
+
+
 def authorize_tool_call(
     name: str,
     arguments: dict[str, Any],
@@ -103,6 +129,15 @@ def authorize_tool_call(
         )
     if tool in READ_ONLY_TOOLS:
         return ToolDecision(True, "allowed", "Read-only tool is within the local allowlist.")
+    if tool in USER_DIRECTED_FILE_TOOLS:
+        if not _explicit_file_request(tool, user_prompt):
+            return ToolDecision(
+                False, "not_requested",
+                "The user did not directly request access to personal files.",
+            )
+        return ToolDecision(
+            True, "allowed", "The user explicitly requested this personal-file operation."
+        )
     if tool not in USER_DIRECTED_TOOLS:
         return ToolDecision(False, "unsupported", "This tool is not in JARVIS's approved capability registry.")
     if not _explicit_action(user_prompt):
