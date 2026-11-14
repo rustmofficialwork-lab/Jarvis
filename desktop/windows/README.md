@@ -27,6 +27,14 @@ The **FACE PRESENCE** control is a separate opt-in camera feature. It runs Media
 Voice examples include “Jarvis Chrome kholo”, “Google Chrome kholo”, “volume kam kar do”, and “awaaz badhao”. Local desktop actions remain restricted to the fixed allowlist.
 
 
+## Safe agent actions and approval boundaries
+
+The AI tool layer is deliberately allowlisted. It can open Notepad, Calculator, Paint, File Explorer, and Task Manager on Windows, and can open a public HTTP/HTTPS URL in the default browser when the user explicitly asks. Website navigation does not sign in, click controls, submit forms, upload files, or change website data. Local file tools are read-only and limited to small ordinary text files in Desktop, Documents, and Downloads.
+
+Study/meeting/deep-work workflows show the exact apps and ask for confirmation before opening them. Creating or deleting recurring automations also asks for confirmation. Scheduled workflows run only after the user has separately approved the recurring schedule.
+
+JARVIS does not currently provide general-purpose browser automation, email/message sending, purchases, account changes, arbitrary file deletion, or payment execution. These require dedicated provider integrations, account authorization, and a separate review/confirmation design; the AI model alone must never be treated as permission. JARVIS must report these limits instead of claiming an action succeeded. Never provide passwords, API keys, PINs, or one-time codes to JARVIS.
+
 ## Hybrid online and offline AI
 
 JARVIS prefers its secured cloud AI gateway while internet and the configured providers are available. If the online command/provider request fails, it automatically tries the local Ollama runtime at `127.0.0.1:11434`. The offline model is `llama3.2:3b`; local requests use a 2,048-token context and a bounded reply length to reduce memory pressure on 8 GB laptops. Local prompts are sent only to the loopback Ollama service and are not routed through the JARVIS cloud backend. Offline AI does not provide live web search, weather, current news, or cloud-only tools.
