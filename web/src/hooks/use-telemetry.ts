@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  BRIDGE_URL,
-  POLL_MS,
-  telemetrySchema,
-  type Telemetry,
-} from "@/lib/telemetry";
+import { BRIDGE_URL, POLL_MS, telemetrySchema, type Telemetry } from "@/lib/telemetry";
 
 type Battery = EventTarget & { level: number; charging: boolean };
 
@@ -15,9 +10,9 @@ export function useTelemetry() {
   } | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [data, setData] = useState<Telemetry | null>(null);
-  const [status, setStatus] = useState<
-    "offline" | "connecting" | "live" | "unavailable"
-  >("offline");
+  const [status, setStatus] = useState<"offline" | "connecting" | "live" | "unavailable">(
+    "offline",
+  );
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
