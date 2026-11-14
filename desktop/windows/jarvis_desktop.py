@@ -2799,22 +2799,25 @@ class JarvisDesktop:
             return False
 
     def open_settings(self):
+        # Match the Settings window to the JARVIS HUD: deep navy surfaces,
+        # cyan accents, fine borders, and compact digital-style headings.
+        colors = {
+            "bg": "#020b14", "panel": "#071725", "panel_alt": "#0a2030",
+            "cyan": "#00e5ff", "bright": "#a4f4ff", "text": "#d7f4ff",
+            "muted": "#78a9bb", "border": "#15506a", "input": "#03111d",
+        }
         window = tk.Toplevel(self.root)
-        window.title("JARVIS Settings")
-        window.configure(bg="#07111b")
+        window.title("J.A.R.V.I.S  //  SYSTEM SETTINGS")
+        window.configure(bg=colors["bg"])
         screen_w = window.winfo_screenwidth()
         screen_h = window.winfo_screenheight()
-        dialog_w = min(900, max(620, screen_w - 100))
-        dialog_h = min(720, max(480, screen_h - 100))
+        dialog_w = min(940, max(660, screen_w - 100))
+        dialog_h = min(760, max(520, screen_h - 100))
         window.geometry(f"{dialog_w}x{dialog_h}")
-        window.minsize(min(620, max(520, screen_w - 60)),
-                       min(480, max(420, screen_h - 60)))
+        window.minsize(min(660, max(540, screen_w - 60)),
+                       min(520, max(440, screen_h - 60)))
         window.resizable(True, True)
 
-        # The HUD is a separate fullscreen pywebview window while Tk's root is
-        # intentionally hidden. A normal Toplevel can therefore be created
-        # behind the HUD. Keep this dialog above the fullscreen HUD and move
-        # keyboard focus to it when it is first mapped.
         try:
             window.attributes("-topmost", True)
         except tk.TclError:
@@ -2822,26 +2825,104 @@ class JarvisDesktop:
 
         def focus_settings_dialog():
             try:
-                if not window.winfo_exists():
-                    return
-                window.deiconify()
-                window.lift()
-                window.focus_force()
-                window.grab_set()
+                if window.winfo_exists():
+                    window.deiconify()
+                    window.lift()
+                    window.focus_force()
+                    window.grab_set()
             except tk.TclError:
                 pass
 
         window.after(80, focus_settings_dialog)
-        # Put settings in a scrollable content area so every option and the
-        # Save/Update buttons remain reachable on small or scaled displays.
-        body = tk.Frame(window, bg="#07111b")
+
+        style = ttk.Style(window)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure(
+            "Jarvis.TEntry", fieldbackground=colors["input"],
+            background=colors["input"], foreground=colors["bright"],
+            insertcolor=colors["cyan"], bordercolor=colors["border"],
+            lightcolor=colors["cyan"], darkcolor=colors["border"],
+            padding=8, relief="flat",
+        )
+        style.configure(
+            "Jarvis.TCombobox", fieldbackground=colors["input"],
+            background=colors["panel_alt"], foreground=colors["bright"],
+            arrowcolor=colors["cyan"], bordercolor=colors["border"],
+            padding=7,
+        )
+        style.map(
+            "Jarvis.TCombobox",
+            fieldbackground=[("readonly", colors["input"])],
+            foreground=[("readonly", colors["bright"])],
+            selectbackground=[("readonly", colors["panel_alt"])],
+            selectforeground=[("readonly", colors["bright"])],
+        )
+        style.configure(
+            "Jarvis.TCheckbutton", background=colors["panel"],
+            foreground=colors["text"], font=("Segoe UI", 10),
+            padding=5,
+        )
+        style.map(
+            "Jarvis.TCheckbutton",
+            background=[("active", colors["panel_alt"])],
+            foreground=[("active", colors["cyan"])],
+        )
+        style.configure(
+            "Jarvis.TButton", background=colors["panel_alt"],
+            foreground=colors["bright"], bordercolor=colors["cyan"],
+            padding=(12, 8), font=("Segoe UI Semibold", 9), relief="flat",
+        )
+        style.map(
+            "Jarvis.TButton",
+            background=[("active", "#10415a"), ("pressed", "#0b3045")],
+            foreground=[("active", "#ffffff")],
+        )
+        style.configure(
+            "Jarvis.Primary.TButton", background="#06445a",
+            foreground="#eaffff", bordercolor=colors["cyan"],
+            padding=(18, 9), font=("Segoe UI Semibold", 10),
+        )
+        style.map(
+            "Jarvis.Primary.TButton",
+            background=[("active", "#08718a"), ("pressed", "#03506a")],
+        )
+        style.configure(
+            "Jarvis.Vertical.TScrollbar",
+            background=colors["panel_alt"], troughcolor=colors["bg"],
+            bordercolor=colors["bg"], arrowcolor=colors["cyan"],
+        )
+
+        body = tk.Frame(window, bg=colors["bg"])
         body.pack(fill="both", expand=True)
-        canvas = tk.Canvas(body, bg="#07111b", highlightthickness=0, bd=0)
-        scrollbar = ttk.Scrollbar(body, orient="vertical", command=canvas.yview)
+        header = tk.Frame(body, bg=colors["bg"], padx=24, pady=18)
+        header.pack(fill="x")
+        tk.Label(
+            header, text="J.A.R.V.I.S", bg=colors["bg"], fg=colors["cyan"],
+            font=("Orbitron", 19, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            header, text="SYSTEM CONFIGURATION  /  CONTROL PANEL",
+            bg=colors["bg"], fg=colors["muted"],
+            font=("Consolas", 9),
+        ).pack(anchor="w", pady=(4, 0))
+        tk.Frame(header, bg=colors["cyan"], height=1).pack(fill="x", pady=(14, 0))
+
+        canvas_area = tk.Frame(body, bg=colors["bg"])
+        canvas_area.pack(fill="both", expand=True)
+        canvas = tk.Canvas(
+            canvas_area, bg=colors["bg"], highlightthickness=0, bd=0,
+        )
+        scrollbar = ttk.Scrollbar(
+            canvas_area, orient="vertical", command=canvas.yview,
+            style="Jarvis.Vertical.TScrollbar",
+        )
         canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        content = tk.Frame(canvas, bg="#07111b")
+        content = tk.Frame(canvas, bg=colors["bg"], padx=24, pady=8)
         content_id = canvas.create_window((0, 0), window=content, anchor="nw")
 
         def update_scroll_region(_event=None):
@@ -2856,42 +2937,137 @@ class JarvisDesktop:
             int(-1 * (event.delta / 120)), "units"
         ))
 
+        def section(parent, title, subtitle=None):
+            panel = tk.Frame(
+                parent, bg=colors["panel"], highlightthickness=1,
+                highlightbackground=colors["border"], padx=18, pady=14,
+            )
+            panel.pack(fill="x", pady=(0, 14))
+            tk.Label(
+                panel, text=title.upper(), bg=colors["panel"],
+                fg=colors["cyan"], font=("Consolas", 10, "bold"),
+            ).pack(anchor="w")
+            if subtitle:
+                tk.Label(
+                    panel, text=subtitle, bg=colors["panel"],
+                    fg=colors["muted"], font=("Segoe UI", 9),
+                    wraplength=max(300, dialog_w - 140), justify="left",
+                ).pack(anchor="w", pady=(4, 10))
+            return panel
+
+        ai_panel = section(
+            content, "AI connection",
+            "Configure the model endpoint and optional legacy API token.",
+        )
+        ai_grid = tk.Frame(ai_panel, bg=colors["panel"])
+        ai_grid.pack(fill="x", pady=(8, 0))
+        ai_grid.grid_columnconfigure(1, weight=1)
         fields = [
             ("AI endpoint (HTTPS)", "endpoint", self.settings.get("endpoint", DEFAULT_ENDPOINT)),
             ("Model", "model", self.settings.get("model", DEFAULT_MODEL)),
-            ("Legacy backend token (optional; auto-connect if blank)", "ai_key", self.api_key_var.get()),
+            ("Legacy backend token (optional)", "ai_key", self.api_key_var.get()),
         ]
         entries = {}
         for row, (label, name, value) in enumerate(fields):
-            tk.Label(content, text=label, bg="#07111b", fg="#d7f4ff",
-                     font=("Segoe UI", 10)).grid(row=row, column=0, sticky="w", padx=14, pady=8)
-            entry = ttk.Entry(content, width=58, show="*" if name.endswith("key") else "")
+            tk.Label(
+                ai_grid, text=label, bg=colors["panel"], fg=colors["text"],
+                font=("Segoe UI", 10),
+            ).grid(row=row, column=0, sticky="w", padx=(0, 18), pady=8)
+            entry = ttk.Entry(
+                ai_grid, width=58, style="Jarvis.TEntry",
+                show="*" if name.endswith("key") else "",
+            )
             entry.insert(0, value)
-            entry.grid(row=row, column=1, padx=14, pady=8, sticky="ew")
+            entry.grid(row=row, column=1, padx=4, pady=7, sticky="ew")
             entries[name] = entry
-        tk.Label(content, text="Speech recognition language", bg="#07111b", fg="#d7f4ff",
-                 font=("Segoe UI", 10)).grid(row=4, column=0, sticky="w", padx=14, pady=8)
-        language = ttk.Combobox(content, values=["en-IN", "hi-IN", "en-US"], state="readonly", width=12)
-        language.set(self.settings.get("language", "en-IN"))
-        language.grid(row=4, column=1, sticky="w", padx=14, pady=8)
+
+        voice_panel = section(
+            content, "Voice & startup",
+            "Choose the speech recognition language and background startup behaviour.",
+        )
+        voice_grid = tk.Frame(voice_panel, bg=colors["panel"])
+        voice_grid.pack(fill="x", pady=(4, 0))
+        voice_grid.grid_columnconfigure(1, weight=1)
         tk.Label(
-            content,
-            text="Offline voice model downloads automatically in the background for the selected language.",
-            bg="#07111b", fg="#78c8df", font=("Segoe UI", 9),
-            wraplength=max(280, dialog_w - 100), justify="left",
-        ).grid(row=5, column=1, sticky="w", padx=14, pady=8)
-        share_memory_var = tk.BooleanVar(value=bool(self.settings.get("share_memory_with_ai", False)))
-        ttk.Checkbutton(content, text="Allow saved memories in online AI chats (optional)",
-                        variable=share_memory_var).grid(row=6, column=1, sticky="w", padx=14, pady=8)
-        startup_var = tk.BooleanVar(value=bool(self.settings.get("start_with_windows", False)))
-        ttk.Checkbutton(content, text="Start JARVIS when I sign in to Windows",
-                        variable=startup_var).grid(row=7, column=1, sticky="w", padx=14, pady=8)
-        tk.Label(content, text="Closing the window keeps JARVIS in the system tray. Use Exit from its tray menu.",
-                 bg="#07111b", fg="#7897aa", font=("Segoe UI", 9), wraplength=max(280, dialog_w - 50),
-                 justify="left").grid(row=8, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 4))
-        tk.Label(content, text="Secrets are stored in Windows Credential Manager when available.",
-                 bg="#07111b", fg="#7897aa", font=("Segoe UI", 9)).grid(
-                     row=9, column=0, columnspan=2, sticky="w", padx=14, pady=(2, 12))
+            voice_grid, text="Speech recognition language",
+            bg=colors["panel"], fg=colors["text"], font=("Segoe UI", 10),
+        ).grid(row=0, column=0, sticky="w", padx=(0, 18), pady=8)
+        language = ttk.Combobox(
+            voice_grid, values=["en-IN", "hi-IN", "en-US"],
+            state="readonly", width=14, style="Jarvis.TCombobox",
+        )
+        language.set(self.settings.get("language", "en-IN"))
+        language.grid(row=0, column=1, sticky="w", padx=4, pady=8)
+        tk.Label(
+            voice_grid,
+            text="Offline voice model downloads automatically in the background.",
+            bg=colors["panel"], fg=colors["muted"], font=("Segoe UI", 9),
+        ).grid(row=1, column=1, sticky="w", padx=4, pady=(0, 8))
+        share_memory_var = tk.BooleanVar(
+            value=bool(self.settings.get("share_memory_with_ai", False))
+        )
+        ttk.Checkbutton(
+            voice_grid, text="Allow saved memories in online AI chats (optional)",
+            variable=share_memory_var, style="Jarvis.TCheckbutton",
+        ).grid(row=2, column=1, sticky="w", padx=4, pady=5)
+        startup_var = tk.BooleanVar(
+            value=bool(self.settings.get("start_with_windows", False))
+        )
+        ttk.Checkbutton(
+            voice_grid, text="Start JARVIS when I sign in to Windows",
+            variable=startup_var, style="Jarvis.TCheckbutton",
+        ).grid(row=3, column=1, sticky="w", padx=4, pady=5)
+
+        privacy = section(
+            content, "Privacy & local data",
+            "Chat history and saved memories stay on this PC unless you explicitly enable memory sharing. "
+            "Secrets are stored in Windows Credential Manager when available.",
+        )
+
+        def open_mic_privacy():
+            if self._open_microphone_privacy_settings():
+                self._set_status("Opened Windows microphone privacy settings.")
+            else:
+                messagebox.showwarning(
+                    "Microphone privacy settings",
+                    "Windows microphone privacy settings could not be opened automatically.",
+                    parent=window,
+                )
+
+        def clear_local_chat():
+            if not messagebox.askyesno(
+                "Clear local chat history?",
+                "This permanently clears JARVIS chat history stored on this PC. Saved memories are not affected.",
+                parent=window,
+            ):
+                return
+            self.clear_chat()
+
+        privacy_actions = tk.Frame(privacy, bg=colors["panel"])
+        privacy_actions.pack(fill="x", pady=(4, 0))
+        ttk.Button(
+            privacy_actions, text="Windows microphone privacy",
+            command=open_mic_privacy, style="Jarvis.TButton",
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            privacy_actions, text="Clear local chat history",
+            command=clear_local_chat, style="Jarvis.TButton",
+        ).pack(side="left")
+
+        actions = tk.Frame(content, bg=colors["bg"])
+        actions.pack(fill="x", pady=(2, 20))
+        ttk.Button(
+            actions, text="Check microphone", command=self._request_microphone_access,
+            style="Jarvis.TButton",
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            actions, text="Set up wake word", command=self._open_wakeword_setup,
+            style="Jarvis.TButton",
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            actions, text="Check for updates", command=self._check_for_updates,
+            style="Jarvis.TButton",
+        ).pack(side="left")
 
         def save():
             try:
@@ -2931,55 +3107,11 @@ class JarvisDesktop:
             self._ensure_offline_model(self.settings["language"])
             window.destroy()
 
-        actions = tk.Frame(content, bg="#07111b")
-        actions.grid(row=10, column=0, columnspan=2, sticky="ew", padx=14, pady=(4, 16))
-        ttk.Button(actions, text="Check microphone access", command=self._request_microphone_access).pack(side="left")
-        ttk.Button(actions, text="Set up wake word", command=self._open_wakeword_setup).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Check for updates", command=self._check_for_updates).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Save settings", command=save).pack(side="right")
-
-        privacy = tk.LabelFrame(
-            content, text="Privacy & local data", bg="#07111b", fg="#d7f4ff",
-            padx=10, pady=8,
-        )
-        privacy.grid(row=11, column=0, columnspan=2, sticky="ew", padx=14, pady=(0, 14))
-        tk.Label(
-            privacy,
-            text="Chat history and saved memories stay on this PC unless you explicitly enable memory sharing.",
-            bg="#07111b", fg="#7897aa", font=("Segoe UI", 9),
-            wraplength=max(280, dialog_w - 120), justify="left",
-        ).pack(anchor="w", pady=(0, 8))
-
-        def open_mic_privacy():
-            if self._open_microphone_privacy_settings():
-                self._set_status("Opened Windows microphone privacy settings.")
-            else:
-                messagebox.showwarning(
-                    "Microphone privacy settings",
-                    "Windows microphone privacy settings could not be opened automatically.",
-                    parent=window,
-                )
-
-        def clear_local_chat():
-            if not messagebox.askyesno(
-                "Clear local chat history?",
-                "This permanently clears JARVIS chat history stored on this PC. Saved memories are not affected.",
-                parent=window,
-            ):
-                return
-            self.clear_chat()
-
-        privacy_actions = tk.Frame(privacy, bg="#07111b")
-        privacy_actions.pack(fill="x")
         ttk.Button(
-            privacy_actions, text="Open Windows microphone privacy",
-            command=open_mic_privacy,
-        ).pack(side="left")
-        ttk.Button(
-            privacy_actions, text="Clear local chat history",
-            command=clear_local_chat,
-        ).pack(side="left", padx=(8, 0))
-        content.grid_columnconfigure(1, weight=1)
+            actions, text="SAVE CONFIGURATION", command=save,
+            style="Jarvis.Primary.TButton",
+        ).pack(side="right")
+        content.grid_columnconfigure(0, weight=1)
 
     def _watch_wakeword_download(self, model_path: Path):
         """Wait for the user's official model download and install it without manual file copying."""
