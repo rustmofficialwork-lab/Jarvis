@@ -2566,7 +2566,6 @@ class HudBridgeActionTests(unittest.TestCase):
 
 class HybridAiTests(unittest.TestCase):
     def test_local_ollama_reply_uses_bounded_context_and_returns_content(self):
-        import io
         from unittest.mock import patch
 
         captured = {}
@@ -2603,17 +2602,17 @@ class HybridAiTests(unittest.TestCase):
         self.assertEqual(captured["payload"]["messages"][-1]["content"], "hello")
 
     def test_local_ollama_missing_model_has_actionable_message(self):
+        import io
         from unittest.mock import patch
 
-        class FakeHttpError(Exception):
-            code = 404
-            def read(self, size=-1):
-                return b"model not found"
-
+        error = jarvis_desktop.urllib.error.HTTPError(
+            "http://127.0.0.1:11434/api/chat", 404, "Not Found", {},
+            io.BytesIO(b"model not found"),
+        )
         with patch.object(
             jarvis_desktop.urllib.request, "build_opener",
             return_value=type("Opener", (), {
-                "open": lambda self, request, timeout: (_ for _ in ()).throw(FakeHttpError())
+                "open": lambda self, request, timeout: (_ for _ in ()).throw(error)
             })(),
         ):
             with self.assertRaisesRegex(RuntimeError, "ollama pull llama3.2:3b"):
