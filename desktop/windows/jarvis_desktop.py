@@ -2832,10 +2832,6 @@ class JarvisDesktop:
                 pass
 
         window.after(80, focus_settings_dialog)
-        window.bind("<Destroy>", lambda event: (
-            window.grab_release() if event.widget is window else None
-        ))
-
         # Put settings in a scrollable content area so every option and the
         # Save/Update buttons remain reachable on small or scaled displays.
         body = tk.Frame(window, bg="#07111b")
