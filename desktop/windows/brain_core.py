@@ -83,9 +83,16 @@ def _explicit_action(prompt: str) -> bool:
     return bool(direct or hinglish)
 
 
-def _explicit_file_request(tool: str, prompt: str) -> bool:
-    """Require a direct, non-negated request before inspecting personal files."""
+def _explicit_file_request(tool: str, arguments: dict[str, Any], prompt: str) -> bool:
+    """Require direct intent and a user-named folder/file before inspecting personal data."""
     text = str(prompt or "").strip().casefold()
+    folder = arguments.get("folder")
+    if not isinstance(folder, str) or not re.search(rf"\\b{re.escape(folder.casefold())}\\b", text):
+        return False
+    if tool == "read_user_text_file":
+        filename = arguments.get("filename")
+        if not isinstance(filename, str) or not filename.strip() or filename.casefold() not in text:
+            return False
     if re.search(
         r"\b(don't|do not|never|avoid|mat|nahi|nahin)\b.{0,60}\b"
         r"(read|open|list|search|find|locate|inspect|check|summarize|"
@@ -130,7 +137,7 @@ def authorize_tool_call(
     if tool in READ_ONLY_TOOLS:
         return ToolDecision(True, "allowed", "Read-only tool is within the local allowlist.")
     if tool in USER_DIRECTED_FILE_TOOLS:
-        if not _explicit_file_request(tool, user_prompt):
+        if not _explicit_file_request(tool, arguments, user_prompt):
             return ToolDecision(
                 False, "not_requested",
                 "The user did not directly request access to personal files.",
