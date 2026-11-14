@@ -789,8 +789,10 @@ class ChatToolCallingTests(unittest.TestCase):
                 return FakeResponse(self.responses.pop(0))
 
         opener = FakeOpener()
-        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=opener), \\
-             patch.object(jarvis_desktop, "execute_tool") as execute:
+        with (
+            patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=opener),
+            patch.object(jarvis_desktop, "execute_tool") as execute,
+        ):
             answer = jarvis_desktop.chat_completion(
                 "https://example.com/chat", "model", "test-key", "What is 6 times 7?", []
             )
