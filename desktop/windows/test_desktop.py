@@ -749,6 +749,60 @@ class ChatToolCallingTests(unittest.TestCase):
         self.assertEqual(tool_message["tool_call_id"], "call_calc_1")
         self.assertEqual(tool_message["content"], "42")
 
+    def test_mixed_allowed_and_sensitive_tool_batch_executes_nothing(self):
+        first = {
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {"id": "call_calc", "type": "function", "function": {
+                            "name": "calculator",
+                            "arguments": json.dumps({"expression": "6 * 7"}),
+                        }},
+                        {"id": "call_payment", "type": "function", "function": {
+                            "name": "send_money",
+                            "arguments": json.dumps({"amount": 100}),
+                        }},
+                    ],
+                },
+            }],
+        }
+        second = {"choices": [{"message": {"role": "assistant", "content": "I blocked that mixed batch."}}]}
+
+        class FakeResponse:
+            def __init__(self, payload):
+                self.payload = json.dumps(payload).encode("utf-8")
+            def __enter__(self):
+                return self
+            def __exit__(self, *_args):
+                return False
+            def read(self, _size=-1):
+                return self.payload
+
+        class FakeOpener:
+            def __init__(self):
+                self.responses = [first, second]
+                self.requests = []
+            def open(self, request, timeout):
+                self.requests.append(json.loads(request.data.decode("utf-8")))
+                return FakeResponse(self.responses.pop(0))
+
+        opener = FakeOpener()
+        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=opener), \\
+             patch.object(jarvis_desktop, "execute_tool") as execute:
+            answer = jarvis_desktop.chat_completion(
+                "https://example.com/chat", "model", "test-key", "What is 6 times 7?", []
+            )
+
+        self.assertEqual(answer, "I blocked that mixed batch.")
+        execute.assert_not_called()
+        tool_messages = [
+            item for item in opener.requests[1]["messages"] if item.get("role") == "tool"
+        ]
+        self.assertEqual(len(tool_messages), 2)
+        self.assertTrue(all("No tools in this batch were executed" in item["content"] for item in tool_messages))
+
     def test_malformed_tool_envelope_is_rejected_before_execution(self):
         malformed = {
             "choices": [{
