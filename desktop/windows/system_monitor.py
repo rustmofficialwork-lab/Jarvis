@@ -66,9 +66,9 @@ def read_windows_power_status():
             return {"battery_present": False, "percent": None, "charging": None}
         percent = status.BatteryLifePercent
         return {
-            "battery_present": percent != 255,
+            "battery_present": status.BatteryFlag != 128,
             "percent": percent if percent <= 100 else None,
-            "charging": bool(status.BatteryFlag & 8),
+            "charging": bool(status.BatteryFlag & 8) if status.BatteryFlag != 255 else None,
         }
     except Exception:
         return None
