@@ -190,6 +190,11 @@
   };
   const start=async()=>{
     if(!gesture){setStatus('Gesture logic unavailable · restart JARVIS');return;}
+    const permissionApi=window.pywebview?.api;
+    if(!permissionApi?.camera_access_allowed || !(await permissionApi.camera_access_allowed())){
+      setStatus('Camera consent not granted · restart JARVIS and allow optional camera access');
+      return;
+    }
     if(!navigator.mediaDevices?.getUserMedia){setStatus('Camera unavailable · run JARVIS in the Windows desktop app');return;}
     toggle.disabled=true;
     try{
