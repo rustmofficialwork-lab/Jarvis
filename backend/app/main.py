@@ -15,7 +15,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
-from .provider_router import ProviderConfigurationError, ProviderUnavailable, request_with_failover
+from .provider_router import (ProviderConfigurationError, ProviderUnavailable, request_with_failover, probe_providers)
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 
 UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -507,3 +507,20 @@ async def chat_completions(
         media_type="application/json",
         headers={"Cache-Control": "no-store"},
     )
+
+
+@app.get("/v1/providers/health")
+async def providers_health(_: str | None = Depends(require_client_token)) -> dict[str, Any]:
+    """Run a tiny authenticated live request against each configured AI provider.
+
+    Only provider name, model, and a coarse status are returned; credentials and
+    upstream response bodies are never exposed.
+    """
+    try:
+        results = await probe_providers(
+            timeout=min(UPSTREAM_TIMEOUT_SECONDS, 15),
+            max_response_bytes=256_000,
+        )
+    except ProviderConfigurationError:
+        raise HTTPException(status_code=503, detail="AI provider configuration is invalid.")
+    return {"providers": results}
