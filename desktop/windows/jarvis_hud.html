@@ -558,6 +558,8 @@ setInterval(updateClock,1000);updateClock();
   const gear=document.querySelector('.gear');
   if(gear)mark(gear,'Open JARVIS settings',{action:'settings'});
   const back=document.querySelector('.back-btn');
+  // Bind runtime animation to the existing orb; this does not alter HUD markup or styling.
+  const orb=document.querySelector('.orb-wrapper');
   if(back)mark(back,'Exit JARVIS',{action:'exit'});
   $$('.quick-item').forEach(row=>{
     const k=txt(row).replace(/^[-\s]+/,'');
@@ -598,7 +600,9 @@ setInterval(updateClock,1000);updateClock();
       if(data.battery&&bh){
         bh.textContent=data.battery;
         const bv=parseFloat(data.battery);
-        if(Number.isFinite(bv))bat.style.setProperty('--bat',Math.max(0,Math.min(100,bv))+'%');
+        // AC power or unavailable battery readings must not retain the decorative 98% default.
+        bat.style.setProperty('--bat',(Number.isFinite(bv)?Math.max(0,Math.min(100,bv)):0)+'%');
+        bat.title=Number.isFinite(bv)?'Battery '+Math.round(bv)+'%':data.battery;
       }
       const cpuValue=Number.parseFloat(data.cpu);
       const rows=document.querySelectorAll('.storage-widget .storage-row span');
