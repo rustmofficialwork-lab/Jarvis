@@ -2811,6 +2811,31 @@ class JarvisDesktop:
                        min(480, max(420, screen_h - 60)))
         window.resizable(True, True)
 
+        # The HUD is a separate fullscreen pywebview window while Tk's root is
+        # intentionally hidden. A normal Toplevel can therefore be created
+        # behind the HUD. Keep this dialog above the fullscreen HUD and move
+        # keyboard focus to it when it is first mapped.
+        try:
+            window.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+
+        def focus_settings_dialog():
+            try:
+                if not window.winfo_exists():
+                    return
+                window.deiconify()
+                window.lift()
+                window.focus_force()
+                window.grab_set()
+            except tk.TclError:
+                pass
+
+        window.after(80, focus_settings_dialog)
+        window.bind("<Destroy>", lambda event: (
+            window.grab_release() if event.widget is window else None
+        ))
+
         # Put settings in a scrollable content area so every option and the
         # Save/Update buttons remain reachable on small or scaled displays.
         body = tk.Frame(window, bg="#07111b")
