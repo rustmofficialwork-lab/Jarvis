@@ -30,6 +30,8 @@ READ_ONLY_TOOLS = frozenset({
     "read_user_text_file",
 })
 USER_DIRECTED_TOOLS = frozenset({"open_app", "open_website"})
+# Exact domain aliases prevent deceptive hosts such as youtube.com.attacker.invalid.
+SITE_ALIASES = {"youtube": "youtube.com", "google": "google.com", "github": "github.com", "gmail": "mail.google.com", "wikipedia": "wikipedia.org", "reddit": "reddit.com", "stackoverflow": "stackoverflow.com"}
 SENSITIVE_TOOL_NAMES = frozenset({
     "send_money", "make_payment", "purchase_item", "send_email",
     "send_message", "delete_file", "delete_folder", "change_account",
@@ -129,9 +131,18 @@ def authorize_tool_call(
     except ValueError:
         host = ""
     prompt = str(user_prompt).casefold()
-    if not host or host not in prompt:
-        # Permit common shorthand only when the user explicitly names it.
-        shorthand = host.removeprefix("www.").split(".")[0] if host else ""
-        if not shorthand or not re.search(rf"\b{re.escape(shorthand)}\b", prompt):
-            return ToolDecision(False, "not_requested", "The user did not name this website.")
+    normalized_host = host.removeprefix("www.")
+    explicitly_named = bool(
+        normalized_host
+        and re.search(rf"(?<![a-z0-9.-]){re.escape(normalized_host)}(?![a-z0-9.-])", prompt)
+    )
+    if not explicitly_named:
+        for alias, domain in SITE_ALIASES.items():
+            if re.search(rf"\b{re.escape(alias)}\b", prompt) and (
+                normalized_host == domain or normalized_host.endswith("." + domain)
+            ):
+                explicitly_named = True
+                break
+    if not host or not explicitly_named:
+        return ToolDecision(False, "not_requested", "The user did not name this website.")
     return ToolDecision(True, "allowed", "The user explicitly requested this website.")
