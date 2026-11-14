@@ -2450,11 +2450,12 @@ class JarvisDesktop:
         try:
             answer = handle_online_command(prompt)
             if answer is not None:
+                self.events.put(("status", "ONLINE MODE — live internet service response."))
                 return answer
             endpoint = self.settings.get("endpoint", DEFAULT_ENDPOINT)
             token = self._ensure_device_token() if endpoint.strip() == DEFAULT_ENDPOINT else self.ai_api_key
             try:
-                return chat_completion(
+                answer = chat_completion(
                     endpoint, self.settings.get("model", DEFAULT_MODEL), token,
                     prompt, self.history, memories,
                 )
@@ -2462,10 +2463,12 @@ class JarvisDesktop:
                 if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
                     raise
                 renewed = self._ensure_device_token(force=True)
-                return chat_completion(
+                answer = chat_completion(
                     endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
                     prompt, self.history, memories,
                 )
+            self.events.put(("status", "ONLINE MODE — cloud AI is responding."))
+            return answer
         except Exception as online_error:
             logging.getLogger("jarvis").info(
                 "Online AI unavailable; attempting local fallback (%s)", type(online_error).__name__
