@@ -49,6 +49,23 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(providers[0].name, "openrouter")
         self.assertEqual(providers[0].model, "openrouter/free")
 
+    def test_groq_provider_configuration(self):
+        env = {
+            "JARVIS_AI_PROVIDERS": (
+                '[{"name":"openrouter","base_url":"https://openrouter.ai/api/v1/chat/completions",'
+                '"api_key_env":"OPENROUTER_API_KEY","model":"openrouter/free"},'
+                '{"name":"groq","base_url":"https://api.groq.com/openai/v1/chat/completions",'
+                '"api_key_env":"GROQ_API_KEY","model":"openai/gpt-oss-120b"}]'
+            ),
+            "OPENROUTER_API_KEY": "openrouter-secret",
+            "GROQ_API_KEY": "groq-secret",
+        }
+        providers = load_providers(env)
+        self.assertEqual([provider.name for provider in providers], ["openrouter", "groq"])
+        self.assertEqual(providers[1].base_url, "https://api.groq.com/openai/v1/chat/completions")
+        self.assertEqual(providers[1].model, "openai/gpt-oss-120b")
+        self.assertEqual(providers[1].api_key, "groq-secret")
+
     def test_unconfigured_provider_keys_are_skipped(self):
         env = {
             "JARVIS_AI_PROVIDERS": (
