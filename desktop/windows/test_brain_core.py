@@ -73,12 +73,23 @@ class BrainCoreTests(unittest.TestCase):
                 self.assertFalse(decision.allowed)
                 self.assertEqual(decision.status, "not_requested")
 
+    def test_personal_file_tools_require_the_user_named_folder_and_filename(self):
+        cases = (
+            ("list_user_files", {"folder": "Downloads"}, "List my files"),
+            ("search_user_files", {"folder": "Documents", "query": "invoice"}, "Find invoice files in Downloads"),
+            ("read_user_text_file", {"folder": "Documents", "filename": "notes.txt"}, "Summarize my document in Documents"),
+            ("read_user_text_file", {"folder": "Documents", "filename": "other.txt"}, "Read notes.txt in Documents"),
+        )
+        for name, arguments, prompt in cases:
+            with self.subTest(name=name, prompt=prompt):
+                self.assertFalse(authorize_tool_call(name, arguments, prompt).allowed)
+
     def test_personal_file_tools_allow_explicit_requests(self):
         cases = (
             ("list_user_files", {"folder": "Documents"}, "Please list my files in Documents"),
             ("search_user_files", {"folder": "Downloads", "query": "invoice"}, "Find the invoice file in Downloads"),
-            ("read_user_text_file", {"folder": "Documents", "filename": "notes.txt"}, "Please summarize my document"),
-            ("read_user_text_file", {"folder": "Desktop", "filename": "notes.txt"}, "Read the file on my Desktop"),
+            ("read_user_text_file", {"folder": "Documents", "filename": "notes.txt"}, "Please summarize notes.txt in Documents"),
+            ("read_user_text_file", {"folder": "Desktop", "filename": "notes.txt"}, "Read notes.txt on my Desktop"),
         )
         for name, arguments, prompt in cases:
             with self.subTest(name=name, prompt=prompt):
