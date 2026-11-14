@@ -48,6 +48,8 @@ class OnlineServicesTests(unittest.TestCase):
     def test_search_command_parsing(self):
         self.assertEqual(parse_online_command("Search web for Python 3.13"), ("search", "Python 3.13"))
         self.assertEqual(parse_online_command("google latest AI news"), ("search", "latest AI news"))
+        self.assertEqual(parse_online_command("look up online Groq API docs"), ("search", "Groq API docs"))
+        self.assertEqual(parse_online_command("internet par search karo Python tutorials"), ("search", "Python tutorials"))
         self.assertIsNone(parse_online_command("open notepad"))
 
     def test_weather_command_parsing_and_missing_city_prompt(self):
