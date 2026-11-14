@@ -24,15 +24,13 @@ export const telemetrySchema = z
   })
   .refine(
     (value) =>
-      value.diskTotal === null ||
-      value.diskFree === null ||
+      value.diskTotal === null || value.diskFree === null ||
       value.diskFree <= value.diskTotal,
     { message: "Free disk space exceeds capacity" },
   )
   .refine(
     (value) =>
-      value.ramTotal === null ||
-      value.ramFree === null ||
+      value.ramTotal === null || value.ramFree === null ||
       value.ramFree <= value.ramTotal,
     { message: "Free memory exceeds capacity" },
   );
@@ -41,10 +39,7 @@ export type Telemetry = z.infer<typeof telemetrySchema>;
 export const BRIDGE_URL = "http://localhost:8765/metrics";
 export const POLL_MS = 3000;
 
-export function usedPercent(
-  total: number | null | undefined,
-  free: number | null | undefined,
-) {
+export function usedPercent(total: number | null | undefined, free: number | null | undefined) {
   return total && free != null ? (1 - free / total) * 100 : null;
 }
 
