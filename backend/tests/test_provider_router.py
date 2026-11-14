@@ -271,3 +271,21 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    async def test_probe_providers_checks_each_provider_without_exposing_keys(self):
+        from app.provider_router import probe_providers
+
+        env = self._two_provider_environment()
+        responses = [
+            FakeResponse(200, [b'{"choices":[{"message":{"role":"assistant","content":"OK"}}]}']),
+            FakeResponse(401),
+        ]
+
+        def factory(**kwargs):
+            return FakeClient(responses)
+
+        results = await probe_providers(environ=env, client_factory=factory)
+        self.assertEqual([item["status"] for item in results], ["working", "invalid_credentials"])
+        self.assertNotIn("secret-one", json.dumps(results))
+        self.assertNotIn("secret-two", json.dumps(results))
