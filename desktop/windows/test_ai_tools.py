@@ -91,7 +91,7 @@ class SafeToolTests(unittest.TestCase):
 
     def test_open_app_uses_only_fixed_windows_command_without_shell(self):
         import sys
-        with patch("ai_tools.sys.platform", "win32", create=True), patch("ai_tools.subprocess.Popen") as popen:
+        with patch("ai_tools.sys.platform", "win32"), patch("ai_tools.subprocess.Popen") as popen:
             result = execute_tool("open_app", {"app": "notepad"})
         self.assertIn("Launch request sent", result)
         popen.assert_called_once_with(["notepad.exe"], shell=False, close_fds=True)
