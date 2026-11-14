@@ -2425,6 +2425,8 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn("getBoundingClientRect()", extensions)
         self.assertIn("candidate.viewBox?.baseVal", extensions)
         self.assertIn("anchorX>=viewBox.x", extensions)
+        self.assertIn("const svg=hit?.closest?.", extensions)
+        self.assertIn("#m.jx-gesture-active .core", extensions)
         self.assertIn('window.__jarvisHudRuntimeAdapterLoaded', runtime)
 
     def test_runtime_adapter_wires_hud_click_actions_to_the_desktop_bridge(self):
