@@ -13,13 +13,14 @@ SPEC.loader.exec_module(jarvis_desktop)
 class WakewordActivationAnnouncementTests(unittest.TestCase):
     def test_verified_wake_activation_speaks_selected_confirmation(self):
         stop_event = __import__("threading").Event()
+        selected_phrase = jarvis_desktop.WAKE_ACTIVATION_PHRASES[1]
         with patch.object(jarvis_desktop, "speak_text_interruptibly", return_value=True) as speak:
             self.assertTrue(
                 jarvis_desktop.announce_wake_activation(
                     stop_event, choice=lambda phrases: phrases[1]
                 )
             )
-        speak.assert_called_once_with("At your service.", stop_event)
+        speak.assert_called_once_with(selected_phrase, stop_event)
 
     def test_wake_activation_has_only_hinglish_and_english_phrases(self):
         phrases = jarvis_desktop.WAKE_ACTIVATION_PHRASES
