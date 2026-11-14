@@ -80,6 +80,41 @@ TOOL_DEFINITIONS = [
                 "additionalProperties": False,
             },
         },
+    },,
+
+    {
+        "type": "function",
+        "function": {
+            "name": "list_user_files",
+            "description": "List filenames in Desktop, Documents, or Downloads. Read-only; never lists system or application data.",
+            "parameters": {"type": "object", "properties": {
+                "folder": {"type": "string", "enum": ["Desktop", "Documents", "Downloads"]},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 30}
+            }, "required": ["folder"], "additionalProperties": False}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_user_files",
+            "description": "Search filenames, not file contents, in Desktop, Documents, or Downloads. Read-only.",
+            "parameters": {"type": "object", "properties": {
+                "folder": {"type": "string", "enum": ["Desktop", "Documents", "Downloads"]},
+                "query": {"type": "string", "minLength": 1, "maxLength": 80},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 30}
+            }, "required": ["folder", "query"], "additionalProperties": False}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_user_text_file",
+            "description": "Read a small plain-text file from Desktop, Documents, or Downloads. Read-only; never use for passwords, keys, tokens, or secrets.",
+            "parameters": {"type": "object", "properties": {
+                "folder": {"type": "string", "enum": ["Desktop", "Documents", "Downloads"]},
+                "filename": {"type": "string", "maxLength": 180}
+            }, "required": ["folder", "filename"], "additionalProperties": False}
+        }
     },
 ]
 
@@ -130,6 +165,76 @@ def calculate(expression: str) -> str:
     return str(result)
 
 
+_USER_FOLDERS = {"Desktop", "Documents", "Downloads"}
+_TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".log"}
+_BLOCKED_NAMES = {"credentials", "secrets", "id_rsa", "id_ed25519", "known_hosts", "config"}
+MAX_TEXT_FILE_BYTES = 64 * 1024
+
+
+def _user_folder(folder: str):
+    from pathlib import Path
+
+    if folder not in _USER_FOLDERS:
+        raise ValueError("Choose Desktop, Documents, or Downloads.")
+    home = Path.home().resolve()
+    path = (home / folder).resolve()
+    if path.parent != home or not path.is_dir():
+        raise ValueError(f"The {folder} folder is not available.")
+    return path
+
+
+def _safe_user_file(folder: str, filename: str):
+    if not isinstance(filename, str) or not filename.strip() or len(filename) > 180:
+        raise ValueError("Provide a valid filename.")
+    name = filename.strip()
+    if name in {".", ".."} or "/" in name or "\\" in name:
+        raise ValueError("Only a filename inside the selected folder is allowed.")
+    root = _user_folder(folder)
+    try:
+        path = (root / name).resolve(strict=True)
+        path.relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise ValueError("That file does not exist inside the selected folder.") from exc
+    if not path.is_file():
+        raise ValueError("The selected item is not a regular file.")
+    if path.name.casefold() in _BLOCKED_NAMES or path.suffix.casefold() in {".key", ".pem", ".p12", ".pfx", ".db", ".sqlite", ".env"}:
+        raise ValueError("For safety, JARVIS cannot read credential, database, or key files.")
+    return path
+
+
+def _list_user_files(folder: str, limit: int = 20, query: str = "") -> str:
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 30:
+        raise ValueError("Limit must be from 1 to 30.")
+    root = _user_folder(folder)
+    matches = []
+    try:
+        for item in root.iterdir():
+            if item.name.startswith(".") or item.name.casefold() in _BLOCKED_NAMES or item.is_symlink():
+                continue
+            if query and query.casefold() not in item.name.casefold():
+                continue
+            if item.is_file() or item.is_dir():
+                matches.append(item.name + ("/" if item.is_dir() else ""))
+            if len(matches) >= limit:
+                break
+    except OSError as exc:
+        raise ValueError(f"Could not list that folder: {exc}") from exc
+    return "\n".join(matches) if matches else "No matching files or folders found."
+
+
+def _read_user_text_file(folder: str, filename: str) -> str:
+    path = _safe_user_file(folder, filename)
+    if path.suffix.casefold() not in _TEXT_EXTENSIONS:
+        raise ValueError("Only .txt, .md, .csv, .json, and .log files can be read.")
+    if path.stat().st_size > MAX_TEXT_FILE_BYTES:
+        raise ValueError("That file is larger than the 64 KB safe reading limit.")
+    try:
+        return path.read_text(encoding="utf-8")[:MAX_TEXT_FILE_BYTES]
+    except UnicodeDecodeError as exc:
+        raise ValueError("That file is not valid UTF-8 text.") from exc
+
+
+
 def execute_tool(name: str, arguments: dict[str, Any]) -> str:
     """Execute one allowlisted, read-only tool with exact argument validation."""
     if not isinstance(arguments, dict):
@@ -153,4 +258,19 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> str:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PROCESS_RESULTS:
             raise ValueError("Process limit must be an integer from 1 to 10.")
         return get_top_processes(limit=limit)
+    if name == "list_user_files":
+        if set(arguments) - {"folder", "limit"} or "folder" not in arguments:
+            raise ValueError("File listing requires folder and optional limit.")
+        return _list_user_files(arguments["folder"], arguments.get("limit", 20))
+    if name == "search_user_files":
+        if set(arguments) - {"folder", "query", "limit"} or not {"folder", "query"} <= set(arguments):
+            raise ValueError("File search requires folder and query, plus optional limit.")
+        query = arguments["query"]
+        if not isinstance(query, str) or not query.strip() or len(query) > 80:
+            raise ValueError("Search query must contain 1 to 80 characters.")
+        return _list_user_files(arguments["folder"], arguments.get("limit", 20), query.strip())
+    if name == "read_user_text_file":
+        if set(arguments) != {"folder", "filename"}:
+            raise ValueError("Text file reading requires only folder and filename.")
+        return _read_user_text_file(arguments["folder"], arguments["filename"])
     raise ValueError("That JARVIS tool is not available.")
