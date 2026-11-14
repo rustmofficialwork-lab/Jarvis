@@ -89,6 +89,31 @@ class SafeToolTests(unittest.TestCase):
                         "folder": "Downloads", "filename": "secret.env"
                     })
 
+    def test_open_website_allows_public_https_url_and_reports_navigation_only(self):
+        with patch("ai_tools.webbrowser.open", return_value=True) as open_browser:
+            result = execute_tool("open_website", {"url": "https://example.com/path?q=jarvis#section"})
+        self.assertIn("has not signed in", result)
+        open_browser.assert_called_once_with(
+            "https://example.com/path?q=jarvis", new=2, autoraise=True
+        )
+
+    def test_open_website_blocks_local_private_and_credential_urls(self):
+        blocked = (
+            "file:///C:/Windows/win.ini",
+            "javascript:alert(1)",
+            "http://localhost/admin",
+            "http://127.0.0.1/",
+            "http://192.168.1.1/",
+            "https://user:pass@example.com/",
+            "https://example.com:8443/",
+        )
+        with patch("ai_tools.webbrowser.open") as open_browser:
+            for url in blocked:
+                with self.subTest(url=url):
+                    with self.assertRaises(ValueError):
+                        execute_tool("open_website", {"url": url})
+            open_browser.assert_not_called()
+
     def test_open_app_uses_only_fixed_windows_command_without_shell(self):
         import sys
         with patch("ai_tools.sys.platform", "win32"), patch("ai_tools.subprocess.Popen") as popen:
