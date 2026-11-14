@@ -2420,7 +2420,7 @@ class HudLiveDataMappingTests(unittest.TestCase):
     def test_hud_document_ids_are_unique(self):
         import re
         hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        ids = re.findall(r"\\bid=['\\\"]([^'\\\"]+)['\\\"]", hud)
+        ids = re.findall(r"\bid=['\"]([^'\"]+)['\"]", hud)
         self.assertEqual(len(ids), len(set(ids)), "HUD contains duplicate element IDs")
 
 
