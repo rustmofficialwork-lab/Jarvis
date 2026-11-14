@@ -2692,7 +2692,7 @@ class HybridAiTests(unittest.TestCase):
 
         self.assertIn("live internet data", answer)
         local.assert_not_called()
-        self.assertIn("OFFLINE MODE", app.events.get_nowait()[1])
+        self.assertIn("ONLINE TASK BLOCKED", app.events.get_nowait()[1])
 
 
     def test_local_fallback_does_not_duplicate_cloud_provider_routing(self):
