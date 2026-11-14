@@ -28,7 +28,7 @@ from reminders import ReminderStore, parse_reminder_command
 from reminder_scheduler import (notify_due_reminders, register_reminder_task,
                                 remove_all_reminder_tasks, sync_pending_reminder_tasks,
                                 unregister_reminder_task)
-from online_services import handle_online_command
+from online_services import handle_online_command, parse_online_command
 from document_reader import read_document
 from updater import check_for_update, download_verified_installer
 from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
@@ -1241,7 +1241,7 @@ def local_chat_completion(prompt: str, history: list[dict],
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             raise RuntimeError(
-                "Offline AI model is not installed yet. Run 'ollama pull llama3.2:3b' once."
+                "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once."
             ) from exc
         detail = exc.read(1024).decode("utf-8", errors="replace")
         raise RuntimeError(f"Local Ollama returned HTTP {exc.code}: {detail}") from exc
@@ -2551,6 +2551,15 @@ class JarvisDesktop:
             logging.getLogger("jarvis").info(
                 "Online AI unavailable; attempting local fallback (%s)", type(online_error).__name__
             )
+            # Search, weather, and news require live data. Never ask a local
+            # language model to guess at current information when the network is down.
+            if parse_online_command(prompt) is not None:
+                self.events.put(("status", "OFFLINE MODE — live search, weather and news need an internet connection."))
+                return (
+                    "Ye request live internet data maangti hai. Internet abhi available nahi hai, "
+                    "isliye main search, current weather ya latest news verify nahi kar sakta. "
+                    "General AI chat offline mode mein available hai."
+                )
             try:
                 answer = local_chat_completion(prompt, self.history, memories)
                 self.events.put(("status", "OFFLINE MODE — local AI is responding; your data stays on this PC."))
