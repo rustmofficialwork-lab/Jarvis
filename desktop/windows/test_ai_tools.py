@@ -89,6 +89,29 @@ class SafeToolTests(unittest.TestCase):
                         "folder": "Downloads", "filename": "secret.env"
                     })
 
+    def test_open_app_uses_only_fixed_windows_command_without_shell(self):
+        import sys
+        with patch("ai_tools.sys.platform", "win32", create=True), patch("ai_tools.subprocess.Popen") as popen:
+            result = execute_tool("open_app", {"app": "notepad"})
+        self.assertIn("Launch request sent", result)
+        popen.assert_called_once_with(["notepad.exe"], shell=False, close_fds=True)
+
+    def test_open_app_rejects_arbitrary_commands_and_non_windows(self):
+        with patch("ai_tools.sys.platform", "linux"):
+            with self.assertRaises(ValueError):
+                execute_tool("open_app", {"app": "notepad"})
+        with patch("ai_tools.sys.platform", "win32", create=True):
+            with self.assertRaises(ValueError):
+                execute_tool("open_app", {"app": "powershell"})
+            with self.assertRaises(ValueError):
+                execute_tool("open_app", {"app": "notepad", "command": "whoami"})
+
+    def test_capabilities_tool_reports_implemented_and_unsupported_actions(self):
+        result = execute_tool("get_available_capabilities", {})
+        self.assertIn("web search, weather, and news", result)
+        self.assertIn("payments", result)
+        self.assertIn("arbitrary browser automation", result)
+
     def test_unknown_tool_is_rejected(self):
         with self.assertRaises(ValueError):
             execute_tool("run_shell", {})
