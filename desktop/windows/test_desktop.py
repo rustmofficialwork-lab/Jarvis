@@ -1284,6 +1284,46 @@ class SystemMetricsTests(unittest.TestCase):
             "N/A",
         )
 
+    def test_windows_native_status_corrects_a_false_zero_percent_desktop_battery(self):
+        import system_monitor
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        fake_psutil = SimpleNamespace(
+            sensors_battery=lambda: SimpleNamespace(percent=0, power_plugged=True, secsleft=0),
+            virtual_memory=lambda: SimpleNamespace(percent=25, total=100, used=25),
+            disk_usage=lambda drive: SimpleNamespace(percent=20, total=100, used=20, free=80),
+            cpu_percent=lambda interval=None: 5,
+            boot_time=lambda: 1,
+            net_if_stats=lambda: {},
+        )
+        with patch.object(system_monitor, "read_windows_power_status", return_value={
+            "battery_present": False, "percent": None, "charging": None,
+        }):
+            metrics = system_monitor.collect_system_metrics(fake_psutil)
+        self.assertIsNone(metrics["battery"])
+        self.assertEqual(system_monitor.format_battery_status(metrics["battery"]), "AC POWER")
+
+    def test_windows_native_percentage_overrides_stale_psutil_value(self):
+        import system_monitor
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        fake_psutil = SimpleNamespace(
+            sensors_battery=lambda: SimpleNamespace(percent=0, power_plugged=True, secsleft=0),
+            virtual_memory=lambda: SimpleNamespace(percent=25, total=100, used=25),
+            disk_usage=lambda drive: SimpleNamespace(percent=20, total=100, used=20, free=80),
+            cpu_percent=lambda interval=None: 5,
+            boot_time=lambda: 1,
+            net_if_stats=lambda: {},
+        )
+        with patch.object(system_monitor, "read_windows_power_status", return_value={
+            "battery_present": True, "percent": 67, "charging": False,
+        }):
+            metrics = system_monitor.collect_system_metrics(fake_psutil)
+        self.assertEqual(system_monitor.format_battery_status(metrics["battery"]), "67% • ON BATTERY")
+
+
 class WindowsBrightnessTests(unittest.TestCase):
     def test_brightness_increases_and_clamps_to_hundred(self):
         class FakeBrightness:
