@@ -33,6 +33,7 @@ from document_reader import read_document
 from updater import check_for_update, download_verified_installer
 from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
 from ai_tools import TOOL_DEFINITIONS, execute_tool
+from brain_core import authorize_tool_call
 from owner_voice_setup import enroll_owner_voice
 from owner_voice_verification import load_owner_profile, load_encoder, verify_pcm_bytes
 
@@ -1127,7 +1128,11 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                 arguments = json.loads(raw_arguments)
                 if not isinstance(arguments, dict):
                     raise ValueError("Tool arguments must be a JSON object.")
-                output = execute_tool(name, arguments)
+                decision = authorize_tool_call(name, arguments, prompt)
+                if not decision.allowed:
+                    output = f"Tool blocked ({decision.status}): {decision.reason}"
+                else:
+                    output = execute_tool(name, arguments)
             except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
                 output = f"Tool unavailable: {str(exc)[:240]}"
             messages.append({
