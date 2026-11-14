@@ -268,11 +268,6 @@ class ProviderRouterTests(unittest.IsolatedAsyncioTestCase):
                 client_factory=factory,
             )
 
-
-if __name__ == "__main__":
-    unittest.main()
-
-
     async def test_probe_providers_checks_each_provider_without_exposing_keys(self):
         from app.provider_router import probe_providers
 
@@ -289,3 +284,7 @@ if __name__ == "__main__":
         self.assertEqual([item["status"] for item in results], ["working", "invalid_credentials"])
         self.assertNotIn("secret-one", json.dumps(results))
         self.assertNotIn("secret-two", json.dumps(results))
+
+
+if __name__ == "__main__":
+    unittest.main()
