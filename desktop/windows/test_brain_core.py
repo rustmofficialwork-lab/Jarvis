@@ -48,9 +48,17 @@ class BrainCoreTests(unittest.TestCase):
         informational = authorize_tool_call(
             "open_website", {"url": "https://www.youtube.com"}, "How do I open YouTube?"
         )
+        deceptive_suffix = authorize_tool_call(
+            "open_website", {"url": "https://youtube.com.attacker.invalid"}, "Please open YouTube"
+        )
+        valid_subdomain = authorize_tool_call(
+            "open_website", {"url": "https://music.youtube.com"}, "Please open YouTube"
+        )
         self.assertTrue(allowed.allowed)
         self.assertFalse(denied.allowed)
         self.assertFalse(informational.allowed)
+        self.assertFalse(deceptive_suffix.allowed)
+        self.assertTrue(valid_subdomain.allowed)
 
     def test_sensitive_actions_never_run_from_model_tool_call(self):
         decision = authorize_tool_call("send_money", {"amount": 100}, "Send 100")
