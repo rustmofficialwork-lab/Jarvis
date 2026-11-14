@@ -79,10 +79,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "JARVIS — Personal AI Assistant" },
-      { name: "description", content: "JARVIS is a personal AI assistant for Windows with voice commands, reminders, memory, and everyday system tools." },
+      {
+        name: "description",
+        content:
+          "JARVIS is a personal AI assistant for Windows with voice commands, reminders, memory, and everyday system tools.",
+      },
       { name: "author", content: "JARVIS" },
       { property: "og:title", content: "JARVIS — Personal AI Assistant" },
-      { property: "og:description", content: "A personal AI assistant for Windows with voice commands, reminders, memory, and everyday system tools." },
+      {
+        property: "og:description",
+        content:
+          "A personal AI assistant for Windows with voice commands, reminders, memory, and everyday system tools.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@rustmofficialwork" },
