@@ -14,6 +14,10 @@ services:
         sync: false
       - key: OPENROUTER_MODEL
         value: openrouter/free
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JARVIS_AI_PROVIDERS
+        value: '[{"name":"openrouter","base_url":"https://openrouter.ai/api/v1/chat/completions","api_key_env":"OPENROUTER_API_KEY","model":"openrouter/free"},{"name":"groq","base_url":"https://api.groq.com/openai/v1/chat/completions","api_key_env":"GROQ_API_KEY","model":"openai/gpt-oss-120b"}]'
       - key: MAX_REQUEST_BYTES
         value: "12582912"
       - key: UPSTREAM_TIMEOUT_SECONDS
