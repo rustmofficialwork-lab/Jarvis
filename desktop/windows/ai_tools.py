@@ -8,6 +8,8 @@ from __future__ import annotations
 import ast
 import math
 import operator
+import subprocess
+import sys
 from datetime import datetime
 from typing import Any
 
@@ -263,9 +265,6 @@ _WINDOWS_APP_COMMANDS = {
 
 
 def _open_app(app: str) -> str:
-    import subprocess
-    import sys
-
     if sys.platform != "win32":
         raise ValueError("Opening Windows apps is supported only on Windows.")
     command = _WINDOWS_APP_COMMANDS.get(app)
