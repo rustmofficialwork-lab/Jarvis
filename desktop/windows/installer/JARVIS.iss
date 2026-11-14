@@ -24,15 +24,18 @@ RestartApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
+Name: "offlineai"; Description: "Install offline AI now (Ollama + Llama 3.2 3B; approximately 2 GB download)"; GroupDescription: "Optional AI setup:"
 
 [Files]
 Source: "..\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\setup_offline_ai.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"
 Name: "{autodesktop}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"; Tasks: desktopicon
 
 [Run]
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_offline_ai.ps1"""; Description: "Set up offline AI (downloads approximately 2 GB)"; Tasks: offlineai; Flags: postinstall waituntilterminated skipifsilent
 Filename: "{app}\JARVIS.exe"; Description: "Launch JARVIS Desktop"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
