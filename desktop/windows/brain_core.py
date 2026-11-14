@@ -62,10 +62,21 @@ def choose_mode(
 
 
 def _explicit_action(prompt: str) -> bool:
-    return bool(re.search(
-        r"\b(open|launch|start|kholo|khol|chalao|shuru karo)\b",
-        str(prompt or "").casefold(),
-    ))
+    text = str(prompt or "").strip().casefold()
+    if re.search(
+        r"\b(don't|do not|never|avoid|mat|nahi|nahin)\b.{0,40}\b(open|launch|start|visit|go to|kholo|khol|chalao)\b",
+        text,
+    ):
+        return False
+    direct = re.search(
+        r"^\s*(?:(?:please|hey jarvis|jarvis|can you|could you|would you|zara|i want you to)\s+)*(?:open|launch|start|visit|go to|kholo|khol do|chalao|shuru karo)\b",
+        text,
+    )
+    hinglish = re.search(
+        r"\b(notepad|calculator|calc|paint|file explorer|explorer|task manager|youtube|google)\s+(?:kholo|khol do|chalao)\b",
+        text,
+    )
+    return bool(direct or hinglish)
 
 
 def authorize_tool_call(
