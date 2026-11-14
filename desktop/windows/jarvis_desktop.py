@@ -28,7 +28,7 @@ from reminders import ReminderStore, parse_reminder_command
 from reminder_scheduler import (notify_due_reminders, register_reminder_task,
                                 remove_all_reminder_tasks, sync_pending_reminder_tasks,
                                 unregister_reminder_task)
-from online_services import handle_online_command, parse_online_command
+from online_services import (explain_online_failure, handle_online_command, parse_online_command)
 from document_reader import read_document
 from updater import check_for_update, download_verified_installer
 from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
@@ -85,10 +85,14 @@ def configure_startup_logging(log_path: Path = STARTUP_LOG_FILE):
     return logger
 SYSTEM_PROMPT = (
     'You are J.A.R.V.I.S., a calm, capable personal AI assistant with subtle dry wit. '
-    'Support Hindi, English, and Hinglish. Match the language and script used by the user. '
+    'Support only Hinglish (Hindi + English in Roman script) and English; default to Hinglish. '
     'Be concise when the reply will be spoken aloud. '
     'Understand the user intent before answering; for multi-step requests, briefly plan the steps, '
     'work through only the tools actually available, and clearly report what is done and what remains. '
+    'If you cannot complete a request, say so clearly and explain the specific reason: for example, '
+    'internet unavailable, online service/API error, missing permission, missing information, or an unsupported capability. '
+    'Never pretend an action succeeded, and never say the internet is down unless a connection failure was actually detected. '
+    'Suggest a practical next step when possible. '
     'Use get_local_time for questions about the computer local time, get_system_status for live PC health, '
     'get_top_processes only when asked about running app resource usage, and calculator for arithmetic. '
     'These tools are read-only. Never imply that you changed settings, launched an app, sent a message, '
@@ -2584,11 +2588,11 @@ class JarvisDesktop:
             # Search, weather, and news require live data. Never ask a local
             # language model to guess at current information when the network is down.
             if parse_online_command(prompt) is not None:
-                self._post_ai_status("OFFLINE MODE — live search, weather and news need an internet connection.")
+                explanation = explain_online_failure(online_error, "live web search/weather/news")
+                self._post_ai_status("ONLINE TASK BLOCKED — live internet service failed.")
                 return (
-                    "Ye request live internet data maangti hai. Internet abhi available nahi hai, "
-                    "isliye main search, current weather ya latest news verify nahi kar sakta. "
-                    "General AI chat offline mode mein available hai."
+                    f"{explanation} General AI chat offline mode mein available hai, "
+                    "lekin main bina live data ke current information guess nahi karunga."
                 )
             try:
                 answer = local_chat_completion(prompt, self.history, memories)
