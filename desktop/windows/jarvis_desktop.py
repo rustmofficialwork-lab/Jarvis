@@ -3460,8 +3460,11 @@ class JarvisWebBridge:
         return False
 
     def open_settings(self):
+        """Open the native settings dialog on the Tk thread."""
         app = self.app_state.get("app")
-        return bool(app is not None)
+        if app is None:
+            return False
+        return self._dispatch(app.open_settings)
 
     def get_settings(self):
         app = self.app_state.get("app")
@@ -3762,6 +3765,24 @@ def run_web_hud():
         min_size=(900, 560), background_color="#020b14", text_select=False,
     )
     bridge.window = window
+
+    runtime_path = Path(__file__).with_name("jarvis_hud_runtime.js")
+    if not runtime_path.exists() and getattr(sys, "frozen", False):
+        runtime_path = Path(sys._MEIPASS) / "jarvis_hud_runtime.js"
+    if not runtime_path.exists():
+        raise FileNotFoundError(f"JARVIS HUD runtime adapter not found: {runtime_path}")
+    runtime_source = runtime_path.read_text(encoding="utf-8")
+
+    def inject_hud_runtime(*_args):
+        try:
+            window.evaluate_js(runtime_source)
+            logger.info("External HUD runtime adapter injected")
+        except Exception:
+            logger.exception("Could not inject the external HUD runtime adapter")
+
+    # Keep the uploaded 116 KB HTML artwork byte-for-byte unchanged. Runtime
+    # bindings and click actions are layered on after the WebView document loads.
+    window.events.loaded += inject_hud_runtime
     logger.info("HUD window created; entering webview event loop")
     webview.start(debug=False)
     logger.info("HUD window closed normally")
