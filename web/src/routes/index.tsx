@@ -33,8 +33,8 @@ function Home() {
           Meet your personal AI assistant.
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-          A focused Windows desktop assistant for conversations, voice commands, reminders,
-          memory, and everyday system tasks.
+          A focused Windows desktop assistant for conversations, voice commands, reminders, memory,
+          and everyday system tasks.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-4">
           <a
