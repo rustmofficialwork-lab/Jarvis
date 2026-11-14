@@ -1302,6 +1302,8 @@ class JarvisDesktop:
             return
         if microphone_consent_required(self.settings):
             self._first_launch_permission_setup()
+            if self.settings.get("microphone_consent_granted"):
+                self._request_microphone_access()
         if camera_consent_required(self.settings):
             accepted = ask_camera_consent(parent=self.root)
             record_camera_consent(self.settings, accepted)
