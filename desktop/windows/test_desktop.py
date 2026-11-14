@@ -10,6 +10,17 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class WakewordActivationAnnouncementTests(unittest.TestCase):
+    def test_verified_wake_activation_speaks_confirmation(self):
+        stop_event = __import__("threading").Event()
+        with patch.object(jarvis_desktop, "speak_text_interruptibly", return_value=True) as speak:
+            self.assertTrue(jarvis_desktop.announce_wake_activation(stop_event))
+        speak.assert_called_once_with(
+            "Yes, I'm listening. What can I do for you?",
+            stop_event,
+        )
+
+
 class WakewordSetupTests(unittest.TestCase):
     def test_openwakeword_assets_use_user_writable_directory_and_selective_download(self):
         import tempfile
