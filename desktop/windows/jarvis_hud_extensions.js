@@ -61,7 +61,7 @@
     const matrix=svg?.getScreenCTM?.();
     if(!matrix){gestureToggle.style.visibility='hidden';return;}
     const point=svg.createSVGPoint();
-    point.x=958; point.y=744;
+    point.x=504; point.y=699;
     const screen=point.matrixTransform(matrix);
     gestureToggle.style.left=screen.x+'px';
     gestureToggle.style.top=screen.y+'px';
