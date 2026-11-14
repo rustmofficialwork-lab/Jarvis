@@ -298,7 +298,7 @@ def _available_capabilities() -> str:
         "Online services implemented separately: web search, weather, and news. "
         "Offline AI depends on the local Ollama model being installed and running. "
         "Not implemented as general actions: interacting with website controls or submitting forms, sending email/messages, "
-        "payments, purchases, account changes, unrestricted shell commands, or arbitrary file deletion. "
+        "payments, purchases, account changes, unrestricted shell commands, arbitrary browser automation, or arbitrary file deletion. "
         "Never claim these unsupported actions were completed."
     )
 
