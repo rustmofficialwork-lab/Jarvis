@@ -10,7 +10,7 @@ On first launch, JARVIS shows separate foreground consent prompts for microphone
 - Python 3.11 (recommended)
 - Microphone and speakers/headphones (microphone access is optional until you enable voice setup; Windows controls the permission)
 - Internet for online AI responses and the one-time download of offline speech models
-- Optional offline AI: Ollama plus the one-time `llama3.2:3b` model download (about 2 GB); run `setup_offline_ai.ps1` from this folder while online
+- Offline AI: select **Install offline AI now** in the JARVIS installer (Ollama + `llama3.2:3b`, approximately 2 GB). This can also be run later with `setup_offline_ai.ps1` while online
 - Either a custom-trained JARVIS ONNX wake-word model or the licensed community Jarvis fallback installed through the in-app **Set up wake word** flow ([details](JARVIS_WAKEWORD_SETUP.md)); custom-model training and import are documented in [WAKEWORD_FIRST_PARTY_MODEL.md](WAKEWORD_FIRST_PARTY_MODEL.md)
 - Internet access for automatic JARVIS backend enrollment and online AI replies
 
@@ -33,11 +33,11 @@ JARVIS prefers its secured cloud AI gateway while internet and the configured pr
 
 **One-time setup (while connected to the internet):**
 
-1. Download or clone this repository and open PowerShell in `desktop/windows`.
-2. Run `powershell -ExecutionPolicy Bypass -File .\\setup_offline_ai.ps1`. The script installs Ollama with WinGet if needed, starts the local service, and downloads `llama3.2:3b` (approximately 2 GB).
-3. Open JARVIS. It continues to use online AI when available and falls back to the local model when the online route is unavailable.
+1. During the JARVIS Windows installer, leave **Install offline AI now** selected. The installer runs the setup script, installs Ollama with WinGet if needed, starts the local service, and downloads `llama3.2:3b` (approximately 2 GB).
+2. If you skip it during installation, run `powershell -ExecutionPolicy Bypass -File .\\setup_offline_ai.ps1` from the installed JARVIS folder while online.
+3. After the model is downloaded once, JARVIS checks cloud AI first on every request and automatically uses local Ollama when the cloud route is unavailable. If Windows restarted and Ollama is not running, JARVIS starts its local service automatically; when cloud access returns, the next request uses cloud AI again.
 
-The local model is not bundled in the JARVIS installer, so it is downloaded once per PC. If the model has not been downloaded, JARVIS reports the exact setup command instead of silently pretending offline AI is ready. The 3B model is a lightweight fallback; response quality and speed are lower than cloud AI and depend on available RAM/CPU. Close other memory-heavy apps if an 8 GB PC struggles.
+The local model is downloaded once per PC and is not embedded in the application binary. If the model has not been downloaded, JARVIS reports that offline setup is required rather than pretending offline AI is ready. The 3B model is a lightweight fallback; response quality and speed are lower than cloud AI and depend on available RAM/CPU. Close other memory-heavy apps if an 8 GB PC struggles.
 
 ## Offline reminders
 
