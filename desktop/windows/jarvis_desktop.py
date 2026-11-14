@@ -743,6 +743,14 @@ def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool
             pass
 
 
+def announce_wake_activation(stop_event) -> bool:
+    """Audibly confirm that the verified owner can now give JARVIS a command."""
+    return speak_text_interruptibly(
+        "Yes, I'm listening. What can I do for you?",
+        stop_event,
+    )
+
+
 def release_wake_recorder(recorder) -> None:
     """Best-effort stop and release a wake-word microphone handle."""
     if recorder is None:
@@ -2750,10 +2758,7 @@ class JarvisDesktop:
                     self.events.put(("status", "Owner voice verified — JARVIS is active."))
                     try:
                         self.speech_stop_event.clear()
-                        speak_text_interruptibly(
-                            "Yes, I'm listening. What can I do for you?",
-                            self.speech_stop_event,
-                        )
+                        announce_wake_activation(self.speech_stop_event)
                     except Exception as exc:
                         self.events.put(("status", f"JARVIS is active; voice confirmation unavailable: {exc}"))
                     recognizer = configure_voice_recognizer(sr.Recognizer())
