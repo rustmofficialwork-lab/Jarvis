@@ -2518,6 +2518,12 @@ class JarvisDesktop:
                 self.device_auth_stop_event.wait(delay)
                 delay = min(delay * 2, 300)
 
+    def _post_ai_status(self, message: str) -> None:
+        """Queue an AI mode update when the desktop event queue is available."""
+        events = getattr(self, "events", None)
+        if events is not None:
+            events.put(("status", message))
+
     def _get_online_reply(self, prompt: str) -> str:
         """Prefer cloud AI; automatically fall back to local Ollama when it is unavailable."""
         memories = (
@@ -2528,7 +2534,7 @@ class JarvisDesktop:
         try:
             answer = handle_online_command(prompt)
             if answer is not None:
-                self.events.put(("status", "ONLINE MODE — live internet service response."))
+                self._post_ai_status("ONLINE MODE — live internet service response.")
                 return answer
             endpoint = self.settings.get("endpoint", DEFAULT_ENDPOINT)
             token = self._ensure_device_token() if endpoint.strip() == DEFAULT_ENDPOINT else self.ai_api_key
@@ -2545,7 +2551,7 @@ class JarvisDesktop:
                     endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
                     prompt, self.history, memories,
                 )
-            self.events.put(("status", "ONLINE MODE — cloud AI is responding."))
+            self._post_ai_status("ONLINE MODE — cloud AI is responding.")
             return answer
         except Exception as online_error:
             logging.getLogger("jarvis").info(
@@ -2554,7 +2560,7 @@ class JarvisDesktop:
             # Search, weather, and news require live data. Never ask a local
             # language model to guess at current information when the network is down.
             if parse_online_command(prompt) is not None:
-                self.events.put(("status", "OFFLINE MODE — live search, weather and news need an internet connection."))
+                self._post_ai_status("OFFLINE MODE — live search, weather and news need an internet connection.")
                 return (
                     "Ye request live internet data maangti hai. Internet abhi available nahi hai, "
                     "isliye main search, current weather ya latest news verify nahi kar sakta. "
@@ -2562,7 +2568,7 @@ class JarvisDesktop:
                 )
             try:
                 answer = local_chat_completion(prompt, self.history, memories)
-                self.events.put(("status", "OFFLINE MODE — local AI is responding; your data stays on this PC."))
+                self._post_ai_status("OFFLINE MODE — local AI is responding; your data stays on this PC.")
                 return answer
             except Exception as offline_error:
                 raise RuntimeError(
