@@ -45,7 +45,7 @@
   `;
   document.head.appendChild(style);
   const controls=document.createElement('div');controls.id='jx-extensions';
-  controls.innerHTML='<span id="jx-ext-status" role="status">3D hologram ready · Camera off</span><button id="jx-face-toggle" type="button" aria-pressed="false">FACE PRESENCE</button>';
+  controls.innerHTML='<span id="jx-ext-status" role="status">HUD ready · Camera off</span><button id="jx-face-toggle" type="button" aria-pressed="false">FACE PRESENCE</button>';
   document.body.appendChild(controls);
   // Keep the hand-gesture control anchored to the red-marked System Status
   // area of the original SVG artwork, without changing the HUD HTML/layout.
@@ -81,7 +81,7 @@
   window.addEventListener('resize',positionGestureToggle,{passive:true});
   window.addEventListener('scroll',positionGestureToggle,{passive:true});
   const preview=document.createElement('video');preview.id='jx-camera-preview';preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Local hand gesture camera preview');document.body.appendChild(preview);
-  const status=document.getElementById('jx-ext-status'),toggle=document.getElementById('jx-gesture-toggle'),faceToggle=document.getElementById('jx-face-toggle'),hud=document.querySelector('.hud-inner'),orb=document.querySelector('.orb-wrapper');
+  const status=document.getElementById('jx-ext-status'),toggle=document.getElementById('jx-gesture-toggle'),faceToggle=document.getElementById('jx-face-toggle'),hud=artwork,orb=document.querySelector('.orb-wrapper');
   const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
   if(orb&&!reducedMotion){
     const canvas=document.createElement('canvas');canvas.id='jx-holo-canvas';orb.appendChild(canvas);
@@ -98,7 +98,7 @@
       const draw=()=>{if(!active)return;const t=clock.getElapsedTime();rig.rotation.y=t*.22;rig.rotation.x=Math.sin(t*.3)*.18;inner.rotation.z=-t*.42;renderer.render(scene,camera);requestAnimationFrame(draw);};draw();
       window.addEventListener('pagehide',()=>{active=false;observer.disconnect();geometry.dispose();material.dispose();innerGeometry.dispose();innerMaterial.dispose();renderer.dispose();},{once:true});
       status.textContent='3D hologram ready · Camera off';
-    }).catch(err=>{console.warn('JARVIS Three.js hologram unavailable; starting native canvas fallback',err);const ctx=canvas.getContext('2d');if(!ctx){status.textContent='Hologram unavailable · HUD remains active';return;}let active=true,angle=0;const resize=()=>{const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);};const observer=new ResizeObserver(resize);observer.observe(orb);resize();const draw=()=>{if(!active)return;const w=canvas.clientWidth,h=canvas.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)*.34;ctx.clearRect(0,0,w,h);angle+=.012;for(let ring=0;ring<3;ring++){ctx.beginPath();ctx.ellipse(cx,cy,r*(1-ring*.19),r*(.34+ring*.12),angle*(ring%2?-.7:1),0,Math.PI*2);ctx.strokeStyle=ring===1?'rgba(255,138,50,.8)':'rgba(0,220,255,.78)';ctx.lineWidth=1.5;ctx.shadowBlur=12;ctx.shadowColor=ctx.strokeStyle;ctx.stroke();}ctx.beginPath();ctx.arc(cx,cy,r*.16,0,Math.PI*2);ctx.fillStyle='rgba(0,220,255,.22)';ctx.fill();ctx.strokeStyle='#8eeaff';ctx.stroke();ctx.shadowBlur=0;requestAnimationFrame(draw);};draw();window.addEventListener('pagehide',()=>{active=false;observer.disconnect();},{once:true});status.textContent='Hologram ready · native canvas fallback · Camera off';});
+    }).catch(err=>{console.warn('JARVIS Three.js hologram unavailable; starting native canvas fallback',err);const ctx=canvas.getContext('2d');if(!ctx){status.textContent='Hologram unavailable · HUD remains active';return;}let active=true,angle=0;const resize=()=>{const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);};const observer=new ResizeObserver(resize);observer.observe(orb);resize();const draw=()=>{if(!active)return;const w=canvas.clientWidth,h=canvas.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)*.34;ctx.clearRect(0,0,w,h);angle+=.012;for(let ring=0;ring<3;ring++){ctx.beginPath();ctx.ellipse(cx,cy,r*(1-ring*.19),r*(.34+ring*.12),angle*(ring%2?-.7:1),0,Math.PI*2);ctx.strokeStyle=ring===1?'rgba(255,138,50,.8)':'rgba(0,220,255,.78)';ctx.lineWidth=1.5;ctx.shadowBlur=12;ctx.shadowColor=ctx.strokeStyle;ctx.stroke();}ctx.beginPath();ctx.arc(cx,cy,r*.16,0,Math.PI*2);ctx.fillStyle='rgba(0,220,255,.22)';ctx.fill();ctx.strokeStyle='#8eeaff';ctx.stroke();ctx.shadowBlur=0;requestAnimationFrame(draw);};draw();window.addEventListener('pagehide',()=>{active=false;observer.disconnect();},{once:true});status.textContent='HUD ready · Camera off';});
   }
   let stream=null,cameraUsers=0,cameraPromise=null,landmarker=null,raf=0,lastPinch=false,lastFist=false,lastGestureAt=0,hologramRig=null,faceDetector=null,faceRaf=0,facePreview=null;
   const acquireCamera=async video=>{
@@ -142,10 +142,12 @@
   });
   const clickHudTarget=hand=>{
     const point=gesture.toViewport(hand[8].x,hand[8].y,window.innerWidth,window.innerHeight,true);
+    // The current HUD is SVG artwork and has no HTML [data-hud] controls.
+    // Dispatch on the SVG so the runtime adapter can route supported hotspots.
     const hit=document.elementFromPoint(point.x,point.y);
-    const target=hit?.closest?.('[data-hud]');
-    if(!target||!target.getClientRects().length||target.disabled||target.getAttribute('aria-disabled')==='true')return false;
-    target.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:point.x,clientY:point.y}));
+    const svg=hit?.closest?.('svg.scene, .row svg, .stack svg');
+    if(!svg)return false;
+    svg.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:point.x,clientY:point.y}));
     return true;
   };
   const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus(facePreview.srcObject?'Face presence active · camera in use':'3D hologram ready · Camera off');};
