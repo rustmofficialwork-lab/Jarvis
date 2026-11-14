@@ -23,15 +23,11 @@ export const telemetrySchema = z
     uptimeSeconds: z.number().finite().nonnegative().nullable(),
   })
   .refine(
-    (value) =>
-      value.diskTotal === null || value.diskFree === null ||
-      value.diskFree <= value.diskTotal,
+    (value) => value.diskTotal === null || value.diskFree === null || value.diskFree <= value.diskTotal,
     { message: "Free disk space exceeds capacity" },
   )
   .refine(
-    (value) =>
-      value.ramTotal === null || value.ramFree === null ||
-      value.ramFree <= value.ramTotal,
+    (value) => value.ramTotal === null || value.ramFree === null || value.ramFree <= value.ramTotal,
     { message: "Free memory exceeds capacity" },
   );
 
