@@ -53,16 +53,15 @@
       put('v-arch', data.architecture);
       put('v-up', data.uptime);
       put('v-dl', '- DOWNLOAD : ' + (data.download || 'Measuring…'));
-      put('v-sb', '- BATTERY : ' + (data.battery || 'N/A'));
       put('v-sr', '- RAM : ' + (data.memory || 'N/A'));
+      putAt(942, 724, '- CPU : ' + (data.cpu || 'N/A'));
+      putAt(942, 757, '- DISK : ' + (data.disk_percent || 'N/A'));
       put('v-wifi', 'Wi-Fi ' + (data.network || 'N/A'));
 
       putAt(929, 616, data.temperature);
       putAt(779, 724, '- ISP : ' + (data.isp || 'N/A'));
       putAt(779, 740, '- IP : ' + (data.ip || 'N/A'));
       putAt(779, 773, '- UPLOAD : ' + (data.upload || 'Measuring…'));
-      putAt(942, 740, '- CPU : ' + (data.cpu || 'N/A'));
-      putAt(942, 773, '- DISK : ' + (data.disk_percent || 'N/A'));
       putAt(124, 253, 'Full Capacity: ' + (data.disk_total || 'N/A'));
       putAt(124, 291, 'Free Capacity: ' + (data.disk_free || 'N/A'));
       putAt(117, 571, 'System: ' + (data.os || 'N/A') + ' · ' + (data.architecture || 'N/A'));
