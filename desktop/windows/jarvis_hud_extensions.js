@@ -31,7 +31,10 @@
     #jx-extensions button:active:not(:disabled){background:rgba(25,211,255,.24)}
     #jx-extensions button:focus-visible{outline:2px solid #fff;outline-offset:3px}
     #jx-extensions button[aria-pressed=true]{color:#fff;border-color:#8eeeff;background:rgba(0,170,205,.18);box-shadow:inset 0 0 9px rgba(25,211,255,.16),0 0 9px rgba(25,211,255,.2)}
-    #jx-extensions button:disabled{opacity:.55;cursor:wait}
+    #jx-extensions button:disabled,#jx-gesture-toggle:disabled{opacity:.55;cursor:wait}
+    #jx-gesture-toggle{border:1px solid rgba(25,211,255,.9);border-radius:1px;background:rgba(0,8,14,.92);color:#e8fbff;font:600 11px Rajdhani,"Segoe UI",sans-serif;text-transform:uppercase;text-shadow:0 0 7px rgba(25,211,255,.45);box-shadow:0 0 10px rgba(25,211,255,.22),inset 0 0 8px rgba(25,211,255,.08);cursor:pointer;backdrop-filter:blur(4px)}
+    #jx-gesture-toggle:hover:not(:disabled){background:rgba(25,211,255,.16);border-color:#e6fcff;box-shadow:0 0 12px rgba(25,211,255,.4)}
+    #jx-gesture-toggle[aria-pressed=true]{color:#fff;border-color:#8eeeff;background:rgba(0,170,205,.24);box-shadow:inset 0 0 9px rgba(25,211,255,.16),0 0 9px rgba(25,211,255,.3)}
     #jx-ext-status{position:relative;max-width:210px;min-width:130px;padding:3px 4px 3px 15px;color:#c8f7ff;border-left:1px solid rgba(25,211,255,.28);font:600 13px Rajdhani,"Segoe UI",sans-serif;line-height:1.2}
     #jx-ext-status:before{content:"";position:absolute;left:4px;top:50%;width:5px;height:5px;border-radius:50%;background:#19d3ff;box-shadow:0 0 7px #19d3ff;transform:translateY(-50%)}
     #jx-camera-preview{position:fixed;right:24px;bottom:78px;width:180px;aspect-ratio:4/3;object-fit:cover;z-index:259;border:1px solid #19d3ff;border-radius:1px;box-shadow:0 0 14px rgba(25,211,255,.22);transform:scaleX(-1);display:none;background:#000}
