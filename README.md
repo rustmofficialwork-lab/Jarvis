@@ -31,7 +31,7 @@ Windows CI compiles Python source, runs the desktop unit tests, packages the por
 
 - New desktop installs automatically enroll with the JARVIS backend and receive a unique, short-lived device credential. Existing manually provisioned client tokens remain supported for migration; keep the OpenRouter secret only in the backend environment.
 - Personal memories are stored locally on each Windows installation; the backend does not expose a memory API or persist chat history.
-- Cloud AI responses require internet, a working backend client token, and an available configured upstream provider. After the one-time Ollama + `llama3.2:3b` setup in [desktop/windows/README.md](desktop/windows/README.md), JARVIS can automatically fall back to local AI chat when cloud AI is unavailable; live web features still require internet.
+- Cloud AI responses require internet, a working backend client token, and an available configured upstream provider. The Windows installer can install Ollama + `llama3.2:3b` in its optional offline-AI setup step (about 2 GB, once per PC). JARVIS can then automatically fall back to local AI chat when cloud AI is unavailable and restart the local Ollama service after Windows reboots; live web features still require internet.
 - Test AI chat, memory, audio, and Windows actions on the target PC before relying on them.
 - Never commit API keys or access tokens.
 
