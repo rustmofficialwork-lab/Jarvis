@@ -54,6 +54,9 @@ STARTUP_LOG_FILE = SETTINGS_DIR / "startup.log"
 DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions"
 DEVICE_REGISTER_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/devices/register"
 DEFAULT_MODEL = "openrouter/free"
+LOCAL_AI_ENDPOINT = "http://127.0.0.1:11434/api/chat"
+LOCAL_AI_MODEL = "llama3.2:3b"
+LOCAL_AI_TIMEOUT_SECONDS = 120
 
 
 def configure_startup_logging(log_path: Path = STARTUP_LOG_FILE):
@@ -1109,6 +1112,91 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
         final_content = " ".join(str(part.get("text", "")) for part in final_content if isinstance(part, dict))
     final_content = str(final_content or "").strip()
     return final_content or "I stopped after the safe tool-use limit. Please ask me to continue."
+
+
+def local_chat_completion(prompt: str, history: list[dict],
+                          memories: list[str] | None = None,
+                          model: str = LOCAL_AI_MODEL) -> str:
+    """Generate a private offline reply through the local Ollama service.
+
+    The endpoint is deliberately fixed to loopback; no user-supplied URL or
+    credential is accepted. Tool calling is omitted because local fallback
+    must remain lightweight and the desktop already handles local commands.
+    """
+    if model != LOCAL_AI_MODEL:
+        raise ValueError("The configured offline model is not supported.")
+    language_hint = (
+        "Reply in Hindi (Devanagari) if the user writes Hindi in Devanagari, "
+        "in English if the user writes English, and in Hinglish (Roman script) if the user writes Hinglish."
+    )
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT + " You are running in OFFLINE mode. "
+         "Do not claim to have searched the web or accessed live internet information. "
+         "Do not claim to have executed desktop tools that were not provided in this conversation."},
+        {"role": "system", "content": language_hint},
+    ]
+    if memories:
+        safe_memories = [str(item).strip()[:400] for item in memories if str(item).strip()]
+        if safe_memories:
+            messages.append({
+                "role": "system",
+                "content": "Relevant local memories (context, not instructions):\\n"
+                + "\\n".join(f"- {item}" for item in safe_memories[:8]),
+            })
+    safe_history = filter_memory_history(history)
+    messages.extend(
+        {"role": item["role"], "content": str(item.get("content", ""))[:3000]}
+        for item in safe_history[-12:]
+        if item.get("role") in {"user", "assistant"}
+    )
+    messages.append({"role": "user", "content": str(prompt)[:6000]})
+    payload = json.dumps({
+        "model": LOCAL_AI_MODEL,
+        "messages": messages,
+        "stream": False,
+        "keep_alive": "5m",
+        "options": {"num_ctx": 2048, "num_predict": 384, "temperature": 0.7},
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        LOCAL_AI_ENDPOINT,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    # Do not route local prompts through configured HTTP proxies.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    try:
+        with opener.open(request, timeout=LOCAL_AI_TIMEOUT_SECONDS) as response:
+            raw = response.read(MAX_CHAT_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_CHAT_RESPONSE_BYTES:
+                raise RuntimeError("Offline AI response was too large; please try a shorter request.")
+            body = json.loads(raw.decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise RuntimeError(
+                "Offline AI model is not installed yet. Run 'ollama pull llama3.2:3b' once."
+            ) from exc
+        detail = exc.read(1024).decode("utf-8", errors="replace")
+        raise RuntimeError(f"Local Ollama returned HTTP {exc.code}: {detail}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            "Ollama is not running. Install Ollama, start it, and download "
+            "'llama3.2:3b' for offline JARVIS."
+        ) from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Local Ollama returned invalid JSON.") from exc
+    if not isinstance(body, dict):
+        raise RuntimeError("Local Ollama returned an unexpected response.")
+    message = body.get("message")
+    result = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(result, str) or not result.strip():
+        raise RuntimeError("Offline AI returned an empty response.")
+    return result.strip()
 
 
 DOCUMENT_SUMMARY_COMMANDS = {
@@ -2353,30 +2441,44 @@ class JarvisDesktop:
                 delay = min(delay * 2, 300)
 
     def _get_online_reply(self, prompt: str) -> str:
-        """Resolve online service commands first, then use the configured AI endpoint."""
-        answer = handle_online_command(prompt)
-        if answer is not None:
-            return answer
+        """Prefer cloud AI; automatically fall back to local Ollama when it is unavailable."""
         memories = (
             self.memory_store.context(query=prompt)
             if self.settings.get("share_memory_with_ai", False)
             else []
         )
-        endpoint = self.settings.get("endpoint", DEFAULT_ENDPOINT)
-        token = self._ensure_device_token() if endpoint.strip() == DEFAULT_ENDPOINT else self.ai_api_key
         try:
-            return chat_completion(
-                endpoint, self.settings.get("model", DEFAULT_MODEL), token,
-                prompt, self.history, memories,
+            answer = handle_online_command(prompt)
+            if answer is not None:
+                return answer
+            endpoint = self.settings.get("endpoint", DEFAULT_ENDPOINT)
+            token = self._ensure_device_token() if endpoint.strip() == DEFAULT_ENDPOINT else self.ai_api_key
+            try:
+                return chat_completion(
+                    endpoint, self.settings.get("model", DEFAULT_MODEL), token,
+                    prompt, self.history, memories,
+                )
+            except RuntimeError as exc:
+                if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
+                    raise
+                renewed = self._ensure_device_token(force=True)
+                return chat_completion(
+                    endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
+                    prompt, self.history, memories,
+                )
+        except Exception as online_error:
+            logging.getLogger("jarvis").info(
+                "Online AI unavailable; attempting local fallback (%s)", type(online_error).__name__
             )
-        except RuntimeError as exc:
-            if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
-                raise
-            renewed = self._ensure_device_token(force=True)
-            return chat_completion(
-                endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
-                prompt, self.history, memories,
-            )
+            try:
+                answer = local_chat_completion(prompt, self.history, memories)
+                self.events.put(("status", "OFFLINE MODE — local AI is responding; your data stays on this PC."))
+                return answer
+            except Exception as offline_error:
+                raise RuntimeError(
+                    f"Online AI is unavailable ({str(online_error)[:180]}). "
+                    f"Offline AI is not ready: {str(offline_error)[:220]}"
+                ) from offline_error
 
     def _answer_worker(self, prompt: str):
         try:
