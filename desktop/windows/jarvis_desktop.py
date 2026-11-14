@@ -2226,7 +2226,17 @@ class JarvisDesktop:
                          "Focus session complete. Take a short break." if status and status["expired"] else
                          "No active focus session.")
             elif action == "workflow":
-                reply = self._execute_workflow(value)
+                label = WORKFLOWS[value][0]
+                commands = WORKFLOWS[value][1]
+                confirmed = messagebox.askyesno(
+                    "Confirm JARVIS workflow",
+                    f"Run {label}?\n\n"
+                    + "JARVIS will open these apps: " + ", ".join(commands)
+                    + "\n\nNo files will be changed by this workflow.",
+                    parent=self.root,
+                )
+                reply = (self._execute_workflow(value) if confirmed else
+                         f"{label} cancelled; no apps were opened.")
             elif action == "automation_add":
                 workflow, interval = value
                 label = WORKFLOWS[workflow][0]
