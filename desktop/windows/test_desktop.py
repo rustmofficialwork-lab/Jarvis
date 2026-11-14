@@ -2564,5 +2564,61 @@ class HudBridgeActionTests(unittest.TestCase):
         self.assertEqual(calls, [("queued", 0), ("opened",)])
 
 
+class HybridAiTests(unittest.TestCase):
+    def test_local_ollama_reply_uses_bounded_context_and_returns_content(self):
+        import io
+        from unittest.mock import patch
+
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, size=-1):
+                return json.dumps({
+                    "message": {"role": "assistant", "content": "Offline reply"}
+                }).encode("utf-8")
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                captured["url"] = request.full_url
+                captured["payload"] = json.loads(request.data.decode("utf-8"))
+                captured["timeout"] = timeout
+                return FakeResponse()
+
+        with patch.object(
+            jarvis_desktop.urllib.request, "build_opener", return_value=FakeOpener()
+        ):
+            result = jarvis_desktop.local_chat_completion(
+                "hello", [{"role": "user", "content": "previous"}]
+            )
+
+        self.assertEqual(result, "Offline reply")
+        self.assertEqual(captured["url"], "http://127.0.0.1:11434/api/chat")
+        self.assertEqual(captured["payload"]["model"], "llama3.2:3b")
+        self.assertEqual(captured["payload"]["options"]["num_ctx"], 2048)
+        self.assertFalse(captured["payload"]["stream"])
+        self.assertEqual(captured["payload"]["messages"][-1]["content"], "hello")
+
+    def test_local_ollama_missing_model_has_actionable_message(self):
+        from unittest.mock import patch
+
+        class FakeHttpError(Exception):
+            code = 404
+            def read(self, size=-1):
+                return b"model not found"
+
+        with patch.object(
+            jarvis_desktop.urllib.request, "build_opener",
+            return_value=type("Opener", (), {
+                "open": lambda self, request, timeout: (_ for _ in ()).throw(FakeHttpError())
+            })(),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "ollama pull llama3.2:3b"):
+                jarvis_desktop.local_chat_completion("hello", [])
+
+
 if __name__ == "__main__":
     unittest.main()
