@@ -15,6 +15,48 @@ MAX_RESPONSE_BYTES = 1_500_000
 TIMEOUT_SECONDS = 12
 
 
+def explain_online_failure(error: Exception, task: str = "online task") -> str:
+    """Turn a technical online-service failure into a clear, actionable user explanation."""
+    message = str(error).casefold()
+    http_code = getattr(error, "code", None)
+    if http_code is None:
+        match = re.search(r"HTTP (\\d{3})", str(error), re.IGNORECASE)
+        http_code = int(match.group(1)) if match else None
+
+    if http_code in {401, 403}:
+        reason = "online service ne request ko access dene se mana kar diya (authentication/permission issue)"
+        action = "Service credentials aur access permissions check karne honge."
+    elif http_code == 404:
+        reason = "requested online endpoint ya resource nahi mila"
+        action = "Service endpoint ya requested resource ka address check karna hoga."
+    elif http_code == 429:
+        reason = "online service ne bahut zyada requests ki wajah se temporary rate limit laga di"
+        action = "Thodi der baad dobara try karo."
+    elif isinstance(http_code, int) and http_code >= 500:
+        reason = f"online service ke server mein problem hai (HTTP {http_code})"
+        action = "Service recover hone ke baad dobara try karo."
+    elif "timed out" in message or "timeout" in message:
+        reason = "online service ne time par response nahi diya"
+        action = "Internet connection check karke dobara try karo."
+    elif any(term in message for term in ("name or service not known", "getaddrinfo failed", "nodename nor servname")):
+        reason = "internet par service ka server address resolve nahi ho pa raha (DNS issue)"
+        action = "Internet connection ya DNS settings check karo."
+    elif any(term in message for term in ("network is unreachable", "not connected", "connection refused", "urlopen error")):
+        reason = "JARVIS online service tak connect nahi kar pa raha"
+        action = "Wi-Fi/internet connection aur firewall/proxy settings check karo."
+    elif any(term in message for term in ("invalid json", "unexpected response", "response format")):
+        reason = "online service ne unreadable ya unexpected data bheja"
+        action = "Service ko baad mein retry karo; agar issue rahe to service response investigate karna hoga."
+    else:
+        reason = str(error).strip()[:240] or "unknown online service error"
+        action = "Connection aur service availability check karke dobara try karo."
+
+    return (
+        f"Main abhi {task} complete nahi kar saka. Reason: {reason}. "
+        f"Next step: {action}"
+    )
+
+
 def _read_url(url: str, opener=None, timeout: int = TIMEOUT_SECONDS) -> bytes:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/rss+xml,application/json"})
     open_url = opener or urllib.request.urlopen
