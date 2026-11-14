@@ -134,7 +134,7 @@ def authorize_tool_call(
     normalized_host = host.removeprefix("www.")
     explicitly_named = bool(
         normalized_host
-        and re.search(rf"(?<![a-z0-9.-]){re.escape(normalized_host)}(?![a-z0-9.-])", prompt)
+        and re.search(rf"(?<![a-z0-9-]){re.escape(normalized_host)}(?![a-z0-9-])", prompt)
     )
     if not explicitly_named:
         for alias, domain in SITE_ALIASES.items():
