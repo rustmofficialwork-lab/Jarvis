@@ -2368,12 +2368,20 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn('id="v-ram"', hud)
         self.assertIn('id="bat"', hud)
 
-    def test_external_runtime_adapter_is_injected_after_hud_load(self):
+    def test_external_hud_assets_are_injected_in_dependency_order_after_hud_load(self):
         desktop = Path(__file__).with_name("jarvis_desktop.py").read_text(encoding="utf-8")
+        gesture_logic = Path(__file__).with_name("jarvis_gesture_logic.js").read_text(encoding="utf-8")
+        extensions = Path(__file__).with_name("jarvis_hud_extensions.js").read_text(encoding="utf-8")
         runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
-        self.assertIn('window.events.loaded += inject_hud_runtime', desktop)
-        self.assertIn('window.evaluate_js(runtime_source)', desktop)
+        self.assertIn('window.events.loaded += inject_hud_assets', desktop)
+        self.assertIn('window.evaluate_js(source)', desktop)
+        self.assertIn('jarvis_gesture_logic.js', desktop)
+        self.assertIn('jarvis_hud_extensions.js', desktop)
         self.assertIn('jarvis_hud_runtime.js', desktop)
+        self.assertLess(desktop.index('("gesture logic", gesture_logic_source)'), desktop.index('("HUD extensions", extensions_source)'))
+        self.assertLess(desktop.index('("HUD extensions", extensions_source)'), desktop.index('("runtime adapter", runtime_source)'))
+        self.assertIn('window.JARVISGestureLogic = api', gesture_logic)
+        self.assertIn("jx-gesture-toggle", extensions)
         self.assertIn('window.__jarvisHudRuntimeAdapterLoaded', runtime)
 
     def test_runtime_adapter_wires_hud_click_actions_to_the_desktop_bridge(self):
