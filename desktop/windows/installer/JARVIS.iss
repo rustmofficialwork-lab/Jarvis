@@ -33,7 +33,7 @@ Name: "{group}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"
 Name: "{autodesktop}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\JARVIS.exe"; Description: "Launch JARVIS Desktop"; Flags: postinstall nowait skipifnotsilent
+Filename: "{app}\JARVIS.exe"; Description: "Launch JARVIS Desktop"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
 Filename: "{app}\JARVIS.exe"; Parameters: "--cleanup-uninstall"; RunOnceId: "CleanupReminderTasks"; Flags: runhidden waituntilterminated skipifdoesntexist
