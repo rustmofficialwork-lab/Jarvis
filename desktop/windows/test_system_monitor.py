@@ -27,7 +27,8 @@ class FakePsutil:
 
 
 class SystemMonitorTests(unittest.TestCase):
-    def test_status_contains_live_metrics(self):
+    @unittest.mock.patch("system_monitor.read_windows_power_status", return_value=None)
+    def test_status_contains_live_metrics(self, _native_power):
         result = get_system_status(FakePsutil(), now=lambda: datetime.fromtimestamp(1000 + 90061))
         self.assertIn("CPU usage: 23%", result)
         self.assertIn("\nCPU usage:", result)
@@ -40,7 +41,8 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertIn("Network adapter link: Online", result)
         self.assertIn("Uptime: 1d 1h 1m", result)
 
-    def test_unsupported_sensor_does_not_hide_other_metrics(self):
+    @unittest.mock.patch("system_monitor.read_windows_power_status", return_value=None)
+    def test_unsupported_sensor_does_not_hide_other_metrics(self, _native_power):
         class Partial(FakePsutil):
             def sensors_battery(self):
                 raise OSError("not supported")
@@ -49,7 +51,8 @@ class SystemMonitorTests(unittest.TestCase):
         self.assertIn("Battery: Unavailable", result)
         self.assertIn("CPU usage: 23%", result)
 
-    def test_shared_collector_reads_metrics_once_for_both_surfaces(self):
+    @unittest.mock.patch("system_monitor.read_windows_power_status", return_value=None)
+    def test_shared_collector_reads_metrics_once_for_both_surfaces(self, _native_power):
         calls = {"cpu": 0, "memory": 0, "disk": 0, "battery": 0, "network": 0}
 
         class CountingPsutil(FakePsutil):
