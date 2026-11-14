@@ -191,7 +191,7 @@ text:not([font-size]){font-size:19px}
 <text x="779" y="698" font-size="16">NETWORK DETAILS</text>
 <text x="779" y="724">- ISP : N/A</text><text x="779" y="740">- IP : LOADING...</text><text id="v-dl" x="779" y="757">- DOWNLOAD : MEASURING...</text><text x="779" y="773">- UPLOAD : MEASURING...</text>
 <text x="942" y="698" font-size="16">SYSTEM STATUS</text>
-<text id="v-sb" x="942" y="724">- BATTERY : LOADING...</text><text x="942" y="740">- CPU : LOADING...</text><text id="v-sr" x="942" y="757">- RAM : LOADING...</text><text x="942" y="773">- DISK : LOADING...</text>
+<text x="942" y="724">- CPU : LOADING...</text><text id="v-sr" x="942" y="740">- RAM : LOADING...</text><text x="942" y="757">- DISK : LOADING...</text>
 </g>
 
 <!-- ===== IRON MAN HELMET ===== -->
@@ -243,7 +243,6 @@ text:not([font-size]){font-size:19px}
   if(n.connection)n.connection.addEventListener("change",net);
   function up(){var t=Math.floor(performance.now()/1000),h=Math.floor(t/3600),m=Math.floor(t%3600/60);set("v-up",h+"h "+m+"m")}
   up();setInterval(up,30000);
-  if(n.getBattery)n.getBattery().then(function(b){var u=function(){set("v-sb","- BATTERY : "+Math.round(b.level*100)+"%")};u();b.addEventListener("levelchange",u)}).catch(function(){});
 })();
 </script>
 <script>
