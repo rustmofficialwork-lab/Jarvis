@@ -98,7 +98,7 @@ SYSTEM_PROMPT = (
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> dict:
-    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN", "device_id": "", "microphone_consent_version": 2, "microphone_consent_granted": False, "camera_consent_version": 1, "camera_consent_granted": False, "voice_setup_completed": False}
+    defaults = {"endpoint": DEFAULT_ENDPOINT, "model": DEFAULT_MODEL, "language": "en-IN", "device_id": "", "microphone_consent_version": 0, "microphone_consent_granted": False, "camera_consent_version": 0, "camera_consent_granted": False, "voice_setup_completed": False}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
