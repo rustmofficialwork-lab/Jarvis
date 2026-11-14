@@ -237,8 +237,7 @@ text:not([font-size]){font-size:19px}
   if(n.deviceMemory){set("v-ram",n.deviceMemory+" GB");set("v-sr","- RAM : "+n.deviceMemory+" GB")}
   try{var c=document.createElement("canvas"),g=c.getContext("webgl"),x=g&&g.getExtension("WEBGL_debug_renderer_info");
     if(x){var r=g.getParameter(x.UNMASKED_RENDERER_WEBGL).replace(/ANGLE \(|\)|Direct3D.*|\(R\)|\(TM\)/g,"").trim();r=r.replace(/^[A-Za-z]+, /,"").replace(/ Graphics/i,"");set("v-gpu",r.length>20?r.slice(0,20)+"…":r)}}catch(e){}
-  function net(){set("v-wifi",n.onLine?"Wi-Fi Connected":"Wi-Fi Disconnected");
-    var k=n.connection;if(k&&k.downlink)set("v-dl","- DOWNLOAD : "+k.downlink+" Mbps")}
+  function net(){set("v-wifi",n.onLine?"Wi-Fi Connected":"Wi-Fi Disconnected")}
   net();addEventListener("online",net);addEventListener("offline",net);
   if(n.connection)n.connection.addEventListener("change",net);
   function up(){var t=Math.floor(performance.now()/1000),h=Math.floor(t/3600),m=Math.floor(t%3600/60);set("v-up",h+"h "+m+"m")}
