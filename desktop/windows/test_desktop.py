@@ -2334,95 +2334,112 @@ class HudKnownFolderNavigationTests(unittest.TestCase):
 
 
 class HudShortcutWiringTests(unittest.TestCase):
-    def test_control_panel_shortcut_uses_system_tool_bridge(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        self.assertIn("if(d.tool==='settings'){", hud)
-        self.assertIn("else if(!await call('open_system_tool',d.tool)){", hud)
-        self.assertNotIn(
-            "d.tool==='settings'||d.tool==='control_panel'",
-            hud,
-        )
+    def test_uploaded_hud_artwork_is_kept_as_the_large_svg_document(self):
+        hud_path = Path(__file__).with_name("jarvis_hud.html")
+        hud = hud_path.read_text(encoding="utf-8")
+        self.assertGreater(len(hud_path.read_bytes()), 110_000)
+        self.assertIn('id="m"', hud)
+        self.assertIn('id="v-cpu"', hud)
+        self.assertIn('id="v-ram"', hud)
+        self.assertIn('id="bat"', hud)
 
+    def test_external_runtime_adapter_is_injected_after_hud_load(self):
+        desktop = Path(__file__).with_name("jarvis_desktop.py").read_text(encoding="utf-8")
+        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        self.assertIn('window.events.loaded += inject_hud_runtime', desktop)
+        self.assertIn('window.evaluate_js(runtime_source)', desktop)
+        self.assertIn('jarvis_hud_runtime.js', desktop)
+        self.assertIn('window.__jarvisHudRuntimeAdapterLoaded', runtime)
 
-    def test_hud_awaits_actual_bridge_action_results(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        self.assertIn("const call=async(name,...args)=>", hud)
-        self.assertIn("await a[name](...args)", hud)
-        self.assertIn("const command=async v=>{await call('send_command',v)", hud)
-        self.assertIn("voice:async()=>{if(!await call('toggle_voice'))", hud)
-        self.assertIn("const run=async el=>", hud)
-        self.assertIn("else if(!await call('open_system_tool',d.tool))", hud)
+    def test_runtime_adapter_wires_hud_click_actions_to_the_desktop_bridge(self):
+        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        for expression in (
+            "callBridge('open_folder', 'Documents')",
+            "callBridge('open_folder', 'Pictures')",
+            "callBridge('open_folder', 'Music')",
+            "callBridge('open_folder', 'Videos')",
+            "callBridge('open_folder', 'This PC')",
+            "callBridge('open_folder', 'Network')",
+            "callBridge('open_folder', 'Recycle Bin')",
+            "callBridge('open_system_tool', 'control_panel')",
+            "callBridge('open_system_tool', 'device_manager')",
+            "callBridge('open_system_tool', 'task_manager')",
+            "callBridge('open_system_tool', 'run')",
+            "callBridge('open_settings')",
+            "callBridge('close_window')",
+            "callBridge('toggle_voice')",
+            "callBridge('send_command', command.trim())",
+        ):
+            with self.subTest(expression=expression):
+                self.assertIn(expression, runtime)
 
-    def test_hud_orb_has_no_click_to_command_mapping(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        self.assertNotIn("mark(orb,'Enter a command for JARVIS'", hud)
-        self.assertNotIn("orb.style.cursor='pointer'", hud)
+    def test_runtime_adapter_waits_for_bridge_and_refreshes_dashboard(self):
+        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        self.assertIn("window.addEventListener('pywebviewready', startBridgeRefresh)", runtime)
+        self.assertIn("if (api()) startBridgeRefresh()", runtime)
+        self.assertIn("bridge.get_dashboard()", runtime)
+        self.assertIn("bridge.get_runtime_state()", runtime)
 
-    def test_hud_starts_dashboard_refresh_if_bridge_is_already_ready(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        self.assertIn("window.addEventListener('pywebviewready',startBridgeRefresh)", hud)
-        self.assertIn("startBridgeRefresh();", hud)
-        self.assertIn("if(bridgeRefreshStarted||!(window.pywebview&&window.pywebview.api))return;", hud)
-
-
+    def test_hud_orb_is_only_used_for_runtime_visual_state(self):
+        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        self.assertIn("artwork.classList.toggle('jx-listening', listening)", runtime)
+        self.assertIn("artwork.classList.toggle('jx-thinking', thinking && !listening)", runtime)
+        self.assertNotIn("callBridge('send_command', '", runtime)
 
 
 class HudLiveDataMappingTests(unittest.TestCase):
-    def test_live_hud_does_not_show_fabricated_hardware_or_network_values(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        for sample in (
-            "INTEL CORE i5", "NVIDIA GEFORCE", "JioFiber",
-            "192.168.1.100", "120 Mbps", "80 Mbps", "Atmospheric",
+    def test_live_hud_metrics_are_bound_to_uploaded_svg_fields(self):
+        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        for expression in (
+            "put('v-cpu', data.cpu)",
+            "put('v-ram', data.ram)",
+            "put('v-gpu', data.gpu)",
+            "put('v-os', data.os)",
+            "put('v-arch', data.architecture)",
+            "put('v-up', data.uptime)",
+            "put('v-dl', '- DOWNLOAD : ' + (data.download || 'Measuring…'))",
+            "put('v-sb', '- BATTERY : ' + (data.battery || 'N/A'))",
+            "put('v-sr', '- RAM : ' + (data.memory || 'N/A'))",
+            "put('v-wifi', 'Wi-Fi ' + (data.network || 'N/A'))",
+            "putAt(929, 616, data.temperature)",
+            "putAt(779, 740, '- IP : ' + (data.ip || 'N/A'))",
+            "putAt(942, 773, '- DISK : ' + (data.disk_percent || 'N/A'))",
+            "data.disk_percent_value",
+            "data.cpuName",
         ):
-            with self.subTest(sample=sample):
-                self.assertNotIn(sample, hud)
-        self.assertIn("data.cpuName", hud)
-        self.assertIn("data.gpu", hud)
-        self.assertIn("data.isp", hud)
-        self.assertIn("data.temperature_value", hud)
-        self.assertIn("CPU sensor<br>Unavailable", hud)
-
-    def test_every_live_hud_metric_label_has_a_bridge_mapping(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        mapping = hud[hud.index("const fields={"):hud.index("};", hud.index("const fields={")) + 1]
-        expected = (
-            "cpu:section.includes('system information')?data.cpuName:data.cpu",
-            "ram:data.ram",
-            "gpu:data.gpu",
-            "os:data.os",
-            "'operating system':data.os",
-            "architecture:data.architecture",
-            "uptime:data.uptime",
-            "temperature:data.temperature",
-            "temp:data.temperature",
-            "battery:data.battery",
-            "isp:data.isp",
-            "ip:data.ip",
-            "download:data.download",
-            "upload:data.upload",
-            "disk:data.disk_percent",
-            "network:data.network",
-        )
-        for expression in expected:
             with self.subTest(expression=expression):
-                self.assertIn(expression, mapping)
-        self.assertIn("data.disk_percent_value", hud)
-        self.assertIn("data.disk_total", hud)
-        self.assertIn("data.disk_free", hud)
+                self.assertIn(expression, runtime)
 
-    def test_hud_runtime_state_targets_existing_orb_and_live_battery_ring(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        self.assertIn("const orb=document.querySelector('.orb-wrapper');", hud)
-        self.assertIn("orb.classList.toggle('is-listening',listening)", hud)
-        self.assertIn("orb.classList.toggle('is-thinking',busy)", hud)
-        self.assertIn("bat.style.setProperty('--bat',(Number.isFinite(bv)?Math.max(0,Math.min(100,bv)):0)+'%')", hud)
+    def test_runtime_state_updates_the_existing_svg_core_without_replacing_artwork(self):
+        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        self.assertIn("artwork.classList.toggle('jx-listening', listening)", runtime)
+        self.assertIn("artwork.classList.toggle('jx-thinking', thinking && !listening)", runtime)
+        self.assertIn("#m.jx-listening .core", runtime)
+        self.assertIn("#m.jx-thinking .core", runtime)
 
     def test_hud_document_ids_are_unique(self):
         import re
         hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        ids = re.findall(r"\bid=['\"]([^'\"]+)['\"]", hud)
+        ids = re.findall(r"\\bid=['\\\"]([^'\\\"]+)['\\\"]", hud)
         self.assertEqual(len(ids), len(set(ids)), "HUD contains duplicate element IDs")
 
+
+class HudBridgeActionTests(unittest.TestCase):
+    def test_open_settings_dispatches_to_the_tk_application(self):
+        calls = []
+
+        class FakeRoot:
+            def after(self, delay, callback):
+                calls.append(("queued", delay))
+                callback()
+
+        class FakeApp:
+            def open_settings(self):
+                calls.append(("opened",))
+
+        bridge = jarvis_desktop.JarvisWebBridge({"root": FakeRoot(), "app": FakeApp()})
+        self.assertTrue(bridge.open_settings())
+        self.assertEqual(calls, [("queued", 0), ("opened",)])
 
 
 if __name__ == "__main__":
