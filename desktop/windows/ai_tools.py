@@ -84,6 +84,24 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "open_app",
+            "description": "Open one of the built-in safe Windows apps when the user explicitly asks to open it. Never pass arbitrary commands, paths, or arguments.",
+            "parameters": {"type": "object", "properties": {
+                "app": {"type": "string", "enum": ["notepad", "calculator", "paint", "file_explorer", "task_manager"]}
+            }, "required": ["app"], "additionalProperties": False}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_available_capabilities",
+            "description": "Return the currently implemented JARVIS tool capabilities and important limitations. Use when asked what JARVIS can do or before promising an action.",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "list_user_files",
             "description": "List filenames in Desktop, Documents, or Downloads. Read-only; never lists system or application data.",
             "parameters": {"type": "object", "properties": {
@@ -234,6 +252,46 @@ def _read_user_text_file(folder: str, filename: str) -> str:
 
 
 
+
+_WINDOWS_APP_COMMANDS = {
+    "notepad": ["notepad.exe"],
+    "calculator": ["calc.exe"],
+    "paint": ["mspaint.exe"],
+    "file_explorer": ["explorer.exe"],
+    "task_manager": ["taskmgr.exe"],
+}
+
+
+def _open_app(app: str) -> str:
+    import subprocess
+    import sys
+
+    if sys.platform != "win32":
+        raise ValueError("Opening Windows apps is supported only on Windows.")
+    command = _WINDOWS_APP_COMMANDS.get(app)
+    if command is None:
+        raise ValueError("That app is not in JARVIS's safe app allowlist.")
+    try:
+        subprocess.Popen(command, shell=False, close_fds=True)
+    except OSError as exc:
+        raise ValueError(f"Could not open {app}: {exc}") from exc
+    return f"Launch request sent for {app}. The app process was started; check the desktop to confirm it opened."
+
+
+def _available_capabilities() -> str:
+    return (
+        "Implemented local tools: calculator; local date/time; PC health snapshot; "
+        "top running process usage; list/search filenames in Desktop, Documents, Downloads; "
+        "read small UTF-8 txt/md/csv/json/log files in those folders; open Notepad, Calculator, "
+        "Paint, File Explorer, and Task Manager on Windows. "
+        "Online services implemented separately: web search, weather, and news. "
+        "Offline AI depends on the local Ollama model being installed and running. "
+        "Not implemented as general actions: arbitrary browser automation, sending email/messages, "
+        "payments, purchases, account changes, unrestricted shell commands, or arbitrary file deletion. "
+        "Never claim these unsupported actions were completed."
+    )
+
+
 def execute_tool(name: str, arguments: dict[str, Any]) -> str:
     """Execute one allowlisted, read-only tool with exact argument validation."""
     if not isinstance(arguments, dict):
@@ -257,6 +315,14 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> str:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PROCESS_RESULTS:
             raise ValueError("Process limit must be an integer from 1 to 10.")
         return get_top_processes(limit=limit)
+    if name == "open_app":
+        if set(arguments) != {"app"} or not isinstance(arguments["app"], str):
+            raise ValueError("Opening an app requires only its allowlisted app name.")
+        return _open_app(arguments["app"])
+    if name == "get_available_capabilities":
+        if arguments:
+            raise ValueError("The capabilities tool does not accept arguments.")
+        return _available_capabilities()
     if name == "list_user_files":
         if set(arguments) - {"folder", "limit"} or "folder" not in arguments:
             raise ValueError("File listing requires folder and optional limit.")
