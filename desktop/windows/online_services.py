@@ -20,7 +20,7 @@ def explain_online_failure(error: Exception, task: str = "online task") -> str:
     message = str(error).casefold()
     http_code = getattr(error, "code", None)
     if http_code is None:
-        match = re.search(r"HTTP (\\d{3})", str(error), re.IGNORECASE)
+        match = re.search(r"HTTP (\d{3})", str(error), re.IGNORECASE)
         http_code = int(match.group(1)) if match else None
 
     if http_code in {401, 403}:
@@ -41,7 +41,7 @@ def explain_online_failure(error: Exception, task: str = "online task") -> str:
     elif any(term in message for term in ("name or service not known", "getaddrinfo failed", "nodename nor servname")):
         reason = "internet par service ka server address resolve nahi ho pa raha (DNS issue)"
         action = "Internet connection ya DNS settings check karo."
-    elif any(term in message for term in ("network is unreachable", "not connected", "connection refused", "urlopen error")):
+    elif any(term in message for term in ("internet service is unavailable", "network is unreachable", "not connected", "connection refused", "urlopen error", "temporary failure in name resolution")):
         reason = "JARVIS online service tak connect nahi kar pa raha"
         action = "Wi-Fi/internet connection aur firewall/proxy settings check karo."
     elif any(term in message for term in ("invalid json", "unexpected response", "response format")):
