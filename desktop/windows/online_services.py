@@ -221,7 +221,13 @@ def parse_online_command(prompt: str) -> tuple[str, str] | None:
     text = " ".join(prompt.strip().split())
     lowered = text.casefold().strip(" ?.!।")
     for prefix in ("search web for ", "web search for ", "search the web for ",
-                   "google search for ", "search for ", "search "):
+                   "search online for ", "look up online ", "look up ",
+                   "find online ", "google search for ", "search for ", "search "):
+        if lowered.startswith(prefix):
+            query = text[len(prefix):].strip()
+            return ("search", query) if query else ("search", "")
+    for prefix in ("internet pe search karo ", "internet par search karo ",
+                   "web par search karo ", "online search karo "):
         if lowered.startswith(prefix):
             query = text[len(prefix):].strip()
             return ("search", query) if query else ("search", "")
