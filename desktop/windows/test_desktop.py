@@ -11,14 +11,20 @@ SPEC.loader.exec_module(jarvis_desktop)
 
 
 class WakewordActivationAnnouncementTests(unittest.TestCase):
-    def test_verified_wake_activation_speaks_confirmation(self):
+    def test_verified_wake_activation_speaks_selected_confirmation(self):
         stop_event = __import__("threading").Event()
         with patch.object(jarvis_desktop, "speak_text_interruptibly", return_value=True) as speak:
-            self.assertTrue(jarvis_desktop.announce_wake_activation(stop_event))
-        speak.assert_called_once_with(
-            "Yes, I'm listening. What can I do for you?",
-            stop_event,
-        )
+            self.assertTrue(
+                jarvis_desktop.announce_wake_activation(
+                    stop_event, choice=lambda phrases: phrases[1]
+                )
+            )
+        speak.assert_called_once_with("At your service.", stop_event)
+
+    def test_wake_activation_has_multiple_distinct_phrases(self):
+        phrases = jarvis_desktop.WAKE_ACTIVATION_PHRASES
+        self.assertGreaterEqual(len(phrases), 6)
+        self.assertEqual(len(phrases), len(set(phrases)))
 
 
 class WakewordSetupTests(unittest.TestCase):
