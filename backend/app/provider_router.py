@@ -206,3 +206,67 @@ async def request_with_failover(
     if failures and all(reason in {"temporarily-unavailable", "timeout", "network-error", "response-too-large", "invalid-response"} for reason in failures):
         raise ProviderUnavailable("AI provider is temporarily unavailable.")
     raise ProviderUnavailable("All configured AI providers are temporarily unavailable.")
+
+
+async def probe_providers(
+    *,
+    timeout: int = 15,
+    max_response_bytes: int = 256_000,
+    environ: dict[str, str] | None = None,
+    client_factory=None,
+) -> list[dict[str, str]]:
+    """Make a minimal live completion request to every configured provider.
+
+    Never return or log API keys or upstream error bodies.
+    """
+    providers = load_providers(environ)
+    make_client = client_factory or httpx.AsyncClient
+    results: list[dict[str, str]] = []
+    for provider in providers:
+        result = {"name": provider.name, "model": provider.model, "status": "unavailable"}
+        try:
+            async with make_client(timeout=timeout) as client:
+                async with client.stream(
+                    "POST",
+                    provider.base_url,
+                    headers={
+                        "Authorization": f"Bearer {provider.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": provider.model,
+                        "messages": [{"role": "user", "content": "Reply with OK."}],
+                        "max_tokens": 1,
+                        "stream": False,
+                    },
+                ) as response:
+                    code = response.status_code
+                    if code in (401, 403):
+                        result["status"] = "invalid_credentials"
+                    elif code == 429:
+                        result["status"] = "rate_limited"
+                    elif code in (400, 404, 422):
+                        result["status"] = "model_or_request_rejected"
+                    elif code >= 500:
+                        result["status"] = "provider_unavailable"
+                    elif code >= 400:
+                        result["status"] = "request_rejected"
+                    else:
+                        chunks: list[bytes] = []
+                        total = 0
+                        async for chunk in response.aiter_bytes():
+                            total += len(chunk)
+                            if total > max_response_bytes:
+                                break
+                            chunks.append(chunk)
+                        else:
+                            if _is_chat_completion_response(b"".join(chunks)):
+                                result["status"] = "working"
+                            else:
+                                result["status"] = "invalid_response"
+        except httpx.TimeoutException:
+            result["status"] = "timeout"
+        except httpx.RequestError:
+            result["status"] = "network_error"
+        results.append(result)
+    return results
