@@ -2422,6 +2422,9 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertLess(desktop.index('("HUD extensions", extensions_source)'), desktop.index('("runtime adapter", runtime_source)'))
         self.assertIn('window.JARVISGestureLogic = api', gesture_logic)
         self.assertIn("jx-gesture-toggle", extensions)
+        self.assertIn("getBoundingClientRect()", extensions)
+        self.assertIn("candidate.viewBox?.baseVal", extensions)
+        self.assertIn("anchorX>=viewBox.x", extensions)
         self.assertIn('window.__jarvisHudRuntimeAdapterLoaded', runtime)
 
     def test_runtime_adapter_wires_hud_click_actions_to_the_desktop_bridge(self):
@@ -2470,11 +2473,12 @@ class HudLiveDataMappingTests(unittest.TestCase):
             "put('v-os', data.os)",
             "put('v-arch', data.architecture)",
             "put('v-up', data.uptime)",
-            "put('v-dl', '- DOWNLOAD : ' + (data.download || 'Measuring…'))",
             "put('v-sr', '- RAM : ' + (data.memory || 'N/A'))",
             "put('v-wifi', 'Wi-Fi ' + (data.network || 'N/A'))",
             "putAt(929, 616, data.temperature)",
             "putAt(779, 740, '- IP : ' + (data.ip || 'N/A'))",
+        self.assertNotIn("v-dl", runtime)
+        self.assertNotIn("data.upload", runtime)
             "putAt(942, 724, '- CPU : ' + (data.cpu || 'N/A'))",
             "putAt(942, 757, '- DISK : ' + (data.disk_percent || 'N/A'))",
             "data.disk_percent_value",
