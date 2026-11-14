@@ -4,6 +4,7 @@ import unittest
 from urllib.parse import urlparse, parse_qs
 
 from online_services import (
+    explain_online_failure,
     get_news,
     get_weather,
     handle_online_command,
@@ -24,6 +25,26 @@ class FakeOpener:
 
 
 class OnlineServicesTests(unittest.TestCase):
+    def test_online_failure_explains_no_internet_and_next_step(self):
+        message = explain_online_failure(RuntimeError("Internet service is unavailable: offline"), "web search")
+        self.assertIn("web search complete nahi kar saka", message)
+        self.assertIn("connect nahi kar pa", message)
+        self.assertIn("Wi-Fi/internet connection", message)
+
+    def test_online_failure_distinguishes_rate_limit_from_connection_failure(self):
+        from urllib.error import HTTPError
+        error = HTTPError("https://example.com", 429, "Too Many Requests", {}, None)
+        message = explain_online_failure(error, "latest news")
+        self.assertIn("rate limit", message)
+        self.assertIn("Thodi der baad", message)
+
+    def test_online_failure_explains_authentication_problem(self):
+        from urllib.error import HTTPError
+        error = HTTPError("https://example.com", 403, "Forbidden", {}, None)
+        message = explain_online_failure(error, "online task")
+        self.assertIn("permission issue", message)
+        self.assertIn("permissions check", message)
+
     def test_search_command_parsing(self):
         self.assertEqual(parse_online_command("Search web for Python 3.13"), ("search", "Python 3.13"))
         self.assertEqual(parse_online_command("google latest AI news"), ("search", "latest AI news"))
