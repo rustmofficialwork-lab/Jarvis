@@ -947,6 +947,34 @@ class MicrophoneConsentTests(unittest.TestCase):
         self.assertFalse(jarvis_desktop.microphone_consent_required(settings))
         self.assertFalse(settings["microphone_consent_granted"])
 
+    def test_camera_consent_is_versioned_and_decline_does_not_grant_access(self):
+        settings = {}
+        self.assertTrue(jarvis_desktop.camera_consent_required(settings))
+        jarvis_desktop.record_camera_consent(settings, False)
+        self.assertFalse(jarvis_desktop.camera_consent_required(settings))
+        self.assertFalse(settings["camera_consent_granted"])
+
+    def test_camera_consent_acceptance_is_persisted(self):
+        settings = {}
+        jarvis_desktop.record_camera_consent(settings, True)
+        self.assertFalse(jarvis_desktop.camera_consent_required(settings))
+        self.assertTrue(settings["camera_consent_granted"])
+
+    def test_camera_consent_dialog_is_foreground_and_camera_is_opt_in(self):
+        class FakeUser32:
+            def __init__(self):
+                self.args = None
+            def MessageBoxW(self, hwnd, message, title, flags):
+                self.args = (hwnd, message, title, flags)
+                return 6
+        user32 = FakeUser32()
+        self.assertTrue(jarvis_desktop.ask_camera_consent(
+            platform_name="nt", user32=user32,
+        ))
+        self.assertIn("camera will remain OFF during startup", user32.args[1])
+        self.assertIn("ENABLE GESTURES", user32.args[1])
+        self.assertEqual(user32.args[3] & 0x00040000, 0x00040000)
+
 
 class SettingsPersistenceTests(unittest.TestCase):
     def test_settings_are_saved_atomically_and_reloaded(self):
