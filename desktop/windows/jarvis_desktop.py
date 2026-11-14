@@ -743,12 +743,24 @@ def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool
             pass
 
 
-def announce_wake_activation(stop_event) -> bool:
-    """Audibly confirm that the verified owner can now give JARVIS a command."""
-    return speak_text_interruptibly(
-        "Yes, I'm listening. What can I do for you?",
-        stop_event,
-    )
+WAKE_ACTIVATION_PHRASES = (
+    "Yes, I'm listening.",
+    "At your service.",
+    "I'm online. Go ahead.",
+    "Ready when you are.",
+    "Yes, how can I help?",
+    "Systems ready. I'm listening.",
+    "I'm here. What's the task?",
+    "JARVIS online. What do you need?",
+)
+
+
+def announce_wake_activation(stop_event, choice=None) -> bool:
+    """Speak a varied confirmation after the owner's wake request is verified."""
+    import random
+    choose = choice or random.choice
+    phrase = choose(WAKE_ACTIVATION_PHRASES)
+    return speak_text_interruptibly(phrase, stop_event)
 
 
 def release_wake_recorder(recorder) -> None:
