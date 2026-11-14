@@ -87,7 +87,7 @@ def _explicit_file_request(tool: str, arguments: dict[str, Any], prompt: str) ->
     """Require direct intent and a user-named folder/file before inspecting personal data."""
     text = str(prompt or "").strip().casefold()
     folder = arguments.get("folder")
-    if not isinstance(folder, str) or not re.search(rf"\\b{re.escape(folder.casefold())}\\b", text):
+    if not isinstance(folder, str) or not re.search(rf"\b{re.escape(folder.casefold())}\b", text):
         return False
     if tool == "read_user_text_file":
         filename = arguments.get("filename")
