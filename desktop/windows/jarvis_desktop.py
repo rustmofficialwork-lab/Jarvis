@@ -1117,24 +1117,46 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
             seen_call_ids.add(call_id)
             validated_calls.append((call_id, function["name"], function["arguments"]))
 
-        # Keep the provider's assistant tool-call envelope intact for the next turn.
-        messages.append({
-            "role": "assistant",
-            "content": message.get("content"),
-            "tool_calls": tool_calls,
-        })
+        # Authorize the entire batch before executing any tool. A mixed batch
+        # containing even one unapproved action must have zero side effects.
+        prepared_calls = []
+        batch_block_reason = None
         for call_id, name, raw_arguments in validated_calls:
             try:
                 arguments = json.loads(raw_arguments)
                 if not isinstance(arguments, dict):
                     raise ValueError("Tool arguments must be a JSON object.")
                 decision = authorize_tool_call(name, arguments, prompt)
-                if not decision.allowed:
-                    output = f"Tool blocked ({decision.status}): {decision.reason}"
-                else:
-                    output = execute_tool(name, arguments)
+                prepared_calls.append((call_id, name, arguments, decision, None))
+                if not decision.allowed and batch_block_reason is None:
+                    batch_block_reason = (
+                        f"Tool blocked ({decision.status}): {decision.reason}"
+                    )
             except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
-                output = f"Tool unavailable: {str(exc)[:240]}"
+                prepared_calls.append((call_id, name, {}, None, str(exc)[:240]))
+                if batch_block_reason is None:
+                    batch_block_reason = f"Tool unavailable: {str(exc)[:240]}"
+
+        # Keep the provider's assistant tool-call envelope intact for the next turn.
+        messages.append({
+            "role": "assistant",
+            "content": message.get("content"),
+            "tool_calls": tool_calls,
+        })
+        for call_id, name, arguments, decision, parse_error in prepared_calls:
+            if batch_block_reason:
+                output = (
+                    f"{batch_block_reason} No tools in this batch were executed."
+                )
+            elif parse_error:
+                output = f"Tool unavailable: {parse_error}"
+            elif decision is None or not decision.allowed:
+                output = "Tool blocked: authorization could not be established."
+            else:
+                try:
+                    output = execute_tool(name, arguments)
+                except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
+                    output = f"Tool unavailable: {str(exc)[:240]}"
             messages.append({
                 "role": "tool",
                 "tool_call_id": call_id,
