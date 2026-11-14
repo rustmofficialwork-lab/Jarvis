@@ -33,6 +33,10 @@ class BrainCoreTests(unittest.TestCase):
         self.assertFalse(denied.allowed)
         self.assertTrue(allowed.allowed)
         self.assertFalse(wrong_app.allowed)
+        negated = authorize_tool_call("open_app", {"app": "notepad"}, "Do not open Notepad")
+        question = authorize_tool_call("open_app", {"app": "notepad"}, "How do I open Notepad?")
+        self.assertFalse(negated.allowed)
+        self.assertFalse(question.allowed)
 
     def test_sensitive_actions_never_run_from_model_tool_call(self):
         decision = authorize_tool_call("send_money", {"amount": 100}, "Send 100")
