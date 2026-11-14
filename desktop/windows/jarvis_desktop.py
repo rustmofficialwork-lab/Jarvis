@@ -1277,7 +1277,7 @@ def local_chat_completion(prompt: str, history: list[dict],
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             raise RuntimeError(
-                "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once."
+                "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once, or open PowerShell and run: ollama pull llama3.2:3b."
             ) from exc
         detail = exc.read(1024).decode("utf-8", errors="replace")
         raise RuntimeError(f"Local Ollama returned HTTP {exc.code}: {detail}") from exc
@@ -1294,7 +1294,7 @@ def local_chat_completion(prompt: str, history: list[dict],
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 raise RuntimeError(
-                    "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once."
+                    "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once, or open PowerShell and run: ollama pull llama3.2:3b."
                 ) from exc
             detail = exc.read(1024).decode("utf-8", errors="replace")
             raise RuntimeError(f"Local Ollama returned HTTP {exc.code}: {detail}") from exc
@@ -2610,7 +2610,7 @@ class JarvisDesktop:
                 self._post_ai_status("ONLINE TASK BLOCKED — live internet service failed.")
                 return (
                     f"{explanation} General AI chat offline mode mein available hai, "
-                    "lekin main bina live data ke current information guess nahi karunga."
+                    "lekin main bina live internet data ke current information guess nahi karunga."
                 )
             try:
                 answer = local_chat_completion(prompt, self.history, memories)
