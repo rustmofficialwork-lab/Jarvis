@@ -2745,7 +2745,17 @@ class JarvisDesktop:
                     if not verified_owner:
                         self.events.put(("status", "Voice not verified — wake request ignored. Say Jarvis again to retry."))
                         continue
-                    self.events.put(("status", "Owner voice verified — speak your command now."))
+                    # Confirm activation audibly only after the owner voice is verified.
+                    # Speaking before verification would announce an untrusted wake trigger.
+                    self.events.put(("status", "Owner voice verified — JARVIS is active."))
+                    try:
+                        self.speech_stop_event.clear()
+                        speak_text_interruptibly(
+                            "Yes, I'm listening. What can I do for you?",
+                            self.speech_stop_event,
+                        )
+                    except Exception as exc:
+                        self.events.put(("status", f"JARVIS is active; voice confirmation unavailable: {exc}"))
                     recognizer = configure_voice_recognizer(sr.Recognizer())
                     try:
                         with sr.Microphone() as source:
