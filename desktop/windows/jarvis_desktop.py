@@ -1469,7 +1469,6 @@ class JarvisDesktop:
                             "Microphone returned an empty or incomplete audio frame."
                         )
                     frame = np.frombuffer(raw, dtype=np.int16)
-                    recent_audio.append(raw_chunk)
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
                     activated, streak = update_wakeword_activation(
@@ -1617,7 +1616,7 @@ class JarvisDesktop:
         )
         # The Python packages alone are insufficient: the custom single-word
         # Jarvis ONNX model is a required local asset for wake-word detection.
-        wakeword_model_ready = JARVIS_WAKEWORD_MODEL.is_file()
+        wakeword_model_ready = active_wakeword_model_path().is_file()
         voice_ready = voice_packages and wakeword_model_ready
         if not voice_packages:
             voice_detail = "INSTALL VOICE PACKAGES"
