@@ -988,6 +988,8 @@ class SettingsPersistenceTests(unittest.TestCase):
             "share_memory_with_ai": False,
             "microphone_consent_version": 1,
             "microphone_consent_granted": False,
+            "camera_consent_version": 1,
+            "camera_consent_granted": False,
             "voice_setup_completed": False,
         }
         jarvis_desktop.save_settings(settings, path)
