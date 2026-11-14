@@ -2648,6 +2648,32 @@ class HybridAiTests(unittest.TestCase):
         self.assertTrue(any("OFFLINE MODE" in status for status in statuses))
         self.assertTrue(any("ONLINE MODE" in status for status in statuses))
 
+
+    def test_live_web_commands_do_not_get_guessed_by_offline_model(self):
+        from types import SimpleNamespace
+        import queue
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT, "model": jarvis_desktop.DEFAULT_MODEL}
+        app.ai_api_key = ""
+        app.device_token = "device-token"
+        app.history = []
+        app.events = queue.Queue()
+        app.memory_store = SimpleNamespace(context=lambda query: [])
+        app._ensure_device_token = lambda force=False: "device-token"
+
+        with (
+            patch.object(jarvis_desktop, "handle_online_command", side_effect=RuntimeError("no internet")),
+            patch.object(jarvis_desktop, "chat_completion", side_effect=RuntimeError("no cloud")),
+            patch.object(jarvis_desktop, "local_chat_completion") as local,
+        ):
+            answer = app._get_online_reply("weather in Bhopal")
+
+        self.assertIn("live internet data", answer)
+        local.assert_not_called()
+        self.assertIn("OFFLINE MODE", app.events.get_nowait()[1])
+
+
     def test_local_fallback_does_not_duplicate_cloud_provider_routing(self):
         source = Path(jarvis_desktop.__file__).read_text(encoding="utf-8")
         self.assertIn("chat_completion(", source)
