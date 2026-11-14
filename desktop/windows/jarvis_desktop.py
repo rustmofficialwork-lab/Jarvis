@@ -98,6 +98,8 @@ SYSTEM_PROMPT = (
     'list_user_files to list Desktop/Documents/Downloads, search_user_files to search filenames there, '
     'and read_user_text_file only for small ordinary text files in those folders. '
     'Use open_app only when the user explicitly asks to open one of its allowlisted Windows apps; '
+    'Use open_website only when the user explicitly asks to visit a public HTTP/HTTPS URL; '
+    'this only opens the default browser and never signs in, submits forms, or clicks website controls. '
     'never invent or pass arbitrary commands. Use get_available_capabilities when asked what you can do; '
     'be honest that browser automation, email/message sending, payments, purchases, account changes, '
     'and arbitrary file deletion are not yet implemented as general actions. '
