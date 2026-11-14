@@ -10,6 +10,8 @@ import math
 import operator
 import subprocess
 import sys
+import urllib.parse
+import webbrowser
 from datetime import datetime
 from typing import Any
 
@@ -82,6 +84,16 @@ TOOL_DEFINITIONS = [
                 "additionalProperties": False,
             },
         },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_website",
+            "description": "Open a public website in the user's default browser only when the user explicitly asks to visit that URL. Read-only navigation; do not submit forms or enter credentials.",
+            "parameters": {"type": "object", "properties": {
+                "url": {"type": "string", "minLength": 8, "maxLength": 2048}
+            }, "required": ["url"], "additionalProperties": False}
+        }
     },
     {
         "type": "function",
@@ -282,13 +294,44 @@ def _available_capabilities() -> str:
         "Implemented local tools: calculator; local date/time; PC health snapshot; "
         "top running process usage; list/search filenames in Desktop, Documents, Downloads; "
         "read small UTF-8 txt/md/csv/json/log files in those folders; open Notepad, Calculator, "
-        "Paint, File Explorer, and Task Manager on Windows. "
+        "Paint, File Explorer, and Task Manager on Windows; open a public website in the default browser when explicitly requested. "
         "Online services implemented separately: web search, weather, and news. "
         "Offline AI depends on the local Ollama model being installed and running. "
-        "Not implemented as general actions: arbitrary browser automation, sending email/messages, "
+        "Not implemented as general actions: interacting with website controls or submitting forms, sending email/messages, "
         "payments, purchases, account changes, unrestricted shell commands, or arbitrary file deletion. "
         "Never claim these unsupported actions were completed."
     )
+
+
+
+def _open_website(url: str) -> str:
+    if not isinstance(url, str) or not 8 <= len(url) <= 2048:
+        raise ValueError("Provide a valid public website URL.")
+    parsed = urllib.parse.urlsplit(url.strip())
+    if parsed.scheme not in {"https", "http"} or not parsed.hostname:
+        raise ValueError("Only complete HTTP or HTTPS website URLs are supported.")
+    if parsed.username or parsed.password:
+        raise ValueError("URLs containing usernames or passwords are blocked.")
+    host = parsed.hostname.rstrip(".").casefold()
+    if host in {"localhost", "localhost.localdomain"} or "." not in host:
+        raise ValueError("Local, intranet, and single-label hostnames are blocked.")
+    try:
+        import ipaddress
+        address = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        address = None
+    if address is not None and not address.is_global:
+        raise ValueError("Private or non-public IP addresses are blocked.")
+    if parsed.port not in {None, 80, 443}:
+        raise ValueError("Non-standard website ports are blocked.")
+    safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
+    try:
+        opened = webbrowser.open(safe_url, new=2, autoraise=True)
+    except Exception as exc:
+        raise ValueError(f"Could not open the browser: {exc}") from exc
+    if not opened:
+        raise ValueError("Windows did not confirm that a browser window was opened.")
+    return "Browser open request accepted for the public website. JARVIS has not signed in, submitted forms, or changed anything on that site."
 
 
 def execute_tool(name: str, arguments: dict[str, Any]) -> str:
@@ -314,6 +357,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> str:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PROCESS_RESULTS:
             raise ValueError("Process limit must be an integer from 1 to 10.")
         return get_top_processes(limit=limit)
+    if name == "open_website":
+        if set(arguments) != {"url"}:
+            raise ValueError("Website opening requires only a URL.")
+        return _open_website(arguments["url"])
     if name == "open_app":
         if set(arguments) != {"app"} or not isinstance(arguments["app"], str):
             raise ValueError("Opening an app requires only its allowlisted app name.")
