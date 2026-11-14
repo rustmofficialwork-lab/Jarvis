@@ -744,14 +744,16 @@ def speak_text_interruptibly(text: str, stop_event, engine_factory=None) -> bool
 
 
 WAKE_ACTIVATION_PHRASES = (
-    "Yes, I'm listening.",
-    "At your service.",
-    "I'm online. Go ahead.",
-    "Ready when you are.",
-    "Yes, how can I help?",
-    "Systems ready. I'm listening.",
-    "I'm here. What's the task?",
-    "JARVIS online. What do you need?",
+    "Haan, main sun raha hoon. Boliye.",
+    "Ji, bataiye. Main ready hoon.",
+    "Ready hoon. Kya kaam hai?",
+    "Haan ji, aap boliye. Main sun raha hoon.",
+    "Main online hoon. Kya help chahiye?",
+    "Aapka JARVIS active hai. Boliye.",
+    "Ji, main taiyaar hoon. Bataiye.",
+    "Yes, I'm listening. Go ahead.",
+    "हाँ, मैं सुन रहा हूँ। बताइए।",
+    "जी, बताइए। मैं तैयार हूँ।",
 )
 
 
@@ -997,8 +999,10 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
         raise ValueError("Please set the AI model and API key in Settings.")
 
     language_hint = (
-        "Reply in Hindi (Devanagari) if the user writes Hindi in Devanagari, "
-        "in English if the user writes English, and in Hinglish (Roman script) if the user writes Hinglish."
+        "Use Hinglish (Hindi + English in Roman script) as JARVIS's default response language, "
+        "even when the user writes a short message in English. If the user explicitly asks for "
+        "pure Hindi or writes Hindi in Devanagari, reply in Hindi (Devanagari). If the user "
+        "clearly asks for English, reply in English. Understand Hindi, English, and Hinglish."
     )
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "system", "content": language_hint}]
@@ -1208,8 +1212,10 @@ def local_chat_completion(prompt: str, history: list[dict],
     if model != LOCAL_AI_MODEL:
         raise ValueError("The configured offline model is not supported.")
     language_hint = (
-        "Reply in Hindi (Devanagari) if the user writes Hindi in Devanagari, "
-        "in English if the user writes English, and in Hinglish (Roman script) if the user writes Hinglish."
+        "Use Hinglish (Hindi + English in Roman script) as JARVIS's default response language, "
+        "even when the user writes a short message in English. If the user explicitly asks for "
+        "pure Hindi or writes Hindi in Devanagari, reply in Hindi (Devanagari). If the user "
+        "clearly asks for English, reply in English. Understand Hindi, English, and Hinglish."
     )
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT + " You are running in OFFLINE mode. "
