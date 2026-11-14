@@ -63,7 +63,7 @@ def choose_mode(
 
 def _explicit_action(prompt: str) -> bool:
     return bool(re.search(
-        r"\\b(open|launch|start|kholo|khol|chalao|shuru karo)\\b",
+        r"\b(open|launch|start|kholo|khol|chalao|shuru karo)\b",
         str(prompt or "").casefold(),
     ))
 
@@ -121,6 +121,6 @@ def authorize_tool_call(
     if not host or host not in prompt:
         # Permit common shorthand only when the user explicitly names it.
         shorthand = host.removeprefix("www.").split(".")[0] if host else ""
-        if not shorthand or not re.search(rf"\\b{re.escape(shorthand)}\\b", prompt):
+        if not shorthand or not re.search(rf"\b{re.escape(shorthand)}\b", prompt):
             return ToolDecision(False, "not_requested", "The user did not name this website.")
     return ToolDecision(True, "allowed", "The user explicitly requested this website.")
