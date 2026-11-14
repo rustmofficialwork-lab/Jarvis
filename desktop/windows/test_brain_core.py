@@ -60,6 +60,30 @@ class BrainCoreTests(unittest.TestCase):
         self.assertFalse(deceptive_suffix.allowed)
         self.assertTrue(valid_subdomain.allowed)
 
+    def test_personal_file_tools_require_direct_user_intent(self):
+        cases = (
+            ("list_user_files", {"folder": "Documents"}, "What can you do?"),
+            ("search_user_files", {"folder": "Downloads", "query": "invoice"}, "Tell me about invoices"),
+            ("read_user_text_file", {"folder": "Documents", "filename": "notes.txt"}, "What is a text file?"),
+            ("read_user_text_file", {"folder": "Documents", "filename": "notes.txt"}, "Do not read my files"),
+        )
+        for name, arguments, prompt in cases:
+            with self.subTest(name=name, prompt=prompt):
+                decision = authorize_tool_call(name, arguments, prompt)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.status, "not_requested")
+
+    def test_personal_file_tools_allow_explicit_requests(self):
+        cases = (
+            ("list_user_files", {"folder": "Documents"}, "Please list my files in Documents"),
+            ("search_user_files", {"folder": "Downloads", "query": "invoice"}, "Find the invoice file in Downloads"),
+            ("read_user_text_file", {"folder": "Documents", "filename": "notes.txt"}, "Please summarize my document"),
+            ("read_user_text_file", {"folder": "Desktop", "filename": "notes.txt"}, "Read the file on my Desktop"),
+        )
+        for name, arguments, prompt in cases:
+            with self.subTest(name=name, prompt=prompt):
+                self.assertTrue(authorize_tool_call(name, arguments, prompt).allowed)
+
     def test_sensitive_actions_never_run_from_model_tool_call(self):
         decision = authorize_tool_call("send_money", {"amount": 100}, "Send 100")
         self.assertFalse(decision.allowed)
