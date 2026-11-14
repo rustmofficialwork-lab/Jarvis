@@ -2410,6 +2410,13 @@ class HudLiveDataMappingTests(unittest.TestCase):
         self.assertIn("data.disk_total", hud)
         self.assertIn("data.disk_free", hud)
 
+    def test_hud_runtime_state_targets_existing_orb_and_live_battery_ring(self):
+        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        self.assertIn("const orb=document.querySelector('.orb-wrapper');", hud)
+        self.assertIn("orb.classList.toggle('is-listening',listening)", hud)
+        self.assertIn("orb.classList.toggle('is-thinking',busy)", hud)
+        self.assertIn("bat.style.setProperty('--bat',(Number.isFinite(bv)?Math.max(0,Math.min(100,bv)):0)+'%')", hud)
+
     def test_hud_document_ids_are_unique(self):
         import re
         hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
