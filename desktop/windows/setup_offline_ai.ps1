@@ -8,9 +8,12 @@ $ollamaCommand = Get-Command ollama -ErrorAction SilentlyContinue
 $ollamaExe = if ($ollamaCommand) { $ollamaCommand.Source } else { $null }
 
 if (-not $ollamaExe) {
+    $localAppData = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $HOME "AppData\Local" }
+    $programFiles = if ($env:ProgramFiles) { $env:ProgramFiles } else { "C:\Program Files" }
     $candidates = @(
-        (Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"),
-        (Join-Path $env:ProgramFiles "Ollama\ollama.exe")
+        (Join-Path $localAppData "Programs\Ollama\ollama.exe"),
+        (Join-Path $programFiles "Ollama\ollama.exe"),
+        "C:\Program Files\Ollama\ollama.exe"
     )
     $ollamaExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
@@ -20,9 +23,12 @@ if (-not $ollamaExe) {
         throw "Ollama is not installed and winget is unavailable. Install Ollama from https://ollama.com/download/windows, then run this script again."
     }
     winget install --id Ollama.Ollama --exact --silent --accept-package-agreements --accept-source-agreements
+    $localAppData = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $HOME "AppData\Local" }
+    $programFiles = if ($env:ProgramFiles) { $env:ProgramFiles } else { "C:\Program Files" }
     $candidates = @(
-        (Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"),
-        (Join-Path $env:ProgramFiles "Ollama\ollama.exe")
+        (Join-Path $localAppData "Programs\Ollama\ollama.exe"),
+        (Join-Path $programFiles "Ollama\ollama.exe"),
+        "C:\Program Files\Ollama\ollama.exe"
     )
     $ollamaExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
@@ -44,7 +50,7 @@ try {
 }
 
 if (-not $serverReady) {
-    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+    for ($attempt = 0; $attempt -lt 45; $attempt++) {
         Start-Sleep -Seconds 2
         try {
             Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 2 | Out-Null
@@ -63,4 +69,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Offline AI is ready. Open JARVIS and it will use this model automatically when online AI is unavailable." -ForegroundColor Green
+Write-Host "Offline AI is ready. JARVIS will start Ollama automatically when needed and use it whenever cloud AI is unavailable." -ForegroundColor Green
