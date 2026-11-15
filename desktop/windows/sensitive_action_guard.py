@@ -177,9 +177,13 @@ class BrowserSessionPolicy:
         self.actions_used = 0
 
     def authorize(self, domain: str, action: str) -> ApprovalResult:
-        host = (urlsplit("//" + str(domain)).hostname or "").casefold().rstrip(".")
-        if host not in self.allowed_domains:
-            return ApprovalResult(False, "domain_denied", "This exact domain is not allowlisted.")
+        if not isinstance(domain, str):
+            return ApprovalResult(False, "domain_denied", "Provide one exact hostname.")
+        raw_domain = domain.strip().casefold().rstrip(".")
+        host = (urlsplit("//" + raw_domain).hostname or "").casefold().rstrip(".")
+        # Reject URL schemes, paths, credentials, ports, and other origin syntax.
+        if not host or host != raw_domain or host not in self.allowed_domains:
+            return ApprovalResult(False, "domain_denied", "This exact hostname is not allowlisted.")
         normalized_action = str(action).strip().casefold()
         if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_ACTIONS:
             return ApprovalResult(False, "action_denied", "Only allowlisted read-only browser actions are permitted.")
