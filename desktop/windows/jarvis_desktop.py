@@ -34,6 +34,7 @@ from updater import check_for_update, download_verified_installer
 from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
 from ai_tools import TOOL_DEFINITIONS, execute_tool
 from brain_core import authorize_tool_call
+from brain_engine import BrainEngine, diagnose_failure
 from owner_voice_setup import enroll_owner_voice
 from owner_voice_verification import load_owner_profile, load_encoder, verify_pcm_bytes
 
@@ -1455,6 +1456,7 @@ class JarvisDesktop:
         self.history: list[dict] = load_chat_history()
         self.last_file_search_results: list[str] = []
         self.memory_store = MemoryStore()
+        self.brain_engine = BrainEngine(self.memory_store)
         self.reminder_store = ReminderStore()
         self.advanced_store = AdvancedFeatureStore()
         self.stop_event = threading.Event()
@@ -2599,10 +2601,8 @@ class JarvisDesktop:
 
     def _get_online_reply(self, prompt: str) -> str:
         """Prefer cloud AI; automatically fall back to local Ollama when it is unavailable."""
-        memories = (
-            self.memory_store.context(query=prompt)
-            if self.settings.get("share_memory_with_ai", False)
-            else []
+        memories = self.brain_engine.context_for(
+            prompt, enabled=bool(self.settings.get("share_memory_with_ai", False)), limit=5
         )
         try:
             answer = handle_online_command(prompt)
@@ -2644,9 +2644,11 @@ class JarvisDesktop:
                 self._post_ai_status("OFFLINE MODE — local AI is responding; your data stays on this PC.")
                 return answer
             except Exception as offline_error:
+                diagnostic = diagnose_failure(online_error)
                 raise RuntimeError(
                     f"Online AI is unavailable ({str(online_error)[:180]}). "
-                    f"Offline AI is not ready: {str(offline_error)[:220]}"
+                    f"Offline AI is not ready: {str(offline_error)[:220]}. "
+                    f"Diagnosis: {diagnostic.explanation} Next step: {diagnostic.next_step}"
                 ) from offline_error
 
     def _answer_worker(self, prompt: str):
