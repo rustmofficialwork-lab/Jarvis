@@ -34,7 +34,9 @@ from updater import check_for_update, download_verified_installer
 from advanced_features import AdvancedFeatureStore, WORKFLOWS, parse_advanced_command
 from ai_tools import TOOL_DEFINITIONS, execute_tool
 from brain_core import authorize_tool_call
-from brain_engine import BrainEngine, diagnose_failure
+from brain_engine import (
+    BrainEngine, create_task_plan, diagnose_failure, evaluate_task,
+)
 from owner_voice_setup import enroll_owner_voice
 from owner_voice_verification import load_owner_profile, load_encoder, verify_pcm_bytes
 
@@ -1144,6 +1146,11 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
             "content": message.get("content"),
             "tool_calls": tool_calls,
         })
+        tool_plan = create_task_plan(
+            prompt[:240] or "Complete the requested task",
+            [f"{name} [{call_id[:16]}]" for call_id, name, *_ in prepared_calls],
+        )
+        completed_tool_steps = []
         for call_id, name, arguments, decision, parse_error in prepared_calls:
             if batch_block_reason:
                 output = (
@@ -1158,11 +1165,25 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                     output = execute_tool(name, arguments)
                 except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
                     output = f"Tool unavailable: {str(exc)[:240]}"
+            if not str(output).casefold().startswith(("tool unavailable:", "tool blocked:")):
+                completed_tool_steps.append(f"{name} [{call_id[:16]}]")
             messages.append({
                 "role": "tool",
                 "tool_call_id": call_id,
                 "content": str(output)[:1000],
             })
+        tool_evaluation = evaluate_task(tool_plan, completed_tool_steps)
+        messages.append({
+            "role": "system",
+            "content": (
+                "Tool-step verification only (this is not proof that the user's entire goal is complete): "
+                f"{tool_evaluation.status}; successful tool steps: "
+                f"{len(tool_evaluation.completed)}/{len(tool_plan.steps)}; "
+                f"remaining tool steps: {len(tool_evaluation.remaining)}. "
+                "Report tool failures honestly and do not claim the overall task is complete "
+                "unless the actual requested outcome has been verified."
+            ),
+        })
         body = request_reply(include_tools=True)
 
     # Never continue an unbounded model/tool loop.
