@@ -167,9 +167,9 @@ class BrainEngine:
             return []
         limit = max(1, min(int(limit), 10))
         return [
-            str(item.get("content", ""))[:MAX_FEEDBACK_LENGTH]
+            str(item)[:MAX_FEEDBACK_LENGTH]
             for item in self.memory.context(query=query, limit=limit)
-            if isinstance(item, dict) and item.get("content")
+            if isinstance(item, str) and item.strip()
         ]
 
     def learn_preference(self, feedback: str, *, explicit: bool) -> dict:
