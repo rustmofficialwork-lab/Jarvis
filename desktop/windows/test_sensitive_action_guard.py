@@ -78,6 +78,7 @@ class SensitiveActionGuardTests(unittest.TestCase):
         self.assertEqual(policy.authorize("example.com", "send_email").status, "action_denied")
         self.assertEqual(policy.authorize("example.com", "submit_form").status, "action_denied")
         self.assertEqual(policy.authorize("example.com", "run_shell_command").status, "action_denied")
+        self.assertEqual(policy.authorize("example.com", "click_link").status, "action_denied")
         self.assertTrue(policy.authorize("example.com", "extract_text").approved)
         for _ in range(18):
             self.assertTrue(policy.authorize("example.com", "read_page").approved)
