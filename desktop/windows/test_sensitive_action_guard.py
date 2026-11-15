@@ -72,6 +72,8 @@ class SensitiveActionGuardTests(unittest.TestCase):
         policy = BrowserSessionPolicy(["example.com"])
         self.assertTrue(policy.authorize("example.com", "open_page").approved)
         self.assertEqual(policy.authorize("sub.example.com", "open_page").status, "domain_denied")
+        for malformed in ("https://example.com", "example.com/path", "example.com:443"):
+            self.assertEqual(policy.authorize(malformed, "open_page").status, "domain_denied")
         self.assertEqual(policy.authorize("example.com", "checkout").status, "action_denied")
         self.assertEqual(policy.authorize("example.com", "send_email").status, "action_denied")
         self.assertEqual(policy.authorize("example.com", "submit_form").status, "action_denied")
