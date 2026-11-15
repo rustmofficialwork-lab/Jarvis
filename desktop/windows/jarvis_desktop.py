@@ -2452,7 +2452,53 @@ class JarvisDesktop:
             self._set_status(f"Reminder check failed: {exc}")
         self.root.after(1000, self._check_reminders)
 
+    def _try_delete_files_command(self, prompt: str) -> bool:
+        """Open a native file picker, then require exact approval before recoverable removal."""
+        import re
+        normalized = " ".join(str(prompt or "").casefold().strip().rstrip(" .!?।॥").split())
+        direct_commands = {
+            "delete file", "delete files", "delete selected files",
+            "move file to recycle bin", "move files to recycle bin",
+            "file delete karo", "files delete karo", "file hatao", "files hatao",
+            "selected files hatao",
+        }
+        if normalized not in direct_commands:
+            return False
+
+        from tkinter import filedialog
+        initial_dir = Path.home() / "Documents"
+        if not initial_dir.is_dir():
+            initial_dir = Path.home()
+        selected = filedialog.askopenfilenames(
+            parent=self.root,
+            title="Select exact files to move to the Recycle Bin",
+            initialdir=str(initial_dir),
+            filetypes=[("All files", "*.*")],
+        )
+        if not selected:
+            response = "File selection cancelled; nothing was changed."
+        else:
+            moved = self.move_selected_files_to_recycle_bin(selected)
+            response = (
+                f"{len(moved)} file(s) moved to the Recycle Bin."
+                if moved else "No files were moved. Approval was denied, expired, or validation failed."
+            )
+
+        self._append("YOU", prompt)
+        self._append("JARVIS", response)
+        self.history.extend([
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": response},
+        ])
+        try:
+            save_chat_history(self.history)
+        except OSError:
+            self._set_status("File operation finished; chat history could not be saved.")
+        return True
+
     def _try_local_command(self, prompt: str) -> bool:
+        if self._try_delete_files_command(prompt):
+            return True
         if self._handle_advanced_command(prompt):
             return True
         if self._handle_reminder_command(prompt):
