@@ -1,7 +1,7 @@
 """Thread-safe synchronous dispatch for dialogs hosted by Tk's UI thread.
 
 Workers may request a UI decision, but must never call Tk widgets directly.
-Timed-out requests are cancelled before a queued callback can display a stale dialog.
+A queued callback is cancelled if the UI does not start it before the timeout.
 """
 from __future__ import annotations
 
@@ -26,14 +26,17 @@ class TkThreadDispatcher:
             return callback(*args, **kwargs)
 
         completed = threading.Event()
-        cancelled = threading.Event()
+        gate = threading.Lock()
+        state = {"cancelled": False, "started": False}
         result: list[Any] = []
         failure: list[BaseException] = []
 
         def invoke() -> None:
-            if cancelled.is_set():
-                completed.set()
-                return
+            with gate:
+                if state["cancelled"]:
+                    completed.set()
+                    return
+                state["started"] = True
             try:
                 result.append(callback(*args, **kwargs))
             except BaseException as exc:
@@ -47,8 +50,15 @@ class TkThreadDispatcher:
             raise RuntimeError("Could not schedule a callback on the JARVIS UI thread.") from exc
 
         if not completed.wait(self._timeout):
-            cancelled.set()
-            raise TimeoutError("The JARVIS UI did not respond in time; the pending dialog was cancelled.")
+            with gate:
+                if not state["started"]:
+                    state["cancelled"] = True
+                    raise TimeoutError(
+                        "The JARVIS UI did not respond in time; the pending dialog was cancelled."
+                    )
+            # The UI claimed the callback just before the timeout. Do not return
+            # while a live approval dialog is still open or report a false timeout.
+            completed.wait()
         if failure:
             raise failure[0]
         return result[0] if result else None
