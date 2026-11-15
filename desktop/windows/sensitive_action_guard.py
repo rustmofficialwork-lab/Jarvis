@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import ipaddress
 import json
+import re
 import secrets
 import threading
 import time
 from typing import Any
-from urllib.parse import urlsplit
 
 MAX_APPROVAL_TTL_SECONDS = 120
 MAX_BROWSER_ACTIONS_PER_SESSION = 20
@@ -48,6 +49,29 @@ class ApprovalResult:
     approved: bool
     status: str
     reason: str
+
+
+def _normalize_exact_hostname(domain: str) -> str:
+    """Validate a plain DNS hostname; reject IP literals and malformed labels."""
+    if not isinstance(domain, str) or not domain or len(domain) > 253:
+        raise ValueError("Provide one exact DNS hostname.")
+    if domain != domain.strip() or domain.endswith(".") or any(ch.isspace() for ch in domain):
+        raise ValueError("Use a hostname only, without whitespace or a trailing dot.")
+    host = domain.casefold()
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        pass
+    else:
+        raise ValueError("IP addresses are not accepted as browser allowlist domains.")
+    labels = host.split(".")
+    if len(labels) < 2 or any(
+        not label or len(label) > 63
+        or re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label) is None
+        for label in labels
+    ):
+        raise ValueError("Use a valid exact DNS hostname.")
+    return host
 
 
 def _canonical_fingerprint(action_type: str, details: dict[str, Any]) -> str:
@@ -107,9 +131,7 @@ def build_approval_request(
         if (not isinstance(domain, str) or not isinstance(action, str)
                 or not action.strip()):
             raise ValueError("Browser domain and requested action are required.")
-        host = (urlsplit("//" + domain).hostname or "").casefold().rstrip(".")
-        if host != domain.casefold().rstrip(".") or not host or "." not in host:
-            raise ValueError("Use one exact hostname, not a URL or wildcard.")
+        host = _normalize_exact_hostname(domain)
         if action.casefold() in BLOCKED_BROWSER_ACTIONS:
             raise PermissionError("This browser action is outside the approved automation scope.")
     current = time.time() if now is None else now
@@ -195,10 +217,7 @@ class BrowserSessionPolicy:
         for domain in allowed_domains:
             if not isinstance(domain, str):
                 raise ValueError("Domains must be exact hostnames.")
-            host = (urlsplit("//" + domain).hostname or "").casefold().rstrip(".")
-            if host != domain.casefold().rstrip(".") or not host or "." not in host:
-                raise ValueError("Wildcards, paths, and URL schemes are not accepted.")
-            normalized.add(host)
+            normalized.add(_normalize_exact_hostname(domain))
         self.allowed_domains = frozenset(normalized)
         self.actions_used = 0
         self._lock = threading.Lock()
@@ -206,10 +225,12 @@ class BrowserSessionPolicy:
     def authorize(self, domain: str, action: str) -> ApprovalResult:
         if not isinstance(domain, str):
             return ApprovalResult(False, "domain_denied", "Provide one exact hostname.")
-        raw_domain = domain.strip().casefold().rstrip(".")
-        host = (urlsplit("//" + raw_domain).hostname or "").casefold().rstrip(".")
-        # Reject URL schemes, paths, credentials, ports, and other origin syntax.
-        if not host or host != raw_domain or host not in self.allowed_domains:
+        # Reject URL schemes, paths, credentials, ports, IP literals, and malformed DNS labels.
+        try:
+            host = _normalize_exact_hostname(domain)
+        except ValueError:
+            return ApprovalResult(False, "domain_denied", "Provide one valid exact DNS hostname.")
+        if host not in self.allowed_domains:
             return ApprovalResult(False, "domain_denied", "This exact hostname is not allowlisted.")
         if not isinstance(action, str):
             return ApprovalResult(False, "action_denied", "Only allowlisted read-only browser actions are permitted.")
