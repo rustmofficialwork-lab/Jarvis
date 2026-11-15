@@ -116,6 +116,18 @@ class SensitiveActionGuardTests(unittest.TestCase):
             self.assertTrue(policy.authorize("example.com", "read_page").approved)
         self.assertEqual(policy.authorize("example.com", "read_page").status, "limit_reached")
 
+    def test_browser_action_limit_is_thread_safe(self):
+        from concurrent.futures import ThreadPoolExecutor
+        policy = BrowserSessionPolicy(["example.com"])
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            results = list(pool.map(
+                lambda _index: policy.authorize("example.com", "read_page"),
+                range(100),
+            ))
+        self.assertEqual(sum(result.approved for result in results), 20)
+        self.assertEqual(sum(result.status == "limit_reached" for result in results), 80)
+        self.assertEqual(policy.actions_used, 20)
+
     def test_browser_policy_rejects_wildcards_and_urls(self):
         for domain in ("*.example.com", "https://example.com/path", "example.com/path"):
             with self.subTest(domain=domain), self.assertRaises(ValueError):
