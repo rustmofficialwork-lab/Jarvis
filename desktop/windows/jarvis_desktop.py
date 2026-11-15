@@ -1873,6 +1873,47 @@ class JarvisDesktop:
                 pass
         return False
 
+    def request_sensitive_action_approval(self, action_type: str, details: dict, summary: str) -> bool:
+        """Show a native, exact-detail approval dialog without changing the HTML HUD."""
+        try:
+            token, request = self.brain_engine.request_sensitive_approval(
+                action_type, details, summary
+            )
+        except (TypeError, ValueError, PermissionError) as exc:
+            messagebox.showerror("JARVIS — Action blocked", str(exc), parent=self.root)
+            return False
+
+        # Show all action-defining fields. Never truncate recipient, amount, URL,
+        # message content, selected paths, or order details in the approval view.
+        lines = [
+            f"Action: {request.action_type.upper()}",
+            f"Summary: {request.summary}",
+            "",
+            "Exact details to be approved:",
+        ]
+        for key, value in request.details.items():
+            rendered = json.dumps(value, ensure_ascii=False, sort_keys=True)
+            lines.append(f"{key}: {rendered}")
+        lines.extend([
+            "",
+            "This approval applies only to these exact details, once, and expires in 120 seconds.",
+            "If any detail changes, JARVIS must ask again.",
+            "",
+            "Approve this action?",
+        ])
+        approved = messagebox.askyesno(
+            "JARVIS — Sensitive action approval",
+            "\\n".join(lines),
+            parent=self.root,
+            icon="warning",
+        )
+        result = self.brain_engine.decide_sensitive_approval(token, approved=approved)
+        if not result.approved:
+            self._set_status("Sensitive action denied or approval expired; no action was executed.")
+            return False
+        self._set_status("Exact action approved once. An approved action executor is still required.")
+        return True
+
     # Legacy Tk dashboard widgets have been removed; the HTML HUD is the sole dashboard.
 
     def _open_hud_url(self, url):
