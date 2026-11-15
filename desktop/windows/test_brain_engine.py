@@ -58,6 +58,20 @@ class BrainEngineTests(unittest.TestCase):
         self.assertEqual(item["category"], "preference")
 
 
+    def test_engine_exposes_bounded_read_only_browser_session(self):
+        missing = self.engine.authorize_browser_action("example.com", "read_page")
+        self.assertEqual(missing.status, "session_missing")
+        self.engine.start_browser_session(["example.com"])
+        self.assertTrue(self.engine.authorize_browser_action("example.com", "read_page").approved)
+        self.assertEqual(
+            self.engine.authorize_browser_action("example.com", "submit_form").status,
+            "action_denied",
+        )
+        self.assertEqual(
+            self.engine.authorize_browser_action("other.example", "read_page").status,
+            "domain_denied",
+        )
+
     def test_engine_exposes_exact_scope_one_time_approval(self):
         details = {"recipient": "person@example.test", "subject": "Hi", "content": "Approved text"}
         token, preview = self.engine.request_sensitive_approval("email", details, "Send email")
