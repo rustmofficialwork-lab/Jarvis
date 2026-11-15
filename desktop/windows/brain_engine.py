@@ -12,6 +12,7 @@ from typing import Iterable
 
 from brain_core import ToolDecision, authorize_tool_call, choose_mode
 from memory_store import MemoryStore
+from sensitive_action_guard import ApprovalLedger, ApprovalRequest, ApprovalResult, build_approval_request
 
 
 MAX_PLAN_STEPS = 8
@@ -140,6 +141,23 @@ class BrainEngine:
 
     def __init__(self, memory: MemoryStore):
         self.memory = memory
+        # Ephemeral approvals are intentionally lost when JARVIS restarts.
+        self.approvals = ApprovalLedger()
+
+    def request_sensitive_approval(
+        self, action_type: str, details: dict, summary: str
+    ) -> tuple[str, ApprovalRequest]:
+        \"\"\"Create an exact-detail preview; this does not execute the action.\"\"\"
+        request = build_approval_request(action_type, details, summary)
+        return self.approvals.request(request), request
+
+    def decide_sensitive_approval(self, token: str, *, approved: bool) -> ApprovalResult:
+        \"\"\"Record a user's decision for one pending, short-lived request.\"\"\"
+        return self.approvals.decide(token, approved=approved)
+
+    def consume_sensitive_approval(self, action_type: str, details: dict) -> ApprovalResult:
+        \"\"\"Require an exact matching one-time grant before a future executor acts.\"\"\"
+        return self.approvals.consume(action_type, details)
 
     @staticmethod
     def select_mode(
