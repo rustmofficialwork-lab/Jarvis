@@ -150,16 +150,16 @@ class BrainEngine:
     def request_sensitive_approval(
         self, action_type: str, details: dict, summary: str
     ) -> tuple[str, ApprovalRequest]:
-        \"\"\"Create an exact-detail preview; this does not execute the action.\"\"\"
+        """Create an exact-detail preview; this does not execute the action."""
         request = build_approval_request(action_type, details, summary)
         return self.approvals.request(request), request
 
     def decide_sensitive_approval(self, token: str, *, approved: bool) -> ApprovalResult:
-        \"\"\"Record a user's decision for one pending, short-lived request.\"\"\"
+        """Record a user's decision for one pending, short-lived request."""
         return self.approvals.decide(token, approved=approved)
 
     def consume_sensitive_approval(self, action_type: str, details: dict) -> ApprovalResult:
-        \"\"\"Require an exact matching one-time grant before a future executor acts.\"\"\"
+        """Require an exact matching one-time grant before a future executor acts."""
         return self.approvals.consume(action_type, details)
 
     def start_browser_session(self, allowed_domains: list[str]) -> None:
