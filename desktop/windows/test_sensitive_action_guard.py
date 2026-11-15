@@ -26,6 +26,38 @@ class SensitiveActionGuardTests(unittest.TestCase):
         exposed["content"] = "Tampered"
         self.assertEqual(request.details["content"], "Final")
 
+    def test_expired_pending_requests_are_purged_before_capacity_check(self):
+        clock = [100.0]
+        ledger = ApprovalLedger(clock=lambda: clock[0])
+        request = build_approval_request(
+            "message", {"recipient": "contact", "content": "Hi"}, "Send message", now=100.0
+        )
+        for _ in range(32):
+            ledger.request(request)
+        clock[0] = 221.0
+        # Expired pending entries are discarded, so they cannot permanently fill the queue.
+        self.assertTrue(ledger.request(build_approval_request(
+            "message", {"recipient": "other", "content": "Hello"}, "Send message", now=221.0
+        )))
+
+    def test_expired_approved_grant_is_purged_and_cannot_be_consumed(self):
+        clock = [100.0]
+        ledger = ApprovalLedger(clock=lambda: clock[0])
+        details = {"recipient": "contact", "content": "Hi"}
+        token = ledger.request(build_approval_request("message", details, "Send message", now=100.0))
+        self.assertTrue(ledger.decide(token, approved=True).approved)
+        clock[0] = 221.0
+        self.assertEqual(ledger.consume("message", details).status, "approval_required")
+
+    def test_already_expired_request_cannot_be_queued(self):
+        clock = [221.0]
+        ledger = ApprovalLedger(clock=lambda: clock[0])
+        request = build_approval_request(
+            "message", {"recipient": "contact", "content": "Hi"}, "Send message", now=100.0
+        )
+        with self.assertRaises(ValueError):
+            ledger.request(request)
+
     def test_denial_and_expiry_never_grant(self):
         clock = [100.0]
         ledger = ApprovalLedger(clock=lambda: clock[0])
