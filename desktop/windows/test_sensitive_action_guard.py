@@ -18,6 +18,14 @@ class SensitiveActionGuardTests(unittest.TestCase):
         self.assertTrue(ledger.consume("email", details).approved)
         self.assertFalse(ledger.consume("email", details).approved)
 
+
+    def test_preview_details_are_returned_as_immutable_copies(self):
+        details = {"recipient": "person@example.test", "subject": "Hi", "content": "Final"}
+        request = build_approval_request("email", details, "Send email")
+        exposed = request.details
+        exposed["content"] = "Tampered"
+        self.assertEqual(request.details["content"], "Final")
+
     def test_denial_and_expiry_never_grant(self):
         clock = [100.0]
         ledger = ApprovalLedger(clock=lambda: clock[0])
