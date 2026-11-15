@@ -12,7 +12,9 @@ from typing import Iterable
 
 from brain_core import ToolDecision, authorize_tool_call, choose_mode
 from memory_store import MemoryStore
-from sensitive_action_guard import ApprovalLedger, ApprovalRequest, ApprovalResult, build_approval_request
+from sensitive_action_guard import (
+    ApprovalLedger, ApprovalRequest, ApprovalResult, BrowserSessionPolicy, build_approval_request,
+)
 
 
 MAX_PLAN_STEPS = 8
@@ -143,6 +145,7 @@ class BrainEngine:
         self.memory = memory
         # Ephemeral approvals are intentionally lost when JARVIS restarts.
         self.approvals = ApprovalLedger()
+        self.browser_session: BrowserSessionPolicy | None = None
 
     def request_sensitive_approval(
         self, action_type: str, details: dict, summary: str
@@ -158,6 +161,17 @@ class BrainEngine:
     def consume_sensitive_approval(self, action_type: str, details: dict) -> ApprovalResult:
         \"\"\"Require an exact matching one-time grant before a future executor acts.\"\"\"
         return self.approvals.consume(action_type, details)
+
+    def start_browser_session(self, allowed_domains: list[str]) -> None:
+        """Start one bounded, read-only browser session for exact hostnames."""
+        self.browser_session = BrowserSessionPolicy(allowed_domains)
+
+    def authorize_browser_action(self, domain: str, action: str) -> ApprovalResult:
+        """Authorize one read-only action within the current bounded browser session."""
+        if self.browser_session is None:
+            return ApprovalResult(False, "session_missing", "No browser domain session has been approved.")
+        return self.browser_session.authorize(domain, action)
+
 
     @staticmethod
     def select_mode(
