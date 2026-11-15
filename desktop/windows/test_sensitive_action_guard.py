@@ -133,6 +133,32 @@ class SensitiveActionGuardTests(unittest.TestCase):
             with self.subTest(domain=domain), self.assertRaises(ValueError):
                 BrowserSessionPolicy([domain])
 
+    def test_browser_policy_rejects_ip_literals_and_malformed_dns_names(self):
+        invalid_domains = (
+            "127.0.0.1", "::1", "[::1]", "example..com",
+            "-example.com", "example-.com", "example.com:443",
+            "example.com\\n.evil", "example .com", "example.com.",
+        )
+        for domain in invalid_domains:
+            with self.subTest(domain=domain), self.assertRaises(ValueError):
+                BrowserSessionPolicy([domain])
+
+    def test_browser_authorization_rejects_malformed_hostname_inputs(self):
+        policy = BrowserSessionPolicy(["example.com"])
+        for domain in ("127.0.0.1", "example..com", "https://example.com", "example.com:443"):
+            with self.subTest(domain=domain):
+                self.assertEqual(
+                    policy.authorize(domain, "read_page").status,
+                    "domain_denied",
+                )
+
+    def test_browser_approval_preview_requires_valid_dns_hostname(self):
+        for domain in ("127.0.0.1", "example..com", "*.example.com", "https://example.com"):
+            with self.subTest(domain=domain), self.assertRaises(ValueError):
+                build_approval_request(
+                    "browser", {"domain": domain, "action": "read_page"}, "Read public page"
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
