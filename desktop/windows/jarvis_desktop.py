@@ -17,6 +17,7 @@ import threading
 import time
 import uuid
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 import tkinter as tk
@@ -38,6 +39,7 @@ from brain_engine import (
     BrainEngine, create_task_plan, diagnose_failure, evaluate_task,
 )
 from recoverable_file_actions import validate_selected_files, move_files_to_trash
+from tk_thread_dispatch import TkThreadDispatcher
 from owner_voice_setup import enroll_owner_voice
 from owner_voice_verification import load_owner_profile, load_encoder, verify_pcm_bytes
 
@@ -1007,7 +1009,8 @@ def register_device(device_id: str, timeout: float = 12.0) -> str:
 
 
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
-                     history: list[dict], memories: list[str] | None = None) -> str:
+                     history: list[dict], memories: list[str] | None = None,
+                     browser_open_authorizer=None) -> str:
     """Request a reply and run only a few explicitly allowlisted read-only tools."""
     endpoint, model = validate_chat_configuration(endpoint, model)
     if not api_key.strip():
@@ -1163,7 +1166,15 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                 output = "Tool blocked: authorization could not be established."
             else:
                 try:
-                    output = execute_tool(name, arguments)
+                    if name == "open_website":
+                        if not callable(browser_open_authorizer):
+                            output = "Tool blocked: browser domain approval is unavailable."
+                        elif not browser_open_authorizer(arguments.get("url")):
+                            output = "Tool blocked: browser domain approval was denied, expired, or did not match."
+                        else:
+                            output = execute_tool(name, arguments)
+                    else:
+                        output = execute_tool(name, arguments)
                 except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
                     output = f"Tool unavailable: {str(exc)[:240]}"
             if not str(output).casefold().startswith(("tool unavailable:", "tool blocked:")):
@@ -1461,6 +1472,7 @@ def build_document_history_entries(prompt: str, document: dict,
 class JarvisDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
+        self.ui_dispatcher = TkThreadDispatcher(root)
         # Tk is retained only as a hidden event-loop/dialog host; the visible UI is the HTML HUD.
         self.settings = load_settings()
         self.device_id = self.settings.get("device_id", "")
@@ -1875,6 +1887,15 @@ class JarvisDesktop:
         return False
 
     def request_sensitive_action_approval(self, action_type: str, details: dict, summary: str) -> bool:
+        """Request approval on Tk's UI thread, even when called by an AI worker."""
+        dispatcher = getattr(self, "ui_dispatcher", None)
+        if dispatcher is None:
+            return self._request_sensitive_action_approval_ui(action_type, details, summary)
+        return dispatcher.call(
+            self._request_sensitive_action_approval_ui, action_type, details, summary
+        )
+
+    def _request_sensitive_action_approval_ui(self, action_type: str, details: dict, summary: str) -> bool:
         """Show a native, exact-detail approval dialog without changing the HTML HUD."""
         try:
             token, request = self.brain_engine.request_sensitive_approval(
@@ -1914,6 +1935,27 @@ class JarvisDesktop:
             return False
         self._set_status("Exact action approved once. An approved action executor is still required.")
         return True
+
+    def _authorize_browser_open(self, url: str) -> bool:
+        """Require a one-time, exact-host approval before opening a public website."""
+        if not isinstance(url, str) or not 8 <= len(url) <= 2048:
+            return False
+        try:
+            parsed = urllib.parse.urlsplit(url.strip())
+            domain = (parsed.hostname or "").casefold()
+            if parsed.scheme not in {"http", "https"} or not domain:
+                return False
+            # The URL executor performs the full public-host and port validation.
+            details = {"domain": domain, "action": "open_page"}
+            approved = self.request_sensitive_action_approval(
+                "browser", details, f"Open public website {domain}"
+            )
+            if not approved:
+                return False
+            result = self.brain_engine.consume_sensitive_approval("browser", details)
+            return bool(result.approved)
+        except (TypeError, ValueError, PermissionError):
+            return False
 
     def move_selected_files_to_recycle_bin(self, paths) -> tuple[str, ...]:
         """Move explicitly selected files to the OS recycle bin after exact approval.
@@ -2773,6 +2815,7 @@ class JarvisDesktop:
                 answer = chat_completion(
                     endpoint, self.settings.get("model", DEFAULT_MODEL), token,
                     prompt, self.history, memories,
+                    browser_open_authorizer=self._authorize_browser_open,
                 )
             except RuntimeError as exc:
                 if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
@@ -2781,6 +2824,7 @@ class JarvisDesktop:
                 answer = chat_completion(
                     endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
                     prompt, self.history, memories,
+                    browser_open_authorizer=self._authorize_browser_open,
                 )
             self._post_ai_status("ONLINE MODE — cloud AI is responding.")
             return answer
