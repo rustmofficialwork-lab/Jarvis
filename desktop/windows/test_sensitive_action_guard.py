@@ -159,6 +159,25 @@ class SensitiveActionGuardTests(unittest.TestCase):
                     "browser", {"domain": domain, "action": "read_page"}, "Read public page"
                 )
 
+    def test_browser_approval_preview_fails_closed_on_unlisted_actions(self):
+        for action in ("click_link", "submit_form", "run_shell_command", "unknown"):
+            with self.subTest(action=action), self.assertRaises(PermissionError):
+                build_approval_request(
+                    "browser",
+                    {"domain": "example.com", "action": action},
+                    "Browser action",
+                )
+
+    def test_browser_approval_preview_accepts_only_read_only_allowlist(self):
+        for action in ("open_page", "read_page", "extract_text", "scroll_page"):
+            with self.subTest(action=action):
+                request = build_approval_request(
+                    "browser",
+                    {"domain": "example.com", "action": action},
+                    "Read public page",
+                )
+                self.assertEqual(request.details["action"], action)
+
 
 if __name__ == "__main__":
     unittest.main()
