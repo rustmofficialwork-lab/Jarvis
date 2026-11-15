@@ -19,7 +19,12 @@ class RecoverableFileActionTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_validates_only_exact_regular_files_in_allowed_roots(self):
-        self.assertEqual(validate_selected_files([str(self.file)], home=self.home), (self.file,))
+        # Windows may resolve a temporary directory through its 8.3 short-name
+        # alias; compare canonical paths rather than their input spelling.
+        self.assertEqual(
+            validate_selected_files([str(self.file)], home=self.home),
+            (self.file.resolve(),),
+        )
         with self.assertRaises(ValueError):
             validate_selected_files([str(self.root)], home=self.home)
         outside = self.home / "outside.txt"
