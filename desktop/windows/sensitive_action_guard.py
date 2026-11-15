@@ -24,7 +24,7 @@ BLOCKED_BROWSER_ACTIONS = frozenset({
 
 # Browser automation is intentionally read-only. Unknown actions fail closed.
 ALLOWED_BROWSER_ACTIONS = frozenset({
-    "open_page", "read_page", "extract_text", "scroll_page", "click_link",
+    "open_page", "read_page", "extract_text", "scroll_page",
 })
 
 
