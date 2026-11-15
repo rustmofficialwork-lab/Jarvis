@@ -201,6 +201,7 @@ class BrowserSessionPolicy:
             normalized.add(host)
         self.allowed_domains = frozenset(normalized)
         self.actions_used = 0
+        self._lock = threading.Lock()
 
     def authorize(self, domain: str, action: str) -> ApprovalResult:
         if not isinstance(domain, str):
@@ -210,10 +211,15 @@ class BrowserSessionPolicy:
         # Reject URL schemes, paths, credentials, ports, and other origin syntax.
         if not host or host != raw_domain or host not in self.allowed_domains:
             return ApprovalResult(False, "domain_denied", "This exact hostname is not allowlisted.")
-        normalized_action = str(action).strip().casefold()
+        if not isinstance(action, str):
+            return ApprovalResult(False, "action_denied", "Only allowlisted read-only browser actions are permitted.")
+        normalized_action = action.strip().casefold()
         if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_ACTIONS:
             return ApprovalResult(False, "action_denied", "Only allowlisted read-only browser actions are permitted.")
-        if self.actions_used >= MAX_BROWSER_ACTIONS_PER_SESSION:
-            return ApprovalResult(False, "limit_reached", "Browser action limit reached for this session.")
-        self.actions_used += 1
-        return ApprovalResult(True, "allowed", "Domain and bounded action are allowed.")
+        # The budget check and increment must be atomic when multiple tool calls
+        # arrive concurrently from voice, chat, or background workers.
+        with self._lock:
+            if self.actions_used >= MAX_BROWSER_ACTIONS_PER_SESSION:
+                return ApprovalResult(False, "limit_reached", "Browser action limit reached for this session.")
+            self.actions_used += 1
+            return ApprovalResult(True, "allowed", "Domain and bounded action are allowed.")
