@@ -1289,6 +1289,7 @@ class VoiceMemoryCommandTests(unittest.TestCase):
             self.assertTrue(app._handle_memory_command("yaad rakhna I prefer Hindi", from_voice=True))
             self.assertTrue(app._handle_memory_command("what do you remember", from_voice=True))
         self.assertEqual(app.memory_store.list()[0]["content"], "I prefer Hindi")
+        self.assertEqual(app.memory_store.list()[0]["category"], "preference")
         self.assertEqual(len(app.history), 4)
         self.assertEqual(speak.call_count, 2)
 
