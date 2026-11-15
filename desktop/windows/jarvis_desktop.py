@@ -2601,7 +2601,11 @@ class JarvisDesktop:
 
     def _get_online_reply(self, prompt: str) -> str:
         """Prefer cloud AI; automatically fall back to local Ollama when it is unavailable."""
-        memories = self.brain_engine.context_for(
+        brain_engine = getattr(self, "brain_engine", None)
+        if brain_engine is None:
+            brain_engine = BrainEngine(self.memory_store)
+            self.brain_engine = brain_engine
+        memories = brain_engine.context_for(
             prompt, enabled=bool(self.settings.get("share_memory_with_ai", False)), limit=5
         )
         try:
