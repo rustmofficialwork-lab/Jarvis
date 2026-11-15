@@ -1129,7 +1129,7 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                 arguments = json.loads(raw_arguments)
                 if not isinstance(arguments, dict):
                     raise ValueError("Tool arguments must be a JSON object.")
-                decision = authorize_tool_call(name, arguments, prompt)
+                decision = BrainEngine.authorize(name, arguments, prompt)
                 prepared_calls.append((call_id, name, arguments, decision, None))
                 if not decision.allowed and batch_block_reason is None:
                     batch_block_reason = (
@@ -1997,9 +1997,15 @@ class JarvisDesktop:
                 reply = "The saved memories were kept."
         elif action == "remember":
             try:
-                self.memory_store.add(content or "", "general")
-                reply = "Yaad rakh liya. Ye memory sirf is PC par save hui hai."
-            except ValueError as exc:
+                brain_engine = getattr(self, "brain_engine", None)
+                if brain_engine is None:
+                    brain_engine = BrainEngine(self.memory_store)
+                    self.brain_engine = brain_engine
+                # The user's explicit "remember" command is the consent signal.
+                # Keep feedback local and reject secrets in MemoryStore.validate().
+                brain_engine.learn_preference(content or "", explicit=True)
+                reply = "Yaad rakh liya. Ye preference sirf is PC par save hui hai."
+            except (ValueError, PermissionError) as exc:
                 reply = str(exc)
         else:
             items = self.memory_store.list()
