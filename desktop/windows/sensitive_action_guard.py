@@ -132,8 +132,9 @@ def build_approval_request(
                 or not action.strip()):
             raise ValueError("Browser domain and requested action are required.")
         host = _normalize_exact_hostname(domain)
-        if action.casefold() in BLOCKED_BROWSER_ACTIONS:
-            raise PermissionError("This browser action is outside the approved automation scope.")
+        normalized_action = action.strip().casefold()
+        if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_ACTIONS:
+            raise PermissionError("Only explicitly allowlisted read-only browser actions can be approved.")
     current = time.time() if now is None else now
     safe_details = json.loads(json.dumps(details, sort_keys=True))
     return ApprovalRequest(
