@@ -1,0 +1,91 @@
+# First-party JARVIS wake-word model
+
+## Current runtime behavior
+
+JARVIS now prefers a locally installed custom model at:
+
+`%APPDATA%\JARVISDesktop\wakewords\jarvis_first_party.onnx`
+
+If that file is absent, the app falls back to the legacy community-published Jarvis model. The custom model is loaded through the same local openWakeWord runtime. The first-party model is a JARVIS-specific classifier trained for the phrase "Jarvis"; it uses openWakeWord's shared frozen feature extractor, so it is not a newly trained speech backbone.
+
+The installer validates the ONNX file and installs it atomically. It does not claim that an arbitrary ONNX file is a compatible or accurate wake-word classifier; the model must come from the training pipeline below and must pass real microphone evaluation.
+
+## Training pipeline
+
+The repository does not contain a trained first-party model binary. A model must be produced by an actual training run; never create a placeholder ONNX file or relabel the publisher's model.
+
+The recommended starting point is the official openWakeWord automatic custom-model notebook:
+
+- Notebook: https://colab.research.google.com/github/dscripka/openWakeWord/blob/main/notebooks/automatic_model_training.ipynb
+- Training overview and data requirements: https://pypi.org/project/openwakeword/#training-new-models
+
+In the notebook:
+
+1. Set the target phrase to exactly `Jarvis`.
+2. Set the exported model name to `jarvis_first_party`.
+3. Generate diverse positive speech examples and hard negative examples using the notebook's supported workflow.
+4. Keep training and validation/test recordings separate. Do not place the same session in both splits.
+5. Export the ONNX artifact and download it to the Windows development PC.
+
+openWakeWord's documentation recommends several thousand positive examples for useful training and large, varied negative audio coverage. A model trained from a tiny hand-recorded sample set is not a reliable general wake-word detector. Keep the user-collected local clips for independent real-microphone evaluation, not as a substitute for broad training data.
+
+Install the exported model from PowerShell, run from `desktop/windows`:
+
+```powershell
+py install_first_party_wakeword.py --model "$HOME\Downloads\jarvis_first_party.onnx" --confirm
+```
+
+The installer places the model in the JARVIS AppData wake-word directory. Restart Voice Listening; the custom model is preferred automatically. The model runs locally after installation.
+
+## Reproducible evaluation CLI
+
+The repository includes `evaluate_first_party_wakeword.py`. It loads the candidate model through the same openWakeWord ONNX runtime used by the desktop app and measures clip-level recall plus negative-audio false activations per hour.
+
+Create *held-out* folders (never copied from training clips), each containing mono 16 kHz 16-bit PCM WAV files:
+
+```text
+evaluation/
+  positive/   # independent intentional "Jarvis" attempts; one attempt per clip
+  negative/   # continuous representative speech/noise without "Jarvis"
+```
+
+Run from `desktop/windows` after installing the desktop requirements:
+
+```powershell
+py evaluate_first_party_wakeword.py --model "$HOME\Downloads\jarvis_first_party.onnx" --positive-dir evaluation\positive --negative-dir evaluation\negative --threshold 0.5 --output evaluation-report.json
+```
+
+The report records recall, misses, negative audio hours, false activation events, and false activations/hour. Run the same held-out set at a small threshold sweep only during validation; freeze the selected threshold before the final test. The CLI default of 0.5 is a starting measurement point, not a calibrated production setting. The evaluation tool uses an event cooldown to avoid counting every consecutive high-score frame as a separate activation; the desktop app's own two-frame/cooldown logic is not identical, so final acceptance still requires testing the integrated Windows microphone path.
+
+## Required release evaluation
+
+Do not mark the model production-ready until all of these are recorded:
+
+- ONNX model loads through the exact Windows openWakeWord runtime.
+- Held-out owner attempts measure missed detections across normal speaking pace, distance, and microphone positions.
+- Several hours of representative background speech/noise are used to estimate false activations per hour.
+- Test sessions are separate from training and validation.
+- The chosen confidence threshold is based on the measured false-accept/false-reject trade-off, not a guessed value.
+- Model file SHA-256, training configuration, source notebook revision, and evaluation report are retained with the release.
+
+The app's two-consecutive-frame rule and cooldown are runtime filters; they do not replace model evaluation.
+
+## Local dataset utilities
+
+For optional local recordings:
+
+```powershell
+py wakeword_dataset_recorder.py --label positive --count 30
+py wakeword_dataset_recorder.py --label negative --count 30
+py wakeword_dataset_audit.py --dataset-dir wakeword_dataset
+```
+
+Record only your own voice or voices for which you have permission. These tools save locally and do not upload recordings. The format audit is not an accuracy test.
+
+## Owner-only activation is a separate gate
+
+Wake-word detection and speaker verification are independent. A positive wake-word score is not proof of who spoke. JARVIS now checks a local ECAPA speaker profile before opening the command-capture pipeline. See `OWNER_VOICE_SETUP.md` for enrollment, privacy, and verification limitations.
+
+## License and model provenance
+
+The openWakeWord project code is Apache-2.0, while its included pretrained models have separate model terms; the current publisher-hosted Jarvis model remains a separate fallback and is not bundled. Review the terms for every model and dataset used in a custom training run. The custom JARVIS classifier artifact must be generated by the project training run, not copied from the publisher model.

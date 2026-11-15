@@ -1,0 +1,191 @@
+"""HTTPS-only GitHub Releases updater with SHA-256 verification."""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import urllib.error
+import urllib.request
+from pathlib import Path
+from urllib.parse import urlparse
+
+API_URL = "https://api.github.com/repos/rustmofficialwork-lab/Jarvis/releases/tags/jarvis-latest"
+INSTALLER_NAME = "JARVIS-Setup-x64.exe"
+CHECKSUM_NAME = "SHA256SUMS.txt"
+MAX_API_BYTES = 1024 * 1024
+MAX_CHECKSUM_BYTES = 16 * 1024
+MAX_INSTALLER_BYTES = 200 * 1024 * 1024
+ALLOWED_REDIRECT_HOSTS = {
+    "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
+}
+
+
+def _version_tuple(value: str) -> tuple[int, ...]:
+    normalized = str(value).strip().removeprefix("v")
+    if not re.fullmatch(r"\d+(?:\.\d+){1,3}", normalized):
+        raise ValueError("The release version is not a valid numeric version.")
+    parts = tuple(int(part) for part in normalized.split("."))
+    return parts + (0,) * (4 - len(parts))
+
+
+def _release_version(payload: dict) -> tuple[str, tuple[int, ...]]:
+    """Read the numeric build version from a rolling release or a versioned tag."""
+    body = payload.get("body", "")
+    if isinstance(body, str):
+        match = re.search(r"(?im)^Version:\s*(v?\d+(?:\.\d+){1,3})\s*$", body)
+        if match:
+            value = match.group(1).removeprefix("v")
+            return value, _version_tuple(value)
+    tag = str(payload.get("tag_name", ""))
+    try:
+        version = _version_tuple(tag)
+    except ValueError as exc:
+        raise RuntimeError(
+            "The GitHub release is missing numeric version metadata. "
+            "Publish a build with a 'Version: x.y.z' release-body line."
+        ) from exc
+    return tag.removeprefix("v"), version
+
+
+def _safe_github_url(value: str) -> str:
+    parsed = urlparse(value)
+    try:
+        valid_port = parsed.port is None or parsed.port == 443
+    except ValueError:
+        valid_port = False
+    if (parsed.scheme != "https" or parsed.hostname != "github.com"
+            or parsed.username or parsed.password or not valid_port):
+        raise ValueError("The update release contains an unsafe download URL.")
+    return value
+
+
+def _is_allowed_redirect_url(value: str) -> bool:
+    """Accept only HTTPS redirects to approved GitHub asset hosts on the default port."""
+    try:
+        parsed = urlparse(value)
+        valid_port = parsed.port is None or parsed.port == 443
+    except ValueError:
+        return False
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname in ALLOWED_REDIRECT_HOSTS
+        and not parsed.username
+        and not parsed.password
+        and valid_port
+    )
+
+
+def _open(url: str, timeout: int, opener=None):
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "JARVIS-Desktop-Updater", "Accept": "application/vnd.github+json"},
+    )
+    if opener is not None:
+        return opener(request, timeout=timeout)
+
+    class SafeRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            if not _is_allowed_redirect_url(newurl):
+                return None
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+    return urllib.request.build_opener(SafeRedirect).open(request, timeout=timeout)
+
+
+def _read_limited(response, maximum: int) -> bytes:
+    data = response.read(maximum + 1)
+    if len(data) > maximum:
+        raise ValueError("The update server returned a file larger than the safety limit.")
+    return data
+
+
+def check_for_update(current_version: str, opener=None) -> dict:
+    """Check the public latest GitHub release; never downloads or runs anything."""
+    current = _version_tuple(current_version)
+    try:
+        with _open(API_URL, timeout=12, opener=opener) as response:
+            payload = json.loads(_read_limited(response, MAX_API_BYTES).decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return {"available": False, "release_exists": False, "current_version": current_version}
+        raise RuntimeError(f"GitHub update check returned HTTP {exc.code}.") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError(f"Could not check for updates: {exc}") from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("GitHub returned an invalid update description.") from exc
+
+    tag = payload.get("tag_name", "")
+    latest_version, latest = _release_version(payload)
+    assets = payload.get("assets", [])
+    if not isinstance(assets, list):
+        raise RuntimeError("The GitHub release has an invalid asset list.")
+    by_name = {
+        item.get("name"): item for item in assets
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    installer = by_name.get(INSTALLER_NAME)
+    checksums = by_name.get(CHECKSUM_NAME)
+    if latest > current and (not installer or not checksums):
+        raise RuntimeError("A newer release exists, but its verified installer assets are incomplete.")
+
+    return {
+        "available": latest > current,
+        "release_exists": True,
+        "current_version": current_version,
+        "latest_version": latest_version,
+        "tag": tag,
+        "release_url": payload.get("html_url", "https://github.com/rustmofficialwork-lab/Jarvis/releases"),
+        "installer_url": _safe_github_url(installer.get("browser_download_url")) if installer else None,
+        "checksums_url": _safe_github_url(checksums.get("browser_download_url")) if checksums else None,
+    }
+
+
+def download_verified_installer(installer_url: str, checksums_url: str,
+                                destination_dir: str | Path, opener=None) -> Path:
+    """Stream the installer to a temporary file and publish it only after SHA-256 verification."""
+    installer_url = _safe_github_url(installer_url)
+    checksums_url = _safe_github_url(checksums_url)
+    destination = Path(destination_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    final_path = destination / INSTALLER_NAME
+    temporary = destination / (INSTALLER_NAME + ".download")
+
+    try:
+        with _open(checksums_url, timeout=20, opener=opener) as response:
+            checksum_text = _read_limited(response, MAX_CHECKSUM_BYTES).decode("utf-8", errors="strict")
+        match = re.search(
+            rf"(?im)^([0-9a-f]{{64}})\s+\*?{re.escape(INSTALLER_NAME)}\s*$",
+            checksum_text,
+        )
+        if not match:
+            raise ValueError("The release checksum file does not contain the expected installer hash.")
+        expected = match.group(1).lower()
+
+        digest = hashlib.sha256()
+        total = 0
+        try:
+            with _open(installer_url, timeout=60, opener=opener) as response, temporary.open("wb") as output:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_INSTALLER_BYTES:
+                        raise ValueError("The update installer exceeded the 200 MB safety limit.")
+                    digest.update(chunk)
+                    output.write(chunk)
+
+            if digest.hexdigest() != expected:
+                raise ValueError("The installer SHA-256 check failed. The downloaded file was not kept.")
+            temporary.replace(final_path)
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError(f"Could not download the JARVIS update: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError("The release checksum file is not valid UTF-8.") from exc
+
+    return final_path
