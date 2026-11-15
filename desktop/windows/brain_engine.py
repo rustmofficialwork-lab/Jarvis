@@ -7,6 +7,7 @@ allowlisted tool executor and explicit user-consent UI for sensitive actions.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from typing import Iterable
 
 from brain_core import ToolDecision, authorize_tool_call, choose_mode
@@ -166,9 +167,20 @@ class BrainEngine:
         if not enabled:
             return []
         limit = max(1, min(int(limit), 10))
+        context_method = self.memory.context
+        parameters = inspect.signature(context_method).parameters
+        accepts_extra = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters.values()
+        )
+        if "limit" in parameters or accepts_extra:
+            items = context_method(query=query, limit=limit)
+        else:
+            # Keep lightweight adapters and older memory providers compatible.
+            items = context_method(query=query)
         return [
             str(item)[:MAX_FEEDBACK_LENGTH]
-            for item in self.memory.context(query=query, limit=limit)
+            for item in items
             if isinstance(item, str) and item.strip()
         ]
 
