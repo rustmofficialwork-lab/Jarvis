@@ -1148,7 +1148,7 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
         })
         tool_plan = create_task_plan(
             prompt[:240] or "Complete the requested task",
-            [f"{name} [{call_id[:16]}]" for call_id, name, *_ in prepared_calls],
+            [f"{str(name)[:120]} [{call_id[:16]}]" for call_id, name, *_ in prepared_calls],
         )
         completed_tool_steps = []
         for call_id, name, arguments, decision, parse_error in prepared_calls:
@@ -1166,7 +1166,7 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                 except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
                     output = f"Tool unavailable: {str(exc)[:240]}"
             if not str(output).casefold().startswith(("tool unavailable:", "tool blocked:")):
-                completed_tool_steps.append(f"{name} [{call_id[:16]}]")
+                completed_tool_steps.append(f"{str(name)[:120]} [{call_id[:16]}]")
             messages.append({
                 "role": "tool",
                 "tool_call_id": call_id,
