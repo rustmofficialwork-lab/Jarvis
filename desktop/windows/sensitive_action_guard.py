@@ -22,6 +22,11 @@ BLOCKED_BROWSER_ACTIONS = frozenset({
     "change_account", "change_security_settings", "download_executable",
 })
 
+# Browser automation is intentionally read-only. Unknown actions fail closed.
+ALLOWED_BROWSER_ACTIONS = frozenset({
+    "open_page", "read_page", "extract_text", "scroll_page", "click_link",
+})
+
 
 @dataclass(frozen=True)
 class ApprovalRequest:
@@ -175,8 +180,9 @@ class BrowserSessionPolicy:
         host = (urlsplit("//" + str(domain)).hostname or "").casefold().rstrip(".")
         if host not in self.allowed_domains:
             return ApprovalResult(False, "domain_denied", "This exact domain is not allowlisted.")
-        if str(action).casefold() in BLOCKED_BROWSER_ACTIONS:
-            return ApprovalResult(False, "action_denied", "This action is outside the browser policy.")
+        normalized_action = str(action).strip().casefold()
+        if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_ACTIONS:
+            return ApprovalResult(False, "action_denied", "Only allowlisted read-only browser actions are permitted.")
         if self.actions_used >= MAX_BROWSER_ACTIONS_PER_SESSION:
             return ApprovalResult(False, "limit_reached", "Browser action limit reached for this session.")
         self.actions_used += 1
