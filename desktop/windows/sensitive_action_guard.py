@@ -158,10 +158,12 @@ class ApprovalLedger:
     def decide(self, token: str, *, approved: bool) -> ApprovalResult:
         with self._lock:
             now = self._clock()
-            self._purge_expired(now)
+            # Pop the requested token before sweeping so its caller receives the
+            # precise "expired" result rather than an ambiguous missing-token result.
             request = self._pending.pop(token, None)
+            self._purge_expired(now)
             if request is None:
-                return ApprovalResult(False, "invalid_or_used", "Approval request is missing, expired, or already used.")
+                return ApprovalResult(False, "invalid_or_used", "Approval request is missing or already used.")
             if request.expires_at <= now:
                 return ApprovalResult(False, "expired", "Approval request expired; create a fresh preview.")
             if not approved:
