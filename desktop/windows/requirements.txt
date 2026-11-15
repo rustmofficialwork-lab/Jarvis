@@ -16,3 +16,5 @@ huggingface_hub>=0.26,<1
 # Required by local ECAPA speaker verification (owner_voice_verification.py).
 numpy>=1.26,<2
 onnxruntime>=1.17,<2
+# Move approved files to the OS Recycle Bin/Trash; never permanently delete.
+Send2Trash>=1.8,<2
