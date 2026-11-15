@@ -24,7 +24,7 @@ class BrainEngineTests(unittest.TestCase):
         plan = create_task_plan("Prepare report", ["Collect data", "Write report", "Collect data"])
         self.assertEqual(plan.steps, ("Collect data", "Write report"))
         with self.assertRaises(ValueError):
-            create_task_plan("Prepare report", ["x"] * 9)
+            create_task_plan("Prepare report", [f"step {index}" for index in range(9)])
 
     def test_evaluation_never_marks_missing_steps_complete(self):
         plan = create_task_plan("Install app", ["Check requirements", "Install", "Verify launch"])
