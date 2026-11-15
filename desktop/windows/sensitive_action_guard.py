@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import secrets
+import threading
 import time
 from typing import Any
 from urllib.parse import urlsplit
@@ -127,36 +128,59 @@ class ApprovalLedger:
 
     def __init__(self, *, clock=time.time):
         self._clock = clock
+        self._lock = threading.RLock()
         self._pending: dict[str, ApprovalRequest] = {}
         self._approved: dict[str, tuple[str, float]] = {}
 
+    def _purge_expired(self, now: float) -> None:
+        """Drop stale requests and grants so abandoned approvals cannot exhaust the ledger."""
+        self._pending = {
+            token: request for token, request in self._pending.items()
+            if request.expires_at > now
+        }
+        self._approved = {
+            fingerprint: grant for fingerprint, grant in self._approved.items()
+            if grant[1] > now
+        }
+
     def request(self, request: ApprovalRequest) -> str:
-        if len(self._pending) >= 32:
-            raise RuntimeError("Too many pending approval requests; resolve an existing request first.")
-        token = secrets.token_urlsafe(24)
-        self._pending[token] = request
-        return token
+        with self._lock:
+            now = self._clock()
+            self._purge_expired(now)
+            if request.expires_at <= now:
+                raise ValueError("Cannot queue an approval request that has already expired.")
+            if len(self._pending) >= 32:
+                raise RuntimeError("Too many pending approval requests; resolve an existing request first.")
+            token = secrets.token_urlsafe(24)
+            self._pending[token] = request
+            return token
 
     def decide(self, token: str, *, approved: bool) -> ApprovalResult:
-        request = self._pending.pop(token, None)
-        if request is None:
-            return ApprovalResult(False, "invalid_or_used", "Approval request is missing or already used.")
-        if self._clock() > request.expires_at:
-            return ApprovalResult(False, "expired", "Approval request expired; create a fresh preview.")
-        if not approved:
-            return ApprovalResult(False, "denied", "The user denied this action.")
-        self._approved[request.fingerprint] = (token, request.expires_at)
-        return ApprovalResult(True, "approved", "Exact action approved once.")
+        with self._lock:
+            now = self._clock()
+            self._purge_expired(now)
+            request = self._pending.pop(token, None)
+            if request is None:
+                return ApprovalResult(False, "invalid_or_used", "Approval request is missing, expired, or already used.")
+            if request.expires_at <= now:
+                return ApprovalResult(False, "expired", "Approval request expired; create a fresh preview.")
+            if not approved:
+                return ApprovalResult(False, "denied", "The user denied this action.")
+            self._approved[request.fingerprint] = (token, request.expires_at)
+            return ApprovalResult(True, "approved", "Exact action approved once.")
 
     def consume(self, action_type: str, details: dict[str, Any]) -> ApprovalResult:
         fingerprint = _canonical_fingerprint(action_type, details)
-        grant = self._approved.pop(fingerprint, None)
-        if grant is None:
-            return ApprovalResult(False, "approval_required", "No approval exists for these exact details.")
-        _token, expires_at = grant
-        if self._clock() > expires_at:
-            return ApprovalResult(False, "expired", "Approval expired; request approval again.")
-        return ApprovalResult(True, "approved", "Exact one-time approval consumed.")
+        with self._lock:
+            now = self._clock()
+            self._purge_expired(now)
+            grant = self._approved.pop(fingerprint, None)
+            if grant is None:
+                return ApprovalResult(False, "approval_required", "No approval exists for these exact details.")
+            _token, expires_at = grant
+            if expires_at <= now:
+                return ApprovalResult(False, "expired", "Approval expired; request approval again.")
+            return ApprovalResult(True, "approved", "Exact one-time approval consumed.")
 
 
 class BrowserSessionPolicy:
