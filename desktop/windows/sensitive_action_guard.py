@@ -27,9 +27,14 @@ BLOCKED_BROWSER_ACTIONS = frozenset({
 class ApprovalRequest:
     action_type: str
     summary: str
-    details: dict[str, Any]
+    details_json: str
     fingerprint: str
     expires_at: float
+
+    @property
+    def details(self) -> dict[str, Any]:
+        # Return a fresh copy so callers cannot mutate the approved preview.
+        return json.loads(self.details_json)
 
 
 @dataclass(frozen=True)
@@ -93,7 +98,8 @@ def build_approval_request(
     if action_type == "browser":
         domain = details["domain"]
         action = details["action"]
-        if not isinstance(domain, str) or not isinstance(action, str) or not action.strip():
+        if (not isinstance(domain, str) or not isinstance(action, str)
+                or not action.strip()):
             raise ValueError("Browser domain and requested action are required.")
         host = (urlsplit("//" + domain).hostname or "").casefold().rstrip(".")
         if host != domain.casefold().rstrip(".") or not host or "." not in host:
@@ -105,7 +111,7 @@ def build_approval_request(
     return ApprovalRequest(
         action_type=action_type,
         summary=summary.strip()[:240],
-        details=safe_details,
+        details_json=json.dumps(safe_details, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
         fingerprint=_canonical_fingerprint(action_type, safe_details),
         expires_at=current + MAX_APPROVAL_TTL_SECONDS,
     )
@@ -120,6 +126,8 @@ class ApprovalLedger:
         self._approved: dict[str, tuple[str, float]] = {}
 
     def request(self, request: ApprovalRequest) -> str:
+        if len(self._pending) >= 32:
+            raise RuntimeError("Too many pending approval requests; resolve an existing request first.")
         token = secrets.token_urlsafe(24)
         self._pending[token] = request
         return token
