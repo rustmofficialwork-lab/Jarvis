@@ -37,6 +37,7 @@ from brain_core import authorize_tool_call
 from brain_engine import (
     BrainEngine, create_task_plan, diagnose_failure, evaluate_task,
 )
+from recoverable_file_actions import validate_selected_files, move_files_to_trash
 from owner_voice_setup import enroll_owner_voice
 from owner_voice_verification import load_owner_profile, load_encoder, verify_pcm_bytes
 
@@ -1913,6 +1914,37 @@ class JarvisDesktop:
             return False
         self._set_status("Exact action approved once. An approved action executor is still required.")
         return True
+
+    def move_selected_files_to_recycle_bin(self, paths) -> tuple[str, ...]:
+        """Move explicitly selected files to the OS recycle bin after exact approval.
+
+        This is a trusted native-app entry point, not an AI/model-callable tool.
+        """
+        try:
+            selected = validate_selected_files(paths)
+            exact_details = {
+                "paths": [str(path) for path in selected],
+                "recovery": True,
+            }
+            approved = self.request_sensitive_action_approval(
+                "delete",
+                exact_details,
+                "Move the selected files to the Recycle Bin (recoverable)",
+            )
+            if not approved:
+                return ()
+            result = move_files_to_trash(
+                [str(path) for path in selected],
+                consume_approval=lambda details: self.brain_engine.consume_sensitive_approval(
+                    "delete", details
+                ),
+            )
+            self._set_status(f"Moved {len(result)} file(s) to the Recycle Bin.")
+            return result
+        except (OSError, RuntimeError, TypeError, ValueError, PermissionError) as exc:
+            self._set_status(f"File removal blocked: {exc}")
+            messagebox.showerror("JARVIS — File removal blocked", str(exc), parent=self.root)
+            return ()
 
     # Legacy Tk dashboard widgets have been removed; the HTML HUD is the sole dashboard.
 
