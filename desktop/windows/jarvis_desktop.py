@@ -1903,7 +1903,7 @@ class JarvisDesktop:
         ])
         approved = messagebox.askyesno(
             "JARVIS — Sensitive action approval",
-            "\\n".join(lines),
+            "\n".join(lines),
             parent=self.root,
             icon="warning",
         )
