@@ -1173,7 +1173,9 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                 "content": str(output)[:1000],
             })
         tool_evaluation = evaluate_task(tool_plan, completed_tool_steps)
-        messages.append({
+        # Place the verification note before the assistant tool-call envelope.
+        # Tool results must remain the final contiguous messages in the protocol turn.
+        messages.insert(len(messages) - len(prepared_calls) - 1, {
             "role": "system",
             "content": (
                 "Tool-step verification only (this is not proof that the user's entire goal is complete): "
@@ -2624,10 +2626,17 @@ class JarvisDesktop:
         """Prefer cloud AI; automatically fall back to local Ollama when it is unavailable."""
         brain_engine = getattr(self, "brain_engine", None)
         if brain_engine is None:
-            brain_engine = BrainEngine(self.memory_store)
-            self.brain_engine = brain_engine
-        memories = brain_engine.context_for(
-            prompt, enabled=bool(self.settings.get("share_memory_with_ai", False)), limit=5
+            # Lightweight test instances and partially initialized app states may
+            # not have a memory store yet. AI replies must still work without memory.
+            memory_store = getattr(self, "memory_store", None)
+            if memory_store is not None:
+                brain_engine = BrainEngine(memory_store)
+                self.brain_engine = brain_engine
+        memories = (
+            brain_engine.context_for(
+                prompt, enabled=bool(self.settings.get("share_memory_with_ai", False)), limit=5
+            )
+            if brain_engine is not None else []
         )
         try:
             answer = handle_online_command(prompt)
