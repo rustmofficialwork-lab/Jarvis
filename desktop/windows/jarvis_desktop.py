@@ -2454,7 +2454,6 @@ class JarvisDesktop:
 
     def _try_delete_files_command(self, prompt: str) -> bool:
         """Open a native file picker, then require exact approval before recoverable removal."""
-        import re
         normalized = " ".join(str(prompt or "").casefold().strip().rstrip(" .!?।॥").split())
         direct_commands = {
             "delete file", "delete files", "delete selected files",
@@ -3057,6 +3056,17 @@ class JarvisDesktop:
         # Clear a previous stop request only after this voice request owns the worker.
         self.speech_stop_event.clear()
         try:
+            normalized_voice_command = " ".join(
+                str(prompt or "").casefold().strip().rstrip(" .!?।॥").split()
+            )
+            if normalized_voice_command in {
+                "delete file", "delete files", "delete selected files",
+                "move file to recycle bin", "move files to recycle bin",
+                "file delete karo", "files delete karo", "file hatao", "files hatao",
+                "selected files hatao",
+            }:
+                self.events.put(("delete_files_voice_request", prompt))
+                return
             if self._handle_voice_reminder_command(prompt):
                 return
             if parse_advanced_command(prompt) is not None:
@@ -3691,6 +3701,8 @@ class JarvisDesktop:
                     self._set_status("Focus session complete — take a break.")
                 elif kind == "file_search_request":
                     self._try_file_search_command(value)
+                elif kind == "delete_files_voice_request":
+                    self._try_delete_files_command(value)
                 elif kind == "open_file_request":
                     self._try_open_file_result_command(value)
                 elif kind == "document_voice_request":
