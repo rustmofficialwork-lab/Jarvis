@@ -57,6 +57,17 @@ class BrainEngineTests(unittest.TestCase):
         item = self.engine.learn_preference("Prefers short answers", explicit=True)
         self.assertEqual(item["category"], "preference")
 
+
+    def test_engine_exposes_exact_scope_one_time_approval(self):
+        details = {"recipient": "person@example.test", "subject": "Hi", "content": "Approved text"}
+        token, preview = self.engine.request_sensitive_approval("email", details, "Send email")
+        self.assertEqual(preview.details, details)
+        self.assertTrue(self.engine.decide_sensitive_approval(token, approved=True).approved)
+        self.assertFalse(self.engine.consume_sensitive_approval(
+            "email", dict(details, content="Modified text")
+        ).approved)
+        self.assertTrue(self.engine.consume_sensitive_approval("email", details).approved)
+
     def test_learning_store_rejects_secrets(self):
         with self.assertRaises(ValueError):
             self.engine.learn_preference("My API key is secret", explicit=True)
