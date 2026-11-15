@@ -1,0 +1,136 @@
+"""Safe, bounded filename search inside a folder explicitly chosen by the user."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+MAX_RESULTS = 50
+MAX_DIRECTORIES = 5000
+# Windows junctions and other reparse points are not always reported as symlinks.
+FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+SAFE_OPEN_EXTENSIONS = {
+    ".pdf", ".docx", ".txt", ".md", ".csv", ".json", ".log", ".ini",
+    ".yaml", ".yml", ".xml", ".png", ".jpg", ".jpeg", ".gif", ".bmp",
+    ".webp", ".mp3", ".wav", ".mp4", ".m4a", ".flac",
+}
+
+
+def parse_open_result_index(prompt: str) -> int | None:
+    """Parse an explicit numbered or ordinal result selection from English/Hinglish."""
+    import re
+
+    normalized = " ".join(str(prompt).casefold().strip().rstrip(" .!?।॥").split())
+    ordinals = {
+        "first": 1, "1st": 1, "pehli": 1, "pahli": 1, "पहली": 1,
+        "second": 2, "2nd": 2, "dusri": 2, "doosri": 2, "दूसरी": 2,
+        "third": 3, "3rd": 3, "teesri": 3, "तीसरी": 3,
+        "fourth": 4, "4th": 4, "chauthi": 4, "चौथी": 4,
+        "fifth": 5, "5th": 5, "paanchvi": 5, "पांचवीं": 5,
+    }
+    patterns = (
+        r"(?:open file|open result|open the result|open the file|file kholo|file khol do|result kholo|khol do|खोल दो|फाइल खोलो|फाइल खोल दो)\s+(\d{1,2})",
+        r"(?:open the )?(" + "|".join(ordinals) + r") (?:file|result)",
+        r"(?:open the|open) (?:file|result) (" + "|".join(ordinals) + r")",
+        r"(" + "|".join(ordinals) + r") (?:file|result) kholo",
+        r"(" + "|".join(ordinals) + r") (?:file|result) khol do",
+        r"(" + "|".join(ordinals) + r") (?:file|result) खोलो",
+        r"(" + "|".join(ordinals) + r") (?:फाइल|रिजल्ट) खोलो",
+    )
+    for pattern in patterns:
+        match = re.fullmatch(pattern, normalized)
+        if match:
+            value = match.group(1)
+            index = ordinals.get(value, int(value) if value.isdigit() else None)
+            return index if index is not None and 1 <= index <= 50 else None
+    return None
+
+
+def _is_reparse_point(path: Path) -> bool:
+    """Detect Windows junctions and other reparse points as well as POSIX symlinks."""
+    try:
+        info = path.stat(follow_symlinks=False)
+    except OSError:
+        return True
+    attributes = getattr(info, "st_file_attributes", 0)
+    return path.is_symlink() or bool(attributes & FILE_ATTRIBUTE_REPARSE_POINT)
+
+
+def validate_search_result_for_open(path: str | os.PathLike) -> Path:
+    """Validate a selected search result as a regular, non-link, passive file."""
+    candidate = Path(path).expanduser()
+    if _is_reparse_point(candidate) or candidate.suffix.casefold() not in SAFE_OPEN_EXTENSIONS:
+        raise ValueError("For safety, JARVIS opens only supported document and media file types.")
+    resolved = candidate.resolve(strict=True)
+    if not resolved.is_file():
+        raise ValueError("The selected search result is no longer a regular file.")
+    return resolved
+
+
+def parse_file_search_query(prompt: str) -> str | None:
+    """Extract a filename fragment from supported English/Hinglish commands."""
+    normalized = " ".join(str(prompt).casefold().strip().rstrip(" .!?।॥").split())
+    prefixes = (
+        "search for file ", "search for files ", "look for file ", "look for files ",
+        "locate file ", "locate files ", "find my file ", "find my files ",
+        "find file ", "search file ", "find files ", "search files ",
+        "file dhundo ", "file dhoondo ", "file dhoondho ", "file khojo ",
+        "फाइल ढूंढो ", "फाइल ढूँढो ", "फाइल खोजो ", "फाइल ढूंढना ",
+    )
+    for prefix in prefixes:
+        if normalized.startswith(prefix):
+            query = normalized[len(prefix):].strip()
+            if query and len(query) <= 120 and not any(ch in query for ch in ("/", "\\", ":", "*", "?", '"', "<", ">", "|")):
+                return query
+            return None
+    return None
+
+
+def search_files(root: str | os.PathLike, query: str, *,
+                 max_results: int = MAX_RESULTS,
+                 max_directories: int = MAX_DIRECTORIES) -> list[str]:
+    """Search names only; never follows symlinks or reads file contents."""
+    base = Path(root).expanduser().resolve()
+    if not base.is_dir():
+        raise NotADirectoryError(str(base))
+    needle = str(query).strip().casefold()
+    if not needle or len(needle) > 120 or any(ch in needle for ch in ("/", "\\", ":", "*", "?", '"', "<", ">", "|")):
+        raise ValueError("Enter a simple filename or extension, not a path or wildcard.")
+    if not 1 <= max_results <= 200 or not 1 <= max_directories <= 20000:
+        raise ValueError("Search limits are outside the supported range.")
+
+    matches: list[str] = []
+    visited = 0
+    for current, dirs, files in os.walk(base, topdown=True, followlinks=False):
+        visited += 1
+        if visited > max_directories:
+            break
+        current_path = Path(current)
+        safe_dirs = []
+        for name in dirs:
+            candidate = current_path / name
+            try:
+                if name.startswith(".") or _is_reparse_point(candidate):
+                    continue
+                attrs = getattr(candidate.stat(follow_symlinks=False), "st_file_attributes", 0)
+                if attrs & 0x2:  # Windows FILE_ATTRIBUTE_HIDDEN
+                    continue
+                safe_dirs.append(name)
+            except OSError:
+                continue
+        dirs[:] = safe_dirs
+        for name in files:
+            if name.startswith(".") or needle not in name.casefold():
+                continue
+            candidate = current_path / name
+            try:
+                if _is_reparse_point(candidate) or not candidate.is_file():
+                    continue
+                attrs = getattr(candidate.stat(follow_symlinks=False), "st_file_attributes", 0)
+                if attrs & 0x2:
+                    continue
+                matches.append(str(candidate))
+            except OSError:
+                continue
+            if len(matches) >= max_results:
+                return matches
+    return matches

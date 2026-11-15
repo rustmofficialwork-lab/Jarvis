@@ -1,0 +1,20 @@
+# Install from PowerShell with: py -m pip install -r requirements.txt
+openwakeword>=0.6.0,<1
+SpeechRecognition>=3.10,<4
+PyAudio>=0.2.14
+pyttsx3>=2.90,<3
+keyring>=25,<26
+pyinstaller>=6,<7
+psutil>=5.9,<8
+pystray>=0.19.5,<1
+Pillow>=10,<13
+screen-brightness-control>=0.24,<1
+vosk>=0.3.45,<1
+pypdf>=5,<7
+pywebview>=5.4,<7
+huggingface_hub>=0.26,<1
+# Required by local ECAPA speaker verification (owner_voice_verification.py).
+numpy>=1.26,<2
+onnxruntime>=1.17,<2
+# Move approved files to the OS Recycle Bin/Trash; never permanently delete.
+Send2Trash>=1.8,<2
