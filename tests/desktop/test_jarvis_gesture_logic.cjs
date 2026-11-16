@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-require('./jarvis_gesture_logic.js');
+require('../../desktop/windows/jarvis_gesture_logic.js');
 const logic = globalThis.JARVISGestureLogic;
 
 function hand() {
