@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import command_chain as cc
 
-MODULE_PATH = Path(__file__).with_name("jarvis_desktop.py")
+MODULE_PATH = Path(__file__).resolve().parents[2] / "desktop" / "windows" / "jarvis_desktop.py"
 SPEC = importlib.util.spec_from_file_location("jarvis_desktop", MODULE_PATH)
 jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
