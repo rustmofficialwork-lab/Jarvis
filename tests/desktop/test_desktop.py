@@ -2519,9 +2519,9 @@ class HudShortcutWiringTests(unittest.TestCase):
 
     def test_external_hud_assets_are_injected_in_dependency_order_after_hud_load(self):
         desktop = MODULE_PATH.read_text(encoding="utf-8")
-        gesture_logic = DESKTOP_DIR / "jarvis_gesture_logic.js".read_text(encoding="utf-8")
-        extensions = DESKTOP_DIR / "jarvis_hud_extensions.js".read_text(encoding="utf-8")
-        runtime = DESKTOP_DIR / "jarvis_hud_runtime.js".read_text(encoding="utf-8")
+        gesture_logic = (DESKTOP_DIR / "jarvis_gesture_logic.js").read_text(encoding="utf-8")
+        extensions = (DESKTOP_DIR / "jarvis_hud_extensions.js").read_text(encoding="utf-8")
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         self.assertIn('window.events.loaded += inject_hud_assets', desktop)
         self.assertIn('window.evaluate_js(source)', desktop)
         self.assertIn('jarvis_gesture_logic.js', desktop)
@@ -2541,7 +2541,7 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn('window.__jarvisHudRuntimeAdapterLoaded', runtime)
 
     def test_runtime_adapter_wires_hud_click_actions_to_the_desktop_bridge(self):
-        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         for expression in (
             "callBridge('open_folder', 'Documents')",
             "callBridge('open_folder', 'Pictures')",
@@ -2563,14 +2563,14 @@ class HudShortcutWiringTests(unittest.TestCase):
                 self.assertIn(expression, runtime)
 
     def test_runtime_adapter_waits_for_bridge_and_refreshes_dashboard(self):
-        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         self.assertIn("window.addEventListener('pywebviewready', startBridgeRefresh)", runtime)
         self.assertIn("if (api()) startBridgeRefresh()", runtime)
         self.assertIn("bridge.get_dashboard()", runtime)
         self.assertIn("bridge.get_runtime_state()", runtime)
 
     def test_hud_orb_is_only_used_for_runtime_visual_state(self):
-        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         self.assertIn("artwork.classList.toggle('jx-listening', listening)", runtime)
         self.assertIn("artwork.classList.toggle('jx-thinking', thinking && !listening)", runtime)
         self.assertNotIn("callBridge('send_command', '", runtime)
@@ -2578,7 +2578,7 @@ class HudShortcutWiringTests(unittest.TestCase):
 
 class HudLiveDataMappingTests(unittest.TestCase):
     def test_live_hud_metrics_are_bound_to_uploaded_svg_fields(self):
-        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         for expression in (
             "put('v-cpu', data.cpu)",
             "put('v-ram', data.ram)",
@@ -2601,8 +2601,8 @@ class HudLiveDataMappingTests(unittest.TestCase):
         self.assertNotIn("data.upload", runtime)
 
     def test_system_status_panel_omits_duplicate_battery_row_but_keeps_main_battery_widget(self):
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
-        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        hud = (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8")
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         self.assertNotIn("v-sb", hud)
         self.assertNotIn("- BATTERY : LOADING...", hud)
         self.assertNotIn("put('v-sb'", runtime)
@@ -2612,7 +2612,7 @@ class HudLiveDataMappingTests(unittest.TestCase):
         self.assertIn('x="942" y="757">- DISK', hud)
 
     def test_runtime_state_updates_the_existing_svg_core_without_replacing_artwork(self):
-        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         self.assertIn("artwork.classList.toggle('jx-listening', listening)", runtime)
         self.assertIn("artwork.classList.toggle('jx-thinking', thinking && !listening)", runtime)
         self.assertIn("#m.jx-listening .core", runtime)
@@ -2620,7 +2620,7 @@ class HudLiveDataMappingTests(unittest.TestCase):
 
     def test_hud_document_ids_are_unique(self):
         import re
-        hud = Path(__file__).with_name("jarvis_hud.html").read_text(encoding="utf-8")
+        hud = (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8")
         ids = re.findall(r"\bid=['\"]([^'\"]+)['\"]", hud)
         self.assertEqual(len(ids), len(set(ids)), "HUD contains duplicate element IDs")
 
