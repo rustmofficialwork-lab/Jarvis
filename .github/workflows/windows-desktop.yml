@@ -117,6 +117,8 @@ jobs:
     name: Build Windows desktop installer
     needs: [source-checks, backend-checks, web-checks]
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -218,3 +220,25 @@ jobs:
             dist-installer/JARVIS-Portable-x64.zip
             dist-installer/SHA256SUMS.txt
           if-no-files-found: error
+      - name: Publish rolling Windows release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: jarvis-latest
+          name: JARVIS Latest Windows Build
+          body: |
+            Latest successful Windows desktop build from the main branch.
+            Version: 1.1.${{ github.run_number }}
+            Installer: JARVIS-Setup-x64.exe
+            Portable build: JARVIS-Portable-x64.zip (extract the complete folder and run JARVIS.exe)
+            SHA-256 checksums are included in SHA256SUMS.txt.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            dist-installer/JARVIS-Setup-x64.exe
+            dist-installer/JARVIS-Portable-x64.zip
+            dist-installer/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
