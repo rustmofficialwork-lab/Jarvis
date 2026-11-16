@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import briefing as br
 
-SPEC = importlib.util.spec_from_file_location("jarvis_desktop", Path(__file__).with_name("jarvis_desktop.py"))
+SPEC = importlib.util.spec_from_file_location("jarvis_desktop", Path(__file__).resolve().parents[2] / "desktop" / "windows" / "jarvis_desktop.py")
 jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
