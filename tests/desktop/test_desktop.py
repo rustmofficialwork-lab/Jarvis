@@ -4,7 +4,8 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-MODULE_PATH = Path(__file__).resolve().parents[2] / "desktop" / "windows" / "jarvis_desktop.py"
+DESKTOP_DIR = Path(__file__).resolve().parents[2] / "desktop" / "windows"
+MODULE_PATH = DESKTOP_DIR / "jarvis_desktop.py"
 SPEC = importlib.util.spec_from_file_location("jarvis_desktop", MODULE_PATH)
 jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
@@ -2508,7 +2509,7 @@ class HudKnownFolderNavigationTests(unittest.TestCase):
 
 class HudShortcutWiringTests(unittest.TestCase):
     def test_uploaded_hud_artwork_is_kept_as_the_large_svg_document(self):
-        hud_path = Path(__file__).with_name("jarvis_hud.html")
+        hud_path = DESKTOP_DIR / "jarvis_hud.html"
         hud = hud_path.read_text(encoding="utf-8")
         self.assertGreater(len(hud_path.read_bytes()), 110_000)
         self.assertIn('id="m"', hud)
@@ -2517,10 +2518,10 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn('id="bat"', hud)
 
     def test_external_hud_assets_are_injected_in_dependency_order_after_hud_load(self):
-        desktop = Path(__file__).resolve().parents[2] / "desktop" / "windows" / "jarvis_desktop.py".read_text(encoding="utf-8")
-        gesture_logic = Path(__file__).with_name("jarvis_gesture_logic.js").read_text(encoding="utf-8")
-        extensions = Path(__file__).with_name("jarvis_hud_extensions.js").read_text(encoding="utf-8")
-        runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        desktop = MODULE_PATH.read_text(encoding="utf-8")
+        gesture_logic = DESKTOP_DIR / "jarvis_gesture_logic.js".read_text(encoding="utf-8")
+        extensions = DESKTOP_DIR / "jarvis_hud_extensions.js".read_text(encoding="utf-8")
+        runtime = DESKTOP_DIR / "jarvis_hud_runtime.js".read_text(encoding="utf-8")
         self.assertIn('window.events.loaded += inject_hud_assets', desktop)
         self.assertIn('window.evaluate_js(source)', desktop)
         self.assertIn('jarvis_gesture_logic.js', desktop)
