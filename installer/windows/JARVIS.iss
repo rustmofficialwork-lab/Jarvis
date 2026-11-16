@@ -27,7 +27,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Name: "offlineai"; Description: "Install offline AI now (Ollama + Llama 3.2 3B; approximately 2 GB download)"; GroupDescription: "Optional AI setup:"
 
 [Files]
-Source: "..\..\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\desktop\windows\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\desktop\windows\setup_offline_ai.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
