@@ -1,0 +1,220 @@
+name: JARVIS Project Checks and Windows Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "desktop/windows/**"
+      - "backend/**"
+      - "src/**"
+      - "tests/**"
+      - "installer/windows/**"
+      - "package.json"
+      - "bun.lock"
+      - "bunfig.toml"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "tsconfig.json"
+      - "eslint.config.js"
+      - "README.md"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "desktop/windows/**"
+      - "backend/**"
+      - "src/**"
+      - "tests/**"
+      - "installer/windows/**"
+      - "package.json"
+      - "bun.lock"
+      - "bunfig.toml"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "tsconfig.json"
+      - "eslint.config.js"
+      - "README.md"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-checks:
+    name: Windows desktop and source checks
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Compile desktop and test sources
+        run: python -m compileall -q desktop/windows tests/desktop
+      - name: Install desktop runtime dependencies
+        run: python -m pip install -r desktop/windows/requirements.txt
+      - name: Run desktop unit tests
+        env:
+          PYTHONPATH: desktop/windows;backend
+        run: python -m unittest discover -s tests/desktop -p "test_*.py" -v
+      - name: Test HUD gesture logic
+        run: node --test tests/desktop/test_jarvis_gesture_logic.cjs
+
+  backend-checks:
+    name: Backend checks
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run backend unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Compile backend Python
+        run: python -m compileall -q app tests
+
+  web-checks:
+    name: Web dashboard checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install locked web dependencies
+        run: bun install --frozen-lockfile
+      - name: Lint web application
+        run: bun run lint
+      - name: Run web tests
+        run: bun run test
+      - name: Build web application
+        run: bun run build
+
+  package-windows:
+    name: Build Windows desktop installer
+    needs: [source-checks, backend-checks, web-checks]
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Node.js for bundled HUD runtimes
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop dependencies
+        run: python -m pip install -r desktop/windows/requirements.txt
+      - name: Bundle pinned HUD runtime libraries
+        shell: pwsh
+        run: |
+          $vendor = Join-Path $PWD "desktop/windows/vendor"
+          $threeTemp = Join-Path $env:RUNNER_TEMP "jarvis-three"
+          $visionTemp = Join-Path $env:RUNNER_TEMP "jarvis-vision"
+          New-Item -ItemType Directory -Force -Path $vendor, $threeTemp, $visionTemp | Out-Null
+
+          $threeArchive = npm pack three@0.160.0 --pack-destination $env:RUNNER_TEMP --silent | Select-Object -Last 1
+          if ($LASTEXITCODE -ne 0 -or -not $threeArchive) { throw "Could not download the pinned Three.js package." }
+          tar -xf (Join-Path $env:RUNNER_TEMP $threeArchive) -C $threeTemp
+          Copy-Item (Join-Path $threeTemp "package/build/three.module.js") (Join-Path $vendor "three.module.js") -Force
+
+          $licenseDir = Join-Path $vendor "licenses"
+          New-Item -ItemType Directory -Force -Path $licenseDir | Out-Null
+          Copy-Item (Join-Path $threeTemp "package/LICENSE") (Join-Path $licenseDir "THREE-MIT.txt") -Force
+
+          $visionArchive = npm pack @mediapipe/tasks-vision@0.10.14 --pack-destination $env:RUNNER_TEMP --silent | Select-Object -Last 1
+          if ($LASTEXITCODE -ne 0 -or -not $visionArchive) { throw "Could not download the pinned MediaPipe package." }
+          tar -xf (Join-Path $env:RUNNER_TEMP $visionArchive) -C $visionTemp
+          $visionVendor = Join-Path $vendor "mediapipe"
+          New-Item -ItemType Directory -Force -Path $visionVendor | Out-Null
+          Copy-Item (Join-Path $visionTemp "package/vision_bundle.mjs") (Join-Path $visionVendor "vision_bundle.mjs") -Force
+          Copy-Item (Join-Path $visionTemp "package/wasm") (Join-Path $visionVendor "wasm") -Recurse -Force
+          $modelDir = Join-Path $visionVendor "models"
+          New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
+          Invoke-WebRequest -Uri "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" -OutFile (Join-Path $modelDir "hand_landmarker.task")
+          if ((Get-Item (Join-Path $modelDir "hand_landmarker.task")).Length -lt 1000000) { throw "The MediaPipe hand-landmarker model download is missing or incomplete." }
+          Invoke-WebRequest -Uri "https://www.apache.org/licenses/LICENSE-2.0.txt" -OutFile (Join-Path $licenseDir "APACHE-2.0.txt")
+          Copy-Item "docs/legal/THIRD_PARTY_NOTICES.md" (Join-Path $vendor "THIRD_PARTY_NOTICES.md") -Force
+
+          if (-not (Test-Path (Join-Path $vendor "three.module.js")) -or
+              -not (Test-Path (Join-Path $visionVendor "vision_bundle.mjs")) -or
+              -not (Test-Path (Join-Path $visionVendor "wasm")) -or
+              -not (Test-Path (Join-Path $modelDir "hand_landmarker.task"))) {
+            throw "One or more bundled HUD runtime or hand-landmarker model assets are missing."
+          }
+      - name: Build standalone Windows executable
+        working-directory: desktop/windows
+        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_hud_runtime.js;." --add-data "jarvis_gesture_logic.js;." --add-data "vendor;vendor" --collect-all webview --collect-all bottle --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --collect-all huggingface_hub --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          )
+          $compiler = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $compiler) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+            $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $compiler)) { throw "ISCC.exe was not found after installation." }
+          New-Item -ItemType Directory -Force -Path "dist-installer" | Out-Null
+          & $compiler "/DMyAppVersion=1.1.$env:GITHUB_RUN_NUMBER" "installer/windows/JARVIS.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package portable release
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "desktop/windows/dist/JARVIS/*" -DestinationPath "dist-installer/JARVIS-Portable-x64.zip" -CompressionLevel Optimal
+      - name: Create SHA-256 checksums
+        shell: pwsh
+        run: |
+          $files = @("dist-installer/JARVIS-Portable-x64.zip", "dist-installer/JARVIS-Setup-x64.exe")
+          $lines = foreach ($file in $files) {
+            if (-not (Test-Path $file)) { throw "Expected release artifact not found: $file" }
+            $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+            "$hash  $([System.IO.Path]::GetFileName($file))"
+          }
+          $lines | Out-File -FilePath "dist-installer/SHA256SUMS.txt" -Encoding ascii
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-Windows-Installer-x64
+          path: |
+            dist-installer/JARVIS-Setup-x64.exe
+            dist-installer/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Upload portable Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-Windows-Portable-x64
+          path: |
+            dist-installer/JARVIS-Portable-x64.zip
+            dist-installer/SHA256SUMS.txt
+          if-no-files-found: error
