@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-MODULE_PATH = Path(__file__).with_name("jarvis_desktop.py")
+MODULE_PATH = Path(__file__).resolve().parents[2] / "desktop" / "windows" / "jarvis_desktop.py"
 SPEC = importlib.util.spec_from_file_location("jarvis_desktop", MODULE_PATH)
 jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
@@ -2517,7 +2517,7 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn('id="bat"', hud)
 
     def test_external_hud_assets_are_injected_in_dependency_order_after_hud_load(self):
-        desktop = Path(__file__).with_name("jarvis_desktop.py").read_text(encoding="utf-8")
+        desktop = Path(__file__).resolve().parents[2] / "desktop" / "windows" / "jarvis_desktop.py".read_text(encoding="utf-8")
         gesture_logic = Path(__file__).with_name("jarvis_gesture_logic.js").read_text(encoding="utf-8")
         extensions = Path(__file__).with_name("jarvis_hud_extensions.js").read_text(encoding="utf-8")
         runtime = Path(__file__).with_name("jarvis_hud_runtime.js").read_text(encoding="utf-8")
