@@ -175,6 +175,58 @@ def send_telegram_message(
     return f"Telegram accepted the message for chat {chat_id}."
 
 
+def send_whatsapp_message(
+    phone_number: str, content: str, *,
+    consume_approval: Callable[[dict[str, Any]], Any],
+) -> str:
+    """Send a text message through the official WhatsApp Cloud API."""
+    phone = _validate_text(phone_number, "WhatsApp phone number", maximum=32)
+    if not re.fullmatch(r"\+[1-9][0-9]{7,14}", phone):
+        raise ValueError("Use an international phone number such as +14155550123.")
+    content = _validate_text(content, "Message")
+    _consume(consume_approval, {"recipient": phone, "content": content})
+    token = _required_env("JARVIS_WHATSAPP_ACCESS_TOKEN")
+    phone_number_id = _required_env("JARVIS_WHATSAPP_PHONE_NUMBER_ID")
+    version = os.environ.get("JARVIS_WHATSAPP_API_VERSION", "v22.0").strip()
+    if not re.fullmatch(r"v[0-9]{1,2}\.[0-9]{1,2}", version):
+        raise IntegrationUnavailable("JARVIS_WHATSAPP_API_VERSION must use the official vNN.N format.")
+    result = _request_json(
+        f"https://graph.facebook.com/{version}/{urllib.parse.quote(phone_number_id, safe='')}/messages",
+        method="POST", token=token,
+        payload={
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": phone,
+            "type": "text",
+            "text": {"preview_url": False, "body": content},
+        },
+    )
+    if not isinstance(result.get("messages"), list) or not result["messages"]:
+        raise IntegrationRejected("WhatsApp Cloud API did not confirm message acceptance.")
+    return f"WhatsApp Cloud API accepted the message for {phone}."
+
+
+def run_approved_action(
+    app: Any, action_type: str, details: dict[str, Any], summary: str,
+    executor: Callable[[Callable[[dict[str, Any]], Any]], str],
+) -> str:
+    """Bridge a provider executor to JARVIS's native voice approval and one-use ledger."""
+    request_permission = getattr(app, "request_sensitive_action_approval", None)
+    brain = getattr(app, "brain_engine", None)
+    consume = getattr(brain, "consume_sensitive_approval", None)
+    if not callable(request_permission) or not callable(consume):
+        raise PermissionError("JARVIS trusted voice approval is unavailable; action was not run.")
+    if not request_permission(action_type, details, summary):
+        raise PermissionError("User denied or could not complete voice approval; action was not run.")
+
+    def consume_exact(approved_details: dict[str, Any]):
+        if approved_details != details:
+            raise PermissionError("Approved action details changed; action was not run.")
+        return consume(action_type, approved_details)
+
+    return executor(consume_exact)
+
+
 def read_browser_page(
     url: str, *, allowed_domains: list[str], consume_approval: Callable[[dict[str, Any]], Any],
 ) -> str:
@@ -214,9 +266,10 @@ def integration_status() -> dict[str, str]:
         "gmail": "configured" if os.environ.get("JARVIS_GMAIL_ACCESS_TOKEN") and os.environ.get("JARVIS_GMAIL_USER") else "needs_local_oauth_setup",
         "microsoft_graph": "configured" if os.environ.get("JARVIS_GRAPH_ACCESS_TOKEN") else "needs_local_oauth_setup",
         "telegram": "configured" if os.environ.get("JARVIS_TELEGRAM_BOT_TOKEN") else "needs_local_bot_setup",
+        "whatsapp": "configured" if all(os.environ.get(k) for k in ("JARVIS_WHATSAPP_ACCESS_TOKEN", "JARVIS_WHATSAPP_PHONE_NUMBER_ID")) else "needs_official_cloud_api_setup",
         "playwright": "optional_dependency_check_required",
         "payments": "disabled_test_mode_only",
         "purchases": "disabled_test_mode_only",
         "account_mutations": "not_implemented_read_only_only",
-        "whatsapp": "not_configured_official_cloud_api_required",
+        
     }
