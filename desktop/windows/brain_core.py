@@ -150,7 +150,7 @@ def authorize_tool_call(
         if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload"}:
             return ToolDecision(False, "invalid", "Unsupported browser action.")
         prompt = str(user_prompt or "").casefold()
-        if re.search(r"\\b(don't|do not|never|avoid|mat|nahi|nahin)\\b.{0,50}\\b(open|visit|navigate|click|fill|type|select|press|scroll|download|upload|read|search)\\b", prompt):
+        if re.search(r"\b(don't|do not|never|avoid|mat|nahi|nahin)\b.{0,50}\b(open|visit|navigate|click|fill|type|select|press|scroll|download|upload|read|search)\b", prompt):
             return ToolDecision(False, "not_requested", "The user explicitly denied this browser action.")
         direct_verbs = {
             "navigate": ("open", "visit", "go to", "navigate", "kholo", "khol do"),
