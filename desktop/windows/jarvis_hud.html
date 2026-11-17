@@ -263,5 +263,33 @@ text:not([font-size]){font-size:19px}
   setInterval(fit,1500);
 })();
 </script>
+<script>
+(function(){
+  if(document.getElementById("jx-gesture-toggle"))return;
+  var button=document.createElement("button");
+  button.id="jx-gesture-toggle";
+  button.type="button";
+  button.setAttribute("aria-pressed","false");
+  button.textContent="ENABLE GESTURES";
+  button.style.cssText="position:fixed;z-index:261;width:112px;min-height:26px;padding:3px 5px;font:600 11px Rajdhani,Segoe UI,sans-serif;letter-spacing:.25px;color:#e8fbff;background:rgba(0,8,14,.94);border:1px solid rgba(25,211,255,.9);box-shadow:0 0 10px rgba(25,211,255,.22);cursor:pointer;transform:translate(-50%,-50%);";
+  document.body.appendChild(button);
+  function place(){
+    var x=845,y=638;
+    var svg=Array.from(document.querySelectorAll("svg.scene,.row svg,.stack svg")).find(function(node){
+      var r=node.getBoundingClientRect(),v=node.viewBox&&node.viewBox.baseVal,m=node.getScreenCTM&&node.getScreenCTM();
+      return m&&r.width>0&&r.height>0&&v&&x>=v.x&&x<=v.x+v.width&&y>=v.y&&y<=v.y+v.height;
+    });
+    var matrix=svg&&svg.getScreenCTM();
+    if(!svg||!matrix){button.style.visibility="hidden";return;}
+    var point=svg.createSVGPoint();point.x=x;point.y=y;
+    var screen=point.matrixTransform(matrix);
+    button.style.left=screen.x+"px";button.style.top=screen.y+"px";button.style.visibility="visible";
+  }
+  button.addEventListener("click",function(){
+    if(!window.__jarvisHudExtensionsLoaded)alert("Hand gesture control is available in the JARVIS desktop app. Open JARVIS to enable camera gestures.");
+  });
+  place();addEventListener("resize",place,{passive:true});addEventListener("scroll",place,{passive:true});
+})();
+</script>
 </body>
 </html>
