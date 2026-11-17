@@ -288,7 +288,7 @@ class BrowserAutomation:
                     str(locator.get_attribute("placeholder") or ""),
                 ]).casefold()
                 if field_type == "password" or re.search(
-                    r"\\b(password|passcode|pin|otp|one.time.code|token|secret|cvv|cvc|card.number)\\b",
+                    r"\b(password|passcode|pin|otp|one.time.code|token|secret|cvv|cvc|card.number)\b",
                     field_name,
                 ):
                     raise PermissionError("JARVIS will not enter passwords, PINs, OTPs, tokens, or payment-card secrets. Enter those yourself in the visible browser.")
