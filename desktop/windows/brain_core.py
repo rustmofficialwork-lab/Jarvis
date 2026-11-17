@@ -152,7 +152,7 @@ def authorize_tool_call(
             "press": ("press", "tab", "escape"),
             "scroll": ("scroll", "neeche", "upar"),
         }[action]
-        if not any(re.search(rf"\\b{re.escape(verb)}\\b", prompt) for verb in direct_verbs):
+        if not any(re.search(rf"\b{re.escape(verb)}\b", prompt) for verb in direct_verbs):
             return ToolDecision(False, "not_requested", "The user did not directly request this browser action.")
         if action == "navigate":
             url = arguments.get("url")
@@ -163,7 +163,7 @@ def authorize_tool_call(
             named = bool(host and re.search(rf"(?<![a-z0-9-]){re.escape(host)}(?![a-z0-9-])", prompt))
             if not named:
                 for alias, domain in SITE_ALIASES.items():
-                    if re.search(rf"\\b{re.escape(alias)}\\b", prompt) and host in {domain, "www." + domain}:
+                    if re.search(rf"\b{re.escape(alias)}\b", prompt) and host in {domain, "www." + domain}:
                         named = True
                         break
             if not named:
