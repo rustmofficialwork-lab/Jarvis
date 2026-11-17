@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from provider_integrations import (
     IntegrationUnavailable,
+    _required_env,
     integration_status,
     read_browser_page,
     run_approved_action,
@@ -81,6 +82,14 @@ class ProviderIntegrationTests(unittest.TestCase):
                         consume_approval=lambda details: type("Denied", (), {"approved": False})(),
                     )
         request.assert_not_called()
+
+    def test_provider_secret_can_be_read_from_windows_credential_manager(self):
+        import sys
+        from types import SimpleNamespace
+        fake_keyring = SimpleNamespace(get_password=lambda service, name: "stored-token")
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.dict(sys.modules, {"keyring": fake_keyring}):
+                self.assertEqual(_required_env("JARVIS_GRAPH_ACCESS_TOKEN"), "stored-token")
 
     def test_missing_credentials_are_reported_without_secret_values(self):
         with patch.dict(os.environ, {}, clear=True):
