@@ -116,6 +116,25 @@ def _explicit_file_request(tool: str, arguments: dict[str, Any], prompt: str) ->
     )
 
 
+def _restricted_browser_request(prompt: str) -> bool:
+    restricted_terms = (
+        "gun|guns|firearm|firearms|ammunition|ammo|explosive|bomb|weapon|weapons|knife|knives|switchblade|"
+        "taser|pepper spray|mace|cocaine|meth|heroin|fentanyl|mdma|ecstasy|lsd|"
+        "marijuana|cannabis|weed|intoxicant|alcohol|beer|wine|liquor|cigarette|tobacco|"
+        "vape|nicotine|steroid|diet pill|laxative|poison|toxin|casino|gambling|betting|"
+        "sportsbook|sports betting|prediction market"
+    )
+    search_intent = (
+        r"\b(open|visit|go to|browse|search|find|locate|buy|purchase|order|download|access|compare|best|top|"
+        r"where|how to get|review)\b"
+    )
+    text = str(prompt or "").casefold()
+    return bool(
+        re.search(search_intent + r".{0,100}\b(?:" + restricted_terms + r")\b", text)
+        or re.search(r"\b(?:" + restricted_terms + r")\b.{0,100}" + search_intent, text)
+    )
+
+
 def authorize_tool_call(
     name: str,
     arguments: dict[str, Any],
@@ -130,6 +149,8 @@ def authorize_tool_call(
     if not isinstance(name, str) or not isinstance(arguments, dict):
         return ToolDecision(False, "invalid", "Malformed tool request.")
     tool = name.strip().casefold()
+    if (tool in BROWSER_ACTION_TOOLS or tool == "open_website") and _restricted_browser_request(user_prompt):
+        return ToolDecision(False, "restricted", "JARVIS cannot use browser tools to locate restricted goods or services.")
     if tool in {"send_email", "send_message"}:
         prompt = str(user_prompt or "").casefold()
         if re.search(r"\b(don't|do not|never|mat|nahi|nahin)\b.{0,40}\b(send|bhej|bhejo)\b", prompt):
@@ -147,22 +168,6 @@ def authorize_tool_call(
         return ToolDecision(True, "allowed", "Read-only tool is within the local allowlist.")
     if tool in BROWSER_ACTION_TOOLS:
         action = arguments.get("action")
-        restricted_terms = (
-            "gun|guns|firearm|ammunition|ammo|explosive|bomb|weapon|knife|switchblade|"
-            "taser|pepper spray|mace|cocaine|meth|heroin|fentanyl|mdma|ecstasy|lsd|"
-            "marijuana|cannabis|weed|intoxicant|alcohol|beer|wine|liquor|cigarette|tobacco|"
-            "vape|nicotine|steroid|diet pill|laxative|poison|toxin|casino|gambling|betting|"
-            "sportsbook|sports betting|prediction market"
-        )
-        search_intent = (
-            r"\b(search|find|locate|buy|purchase|order|download|access|compare|best|top|"
-            r"where|how to get|review)\b"
-        )
-        if re.search(search_intent + r".{0,100}\b(?:" + restricted_terms + r")\b", str(user_prompt or "").casefold()) or re.search(
-            r"\b(?:" + restricted_terms + r")\b.{0,100}" + search_intent,
-            str(user_prompt or "").casefold(),
-        ):
-            return ToolDecision(False, "restricted", "JARVIS cannot use browser automation to locate restricted goods or services.")
         if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload", "new_tab", "switch_tab"}:
             return ToolDecision(False, "invalid", "Unsupported browser action.")
         prompt = str(user_prompt or "").casefold()
