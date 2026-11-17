@@ -18,3 +18,6 @@ numpy>=1.26,<2
 onnxruntime>=1.17,<2
 # Move approved files to the OS Recycle Bin/Trash; never permanently delete.
 Send2Trash>=1.8,<2
+
+# Visible browser automation (install Chromium with: py -m playwright install chromium)
+playwright>=1.48,<2
