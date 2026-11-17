@@ -18,6 +18,7 @@ from typing import Any
 MAX_STEPS_PER_SESSION = 40
 MAX_TEXT_CHARS = 16_000
 MAX_SELECTOR_CHARS = 240
+FINANCIAL_LABELS = re.compile(r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|cart|add to cart)\b", re.IGNORECASE)
 SENSITIVE_LABELS = re.compile(
     r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|"
     r"send|transfer|delete|remove account|change password|confirm booking)\b",
@@ -156,7 +157,7 @@ class BrowserAutomation:
         text = page.locator("body").inner_text(timeout=5_000)[:MAX_TEXT_CHARS]
         return f"Page: {title}\nURL: {url}\n\n{text}"
 
-    def act(self, action: str, *, selector: str = "", value: str = "", url: str = "") -> str:
+    def act(self, action: str, *, selector: str = "", value: str = "", url: str = "", approval_callback=None) -> str:
         if action == "navigate":
             return self.navigate(url)
         if action not in {"read", "click", "fill", "select", "press", "scroll"}:
@@ -185,10 +186,15 @@ class BrowserAutomation:
                     str(locator.get_attribute("title") or ""),
                     str(locator.get_attribute("value") or ""),
                 ]).strip()[:500]
+                if FINANCIAL_LABELS.search(label):
+                    raise PermissionError("Purchases, checkout, and payment controls are disabled.")
                 if SENSITIVE_LABELS.search(label):
-                    raise PermissionError(
-                        "Sensitive control detected. JARVIS will not click it automatically; a dedicated exact-action approval flow is required."
-                    )
+                    details = {"domain": self._host, "action": "click_sensitive_control",
+                               "label": label[:240], "selector": selector[:240]}
+                    if not callable(approval_callback) or not approval_callback(
+                        details, f"Click sensitive website control: {label[:160]}"
+                    ):
+                        raise PermissionError("Sensitive website action was not approved; nothing was clicked.")
                 locator.click()
                 return f"Clicked the selected page element: {label[:160] or selector}."
             if action == "fill":
@@ -199,7 +205,12 @@ class BrowserAutomation:
                 return "Selected the requested option. The form was not submitted."
             if action == "press":
                 if value.casefold() in {"enter", "return"}:
-                    raise PermissionError("Submitting a form with Enter is a sensitive action and is blocked in automatic mode.")
+                    details = {"domain": self._host, "action": "submit_form",
+                               "selector": selector[:240], "key": "Enter"}
+                    if not callable(approval_callback) or not approval_callback(
+                        details, "Submit the current website form"
+                    ):
+                        raise PermissionError("Form submission was not approved; the form was not submitted.")
                 if value.casefold() not in {"tab", "escape", "arrowdown", "arrowup", "home", "end"}:
                     raise ValueError("Only navigation keys are supported.")
                 locator.press(value)
