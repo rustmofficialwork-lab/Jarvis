@@ -147,6 +147,21 @@ def authorize_tool_call(
         return ToolDecision(True, "allowed", "Read-only tool is within the local allowlist.")
     if tool in BROWSER_ACTION_TOOLS:
         action = arguments.get("action")
+        restricted_terms = (
+            "gun|guns|firearm|ammunition|ammo|explosive|bomb|weapon|knife|switchblade|"
+            "taser|pepper spray|mace|cocaine|meth|heroin|fentanyl|mdma|ecstasy|lsd|"
+            "marijuana|cannabis|weed|intoxicant|vape|nicotine|casino|gambling|betting|"
+            "sportsbook|sports betting|prediction market"
+        )
+        search_intent = (
+            r"\\b(search|find|locate|buy|purchase|order|download|access|compare|best|top|"
+            r"where|how to get|review)\\b"
+        )
+        if re.search(search_intent + r".{0,100}\\b(?:" + restricted_terms + r")\\b", str(user_prompt or "").casefold()) or re.search(
+            r"\\b(?:" + restricted_terms + r")\\b.{0,100}" + search_intent,
+            str(user_prompt or "").casefold(),
+        ):
+            return ToolDecision(False, "restricted", "JARVIS cannot use browser automation to locate restricted goods or services.")
         if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload", "new_tab", "switch_tab"}:
             return ToolDecision(False, "invalid", "Unsupported browser action.")
         prompt = str(user_prompt or "").casefold()
