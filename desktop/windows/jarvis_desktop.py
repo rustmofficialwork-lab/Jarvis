@@ -3010,6 +3010,7 @@ class JarvisDesktop:
                     endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
                     prompt, self.history, memories,
                     browser_open_authorizer=self._authorize_browser_open,
+                    browser_action_executor=self._run_browser_automation,
                 )
             self._post_ai_status("ONLINE MODE — cloud AI is responding.")
             return answer
