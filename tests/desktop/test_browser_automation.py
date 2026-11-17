@@ -45,7 +45,7 @@ class BrowserAutomationTests(unittest.TestCase):
     def test_sensitive_click_requires_exact_approval(self):
         browser, locator = self._fake_browser("Send message")
         with self.assertRaises(PermissionError):
-            browser.act("click", selector="button.send")
+            browser._act_local("click", selector="button.send")
         locator.click.assert_not_called()
 
         approved = []
