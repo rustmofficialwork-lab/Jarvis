@@ -4362,6 +4362,15 @@ class JarvisDesktop:
             except Exception:
                 pass
             self.tray_icon = None
+        browser = getattr(self, "_browser_automation", None)
+        if browser is not None:
+            try:
+                browser.close()
+            except Exception as exc:
+                logging.getLogger("jarvis").warning(
+                    "Could not close the browser automation session cleanly (%s).",
+                    type(exc).__name__,
+                )
         self.root.destroy()
 
     def close(self):
