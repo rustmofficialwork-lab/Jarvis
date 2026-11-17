@@ -50,13 +50,15 @@
   document.body.appendChild(controls);
   // Place the hand-gesture control inside the red-marked area below ARCHITECTURE
   // in SYSTEM INFORMATION, without changing the original HUD HTML/layout.
-  const gestureToggle=document.createElement('button');
-  gestureToggle.id='jx-gesture-toggle';
-  gestureToggle.type='button';
-  gestureToggle.setAttribute('aria-pressed','false');
-  gestureToggle.textContent='ENABLE GESTURES';
+  const gestureToggle=document.getElementById('jx-gesture-toggle')||document.createElement('button');
+  if(!gestureToggle.isConnected){
+    gestureToggle.id='jx-gesture-toggle';
+    gestureToggle.type='button';
+    gestureToggle.setAttribute('aria-pressed','false');
+    gestureToggle.textContent='ENABLE GESTURES';
+    document.body.appendChild(gestureToggle);
+  }
   gestureToggle.style.cssText='position:fixed;z-index:261;width:112px;min-height:26px;padding:3px 5px;font-size:11px;letter-spacing:.25px;transform:translate(-50%,-50%);';
-  document.body.appendChild(gestureToggle);
   const positionGestureToggle=()=>{
     // The HUD switches between scene, row and stack SVG layouts by aspect
     // ratio. Pick the visible SVG whose viewBox actually contains the anchor.
