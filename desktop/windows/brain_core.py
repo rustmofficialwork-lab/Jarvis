@@ -33,8 +33,9 @@ USER_DIRECTED_FILE_TOOLS = frozenset({
     "list_user_files", "search_user_files", "read_user_text_file",
 })
 USER_DIRECTED_TOOLS = frozenset({"open_app", "open_website"})
+BROWSER_ACTION_TOOLS = frozenset({"browser_automation"})
 # Exact domain aliases prevent deceptive hosts such as youtube.com.attacker.invalid.
-SITE_ALIASES = {"youtube": "youtube.com", "google": "google.com", "github": "github.com", "gmail": "mail.google.com", "wikipedia": "wikipedia.org", "reddit": "reddit.com", "stackoverflow": "stackoverflow.com"}
+SITE_ALIASES = {"youtube": "youtube.com", "google": "google.com", "github": "github.com", "gmail": "mail.google.com", "wikipedia": "wikipedia.org", "reddit": "reddit.com", "stackoverflow": "stackoverflow.com", "amazon": "amazon.com", "flipkart": "flipkart.com", "ebay": "ebay.com", "myntra": "myntra.com"}
 SENSITIVE_TOOL_NAMES = frozenset({
     "send_money", "make_payment", "purchase_item", "send_email",
     "send_message", "delete_file", "delete_folder", "change_account",
@@ -137,6 +138,37 @@ def authorize_tool_call(
         )
     if tool in READ_ONLY_TOOLS:
         return ToolDecision(True, "allowed", "Read-only tool is within the local allowlist.")
+    if tool in BROWSER_ACTION_TOOLS:
+        action = arguments.get("action")
+        if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll"}:
+            return ToolDecision(False, "invalid", "Unsupported browser action.")
+        prompt = str(user_prompt or "").casefold()
+        direct_verbs = {
+            "navigate": ("open", "visit", "go to", "navigate", "kholo", "khol do"),
+            "read": ("read", "show", "summarize", "check", "padho", "dikhao"),
+            "click": ("click", "press", "select", "dabao", "click karo"),
+            "fill": ("fill", "type", "enter", "search", "likho", "bharo"),
+            "select": ("select", "choose", "pick", "chuno"),
+            "press": ("press", "tab", "escape"),
+            "scroll": ("scroll", "neeche", "upar"),
+        }[action]
+        if not any(re.search(rf"\\b{re.escape(verb)}\\b", prompt) for verb in direct_verbs):
+            return ToolDecision(False, "not_requested", "The user did not directly request this browser action.")
+        if action == "navigate":
+            url = arguments.get("url")
+            try:
+                host = (urlsplit(url.strip()).hostname or "").casefold().removeprefix("www.") if isinstance(url, str) else ""
+            except ValueError:
+                host = ""
+            named = bool(host and re.search(rf"(?<![a-z0-9-]){re.escape(host)}(?![a-z0-9-])", prompt))
+            if not named:
+                for alias, domain in SITE_ALIASES.items():
+                    if re.search(rf"\\b{re.escape(alias)}\\b", prompt) and host in {domain, "www." + domain}:
+                        named = True
+                        break
+            if not named:
+                return ToolDecision(False, "not_requested", "The user must name the website being opened.")
+        return ToolDecision(True, "allowed", "The user directly requested this bounded browser action.")
     if tool in USER_DIRECTED_FILE_TOOLS:
         if not _explicit_file_request(tool, arguments, user_prompt):
             return ToolDecision(
