@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import ipaddress
 import re
 import urllib.error
 import urllib.parse
@@ -237,6 +238,14 @@ def read_browser_page(
     host = (parsed.hostname or "").casefold().rstrip(".")
     if parsed.scheme != "https" or not host or parsed.username or parsed.password or parsed.port not in (None, 443):
         raise ValueError("Browser automation requires a public HTTPS URL without embedded credentials.")
+    try:
+        address = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        address = None
+    if (address is not None and not address.is_global) or (address is None and (
+        "." not in host or host.endswith((".local", ".localhost", ".internal", ".test"))
+    )):
+        raise ValueError("Local, private, and non-public browser hosts are blocked.")
     if not isinstance(allowed_domains, list) or host not in {str(x).casefold() for x in allowed_domains}:
         raise PermissionError("The exact website hostname is not allowlisted.")
     details = {"domain": host, "action": "read_page"}
@@ -250,6 +259,16 @@ def read_browser_page(
         try:
             page = browser.new_page()
             page.set_default_navigation_timeout(10_000)
+
+            def restrict_requests(route):
+                requested = urllib.parse.urlsplit(route.request.url)
+                request_host = (requested.hostname or "").casefold().rstrip(".")
+                if requested.scheme == "https" and request_host == host:
+                    route.continue_()
+                else:
+                    route.abort()
+
+            page.route("**/*", restrict_requests)
             page.goto(url, wait_until="domcontentloaded")
             final_host = (urllib.parse.urlsplit(page.url).hostname or "").casefold().rstrip(".")
             if final_host != host:
