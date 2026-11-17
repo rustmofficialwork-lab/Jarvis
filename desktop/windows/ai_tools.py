@@ -306,8 +306,10 @@ def _available_capabilities() -> str:
         "Paint, File Explorer, and Task Manager on Windows; open a public website in the default browser when explicitly requested. "
         "Online services implemented separately: web search, weather, and news. "
         "Offline AI depends on the local Ollama model being installed and running. "
-        "Not implemented as general actions: interacting with website controls or submitting forms, sending email/messages, "
-        "payments, purchases, account changes, unrestricted shell commands, arbitrary browser automation, or arbitrary file deletion. "
+        "Optional provider adapters exist for approval-gated email/messaging and read-only browser page extraction, "
+        "but they are not wired as AI-callable action tools or HUD controls; use the read-only provider status tool to inspect setup. "
+        "Not implemented as general actions: website control/form submission, automatic email/message sending, payments, purchases, "
+        "account changes, unrestricted shell commands, or arbitrary file deletion. "
         "Never claim these unsupported actions were completed."
     )
 
