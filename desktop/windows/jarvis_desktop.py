@@ -4705,6 +4705,9 @@ def main(argv=None):
     logger = configure_startup_logging()
     logger.info("JARVIS process started")
     args = list(sys.argv[1:] if argv is None else argv)
+    if args == ["--version"]:
+        print(APP_VERSION)
+        return 0
     if args == ["--reminder-check"]:
         logger.info("Running scheduled reminder check")
         # Task Scheduler starts a short-lived helper instead of opening the full UI.
