@@ -130,6 +130,11 @@ def authorize_tool_call(
     if not isinstance(name, str) or not isinstance(arguments, dict):
         return ToolDecision(False, "invalid", "Malformed tool request.")
     tool = name.strip().casefold()
+    if tool in {"send_email", "send_message"}:
+        prompt = str(user_prompt or "").casefold()
+        if not re.search(r"\\b(send|bhej|bhejo)\\b", prompt):
+            return ToolDecision(False, "not_requested", "The user did not directly request sending a message.")
+        return ToolDecision(True, "confirmation_required", "A trusted one-time voice approval is mandatory before sending.")
     if tool in SENSITIVE_TOOL_NAMES:
         return ToolDecision(
             False, "confirmation_required",
@@ -140,7 +145,7 @@ def authorize_tool_call(
         return ToolDecision(True, "allowed", "Read-only tool is within the local allowlist.")
     if tool in BROWSER_ACTION_TOOLS:
         action = arguments.get("action")
-        if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll"}:
+        if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload"}:
             return ToolDecision(False, "invalid", "Unsupported browser action.")
         prompt = str(user_prompt or "").casefold()
         direct_verbs = {
@@ -151,6 +156,8 @@ def authorize_tool_call(
             "select": ("select", "choose", "pick", "chuno"),
             "press": ("press", "tab", "escape"),
             "scroll": ("scroll", "neeche", "upar"),
+            "download": ("download", "save", "download karo"),
+            "upload": ("upload", "attach", "lagao", "bhejo"),
         }[action]
         if not any(re.search(rf"\b{re.escape(verb)}\b", prompt) for verb in direct_verbs):
             return ToolDecision(False, "not_requested", "The user did not directly request this browser action.")
