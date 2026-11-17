@@ -154,11 +154,11 @@ def authorize_tool_call(
             "sportsbook|sports betting|prediction market"
         )
         search_intent = (
-            r"\\b(search|find|locate|buy|purchase|order|download|access|compare|best|top|"
-            r"where|how to get|review)\\b"
+            r"\b(search|find|locate|buy|purchase|order|download|access|compare|best|top|"
+            r"where|how to get|review)\b"
         )
-        if re.search(search_intent + r".{0,100}\\b(?:" + restricted_terms + r")\\b", str(user_prompt or "").casefold()) or re.search(
-            r"\\b(?:" + restricted_terms + r")\\b.{0,100}" + search_intent,
+        if re.search(search_intent + r".{0,100}\b(?:" + restricted_terms + r")\b", str(user_prompt or "").casefold()) or re.search(
+            r"\b(?:" + restricted_terms + r")\b.{0,100}" + search_intent,
             str(user_prompt or "").casefold(),
         ):
             return ToolDecision(False, "restricted", "JARVIS cannot use browser automation to locate restricted goods or services.")
