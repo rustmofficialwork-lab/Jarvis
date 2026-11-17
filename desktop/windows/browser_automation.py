@@ -367,6 +367,7 @@ class BrowserAutomation:
                     str(locator.get_attribute("aria-label") or ""),
                     str(locator.get_attribute("placeholder") or ""),
                 ]).casefold()
+                field_name = re.sub(r"[_-]+", " ", field_name)
                 if field_type == "password" or re.search(
                     r"\b(password|passcode|pin|otp|one.time.code|token|secret|cvv|cvc|card.number)\b",
                     field_name,
