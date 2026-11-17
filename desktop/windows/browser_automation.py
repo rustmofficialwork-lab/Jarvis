@@ -223,7 +223,55 @@ class BrowserAutomation:
         title = page.title()[:240]
         url = page.url[:2048]
         text = page.locator("body").inner_text(timeout=5_000)[:MAX_TEXT_CHARS]
-        return f"Page: {title}\nURL: {url}\n\n{text}"
+        controls = page.locator("button, a[href], input, select, textarea, [role='button']")
+        control_lines = []
+        for index in range(min(controls.count(), 60)):
+            try:
+                metadata = controls.nth(index).evaluate(
+                    """el => {
+                        const cssEscape = window.CSS && CSS.escape
+                            ? CSS.escape
+                            : value => String(value).replace(/[^a-zA-Z0-9_-]/g, ch => '\\\\' + ch);
+                        const parts = [];
+                        for (let node = el; node && node.nodeType === 1 && node !== document.body; node = node.parentElement) {
+                            let part = node.tagName.toLowerCase();
+                            if (node.id) {
+                                part += '#' + cssEscape(node.id);
+                                parts.unshift(part);
+                                break;
+                            }
+                            const parent = node.parentElement;
+                            if (parent) {
+                                const siblings = Array.from(parent.children).filter(item => item.tagName === node.tagName);
+                                if (siblings.length > 1) part += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')';
+                            }
+                            parts.unshift(part);
+                        }
+                        return {
+                            tag: el.tagName.toLowerCase(),
+                            type: el.getAttribute('type') || '',
+                            name: el.getAttribute('name') || '',
+                            label: (el.labels && el.labels[0] ? el.labels[0].innerText : '') || el.getAttribute('aria-label') || '',
+                            placeholder: el.getAttribute('placeholder') || '',
+                            text: (el.innerText || el.textContent || '').trim().slice(0, 100),
+                            selector: parts.join(' > ').slice(0, 240)
+                        };
+                    }"""
+                )
+                if metadata.get("selector"):
+                    summary = " ".join(
+                        f"{key}={str(metadata.get(key, '')).replace(chr(10), ' ')[:120]}"
+                        for key in ("tag", "type", "label", "placeholder", "text", "selector")
+                        if metadata.get(key)
+                    )
+                    control_lines.append(f"- {summary}")
+            except Exception:
+                continue
+        controls_text = "\n".join(control_lines) or "- No interactive controls detected."
+        return (
+            f"Page: {title}\nURL: {url}\n\nVisible page text:\n{text}"
+            f"\n\nInteractive controls (selectors are for this page only):\n{controls_text}"
+        )
 
     def act(self, action: str, *, selector: str = "", value: str = "", url: str = "", approval_callback=None) -> str:
         return self._call_worker(
