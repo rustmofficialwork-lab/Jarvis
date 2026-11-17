@@ -2532,6 +2532,8 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn('window.JARVISGestureLogic = api', gesture_logic)
         self.assertIn("jx-gesture-toggle", extensions)
         self.assertIn("const anchorX=845,anchorY=638;", extensions)
+        self.assertIn('id="jx-gesture-toggle"', (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
+        self.assertIn("document.getElementById('jx-gesture-toggle')||document.createElement", extensions)
         self.assertIn("ARCHITECTURE", (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
         self.assertIn("getBoundingClientRect()", extensions)
         self.assertIn("candidate.viewBox?.baseVal", extensions)
