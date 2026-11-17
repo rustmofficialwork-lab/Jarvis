@@ -455,7 +455,7 @@ class BrowserAutomation:
                     ]).casefold()
                     is_search_submit = (
                         field_type == "search"
-                        or bool(re.search(r"\\b(q|search|query)\\b", field_name))
+                        or bool(re.search(r"\b(q|search|query)\b", field_name))
                     )
                     if not is_search_submit:
                         details = {"domain": self._host, "action": "submit_form",
