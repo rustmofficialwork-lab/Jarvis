@@ -188,7 +188,7 @@ def send_whatsapp_message(
     _consume(consume_approval, {"recipient": phone, "content": content})
     token = _required_env("JARVIS_WHATSAPP_ACCESS_TOKEN")
     phone_number_id = _required_env("JARVIS_WHATSAPP_PHONE_NUMBER_ID")
-    version = os.environ.get("JARVIS_WHATSAPP_API_VERSION", "v22.0").strip()
+    version = _required_env("JARVIS_WHATSAPP_API_VERSION")
     if not re.fullmatch(r"v[0-9]{1,2}\.[0-9]{1,2}", version):
         raise IntegrationUnavailable("JARVIS_WHATSAPP_API_VERSION must use the official vNN.N format.")
     result = _request_json(
@@ -287,9 +287,9 @@ def integration_status() -> dict[str, str]:
         "gmail": "configured" if os.environ.get("JARVIS_GMAIL_ACCESS_TOKEN") and os.environ.get("JARVIS_GMAIL_USER") else "needs_local_oauth_setup",
         "microsoft_graph": "configured" if os.environ.get("JARVIS_GRAPH_ACCESS_TOKEN") else "needs_local_oauth_setup",
         "telegram": "configured" if os.environ.get("JARVIS_TELEGRAM_BOT_TOKEN") else "needs_local_bot_setup",
-        "whatsapp": "configured" if all(os.environ.get(k) for k in ("JARVIS_WHATSAPP_ACCESS_TOKEN", "JARVIS_WHATSAPP_PHONE_NUMBER_ID")) else "needs_official_cloud_api_setup",
+        "whatsapp": "configured" if all(os.environ.get(k) for k in ("JARVIS_WHATSAPP_ACCESS_TOKEN", "JARVIS_WHATSAPP_PHONE_NUMBER_ID", "JARVIS_WHATSAPP_API_VERSION")) else "needs_official_cloud_api_setup",
         "playwright": "installed" if playwright_ready else "optional_dependency_missing",
-        "payments": "disabled_test_mode_only",
-        "purchases": "disabled_test_mode_only",
+        "payments": "disabled_no_executor",
+        "purchases": "disabled_no_executor",
         "account_mutations": "not_implemented_read_only_only",
     }
