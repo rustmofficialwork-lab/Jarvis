@@ -224,23 +224,12 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path "desktop/windows/dist/JARVIS/*" -DestinationPath "dist-installer/JARVIS-Portable-x64.zip" -CompressionLevel Optimal
-      - name: Create SHA-256 checksums
-        shell: pwsh
-        run: |
-          $files = @("dist-installer/JARVIS-Portable-x64.zip", "dist-installer/JARVIS-Setup-x64.exe")
-          $lines = foreach ($file in $files) {
-            if (-not (Test-Path $file)) { throw "Expected release artifact not found: $file" }
-            $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
-            "$hash  $([System.IO.Path]::GetFileName($file))"
-          }
-          $lines | Out-File -FilePath "dist-installer/SHA256SUMS.txt" -Encoding ascii
       - name: Upload Windows installer
         uses: actions/upload-artifact@v6
         with:
           name: JARVIS-Windows-Installer-x64
           path: |
             dist-installer/JARVIS-Setup-x64.exe
-            dist-installer/SHA256SUMS.txt
           if-no-files-found: error
       - name: Upload portable Windows build
         uses: actions/upload-artifact@v6
@@ -248,8 +237,19 @@ jobs:
           name: JARVIS-Windows-Portable-x64
           path: |
             dist-installer/JARVIS-Portable-x64.zip
-            dist-installer/SHA256SUMS.txt
           if-no-files-found: error
+      - name: Remove legacy checksum asset from rolling release
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/jarvis-latest" | ConvertFrom-Json
+          $legacyAssets = @($release.assets | Where-Object { $_.name -eq "SHA256SUMS.txt" })
+          foreach ($asset in $legacyAssets) {
+            gh api --method DELETE "repos/$env:GITHUB_REPOSITORY/releases/assets/$($asset.id)"
+            if ($LASTEXITCODE -ne 0) { throw "Could not remove the legacy checksum release asset." }
+          }
       - name: Publish rolling Windows release
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v3
@@ -261,7 +261,6 @@ jobs:
             Version: 1.1.${{ github.run_number }}
             Installer: JARVIS-Setup-x64.exe
             Portable build: JARVIS-Portable-x64.zip (extract the complete folder and run JARVIS.exe)
-            SHA-256 checksums are included in SHA256SUMS.txt.
           prerelease: true
           make_latest: false
           overwrite_files: true
