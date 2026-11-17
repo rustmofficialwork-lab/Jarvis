@@ -13,6 +13,16 @@ import queue
 import shutil
 import subprocess
 import sys
+
+# Keep the packaged version probe independent of heavyweight desktop/ML imports.
+# CI and support tools use this command to verify the frozen executable.
+if __name__ == "__main__" and sys.argv[1:] == ["--version"]:
+    try:
+        from build_version import APP_VERSION
+    except ImportError:
+        APP_VERSION = "1.1.0"
+    print(APP_VERSION)
+    raise SystemExit(0)
 import threading
 import time
 import uuid
