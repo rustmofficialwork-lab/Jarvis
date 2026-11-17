@@ -3853,7 +3853,7 @@ class JarvisDesktop:
             try:
                 update_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "JARVISDesktop" / "updates"
                 installer = download_verified_installer(
-                    result["installer_url"], result["checksums_url"], update_dir
+                    result["installer_url"], result["expected_sha256"], update_dir
                 )
                 self.events.put(("update_downloaded", str(installer)))
             except Exception as exc:
