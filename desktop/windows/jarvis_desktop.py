@@ -2001,7 +2001,7 @@ class JarvisDesktop:
             f"Action: {request.action_type}. Summary: {request.summary}. "
             f"Exact details: {spoken_details}."
         )
-        language = self.settings.get("offline_speech_language", "en-IN")
+        language = self.settings.get("language", "en-IN")
         if language not in {"hi-IN", "en-IN", "en-US"}:
             language = "en-IN"
         approved = request_voice_permission(
