@@ -175,13 +175,23 @@ class SensitiveActionGuardTests(unittest.TestCase):
                 )
 
     def test_browser_approval_preview_fails_closed_on_unlisted_actions(self):
-        for action in ("click_link", "submit_form", "run_shell_command", "unknown"):
+        for action in ("click_link", "run_shell_command", "unknown"):
             with self.subTest(action=action), self.assertRaises(PermissionError):
                 build_approval_request(
                     "browser",
                     {"domain": "example.com", "action": action},
                     "Browser action",
                 )
+
+    def test_browser_approval_preview_accepts_sensitive_actions_for_voice_gate(self):
+        for action in ("click_sensitive_control", "submit_form", "upload_file"):
+            with self.subTest(action=action):
+                request = build_approval_request(
+                    "browser",
+                    {"domain": "example.com", "action": action},
+                    "Sensitive browser action",
+                )
+                self.assertEqual(request.details["action"], action)
 
     def test_browser_approval_preview_accepts_only_read_only_allowlist(self):
         for action in ("open_page", "read_page", "extract_text", "scroll_page"):
