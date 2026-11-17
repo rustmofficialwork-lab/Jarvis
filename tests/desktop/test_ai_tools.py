@@ -137,6 +137,18 @@ class SafeToolTests(unittest.TestCase):
         self.assertIn("payments", result)
         self.assertIn("arbitrary browser automation", result)
 
+    def test_provider_status_is_read_only_and_hides_secrets(self):
+        import json
+        from unittest.mock import patch
+        with patch("provider_integrations.integration_status", return_value={
+            "gmail": "needs_local_oauth_setup", "payments": "disabled_no_executor"
+        }):
+            result = json.loads(execute_tool("get_provider_integration_status", {}))
+        self.assertEqual(result["gmail"], "needs_local_oauth_setup")
+        self.assertNotIn("token", repr(result).casefold())
+        with self.assertRaises(ValueError):
+            execute_tool("get_provider_integration_status", {"unexpected": True})
+
     def test_unknown_tool_is_rejected(self):
         with self.assertRaises(ValueError):
             execute_tool("run_shell", {})
