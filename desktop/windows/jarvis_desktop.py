@@ -1054,7 +1054,8 @@ def register_device(device_id: str, timeout: float = 12.0) -> str:
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                      history: list[dict], memories: list[str] | None = None,
                      browser_open_authorizer=None,
-                     browser_action_executor=None) -> str:
+                     browser_action_executor=None,
+                     sensitive_action_executor=None) -> str:
     """Request a reply and run only explicitly allowlisted, bounded tools."""
     endpoint, model = validate_chat_configuration(endpoint, model)
     if not api_key.strip():
@@ -1222,6 +1223,11 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                             output = "Tool blocked: the visible browser controller is unavailable."
                         else:
                             output = browser_action_executor(arguments)
+                    elif name in {"send_email", "send_message"}:
+                        if not callable(sensitive_action_executor):
+                            output = "Tool blocked: trusted voice approval and provider integration are unavailable."
+                        else:
+                            output = sensitive_action_executor(name, arguments)
                     else:
                         output = execute_tool(name, arguments)
                 except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
@@ -2024,6 +2030,55 @@ class JarvisDesktop:
             return False
         self._set_status("Exact action approved once by voice.")
         return True
+
+    def _run_sensitive_external_action(self, tool_name: str, arguments: dict) -> str:
+        """Send a message only after exact preview and one-time native voice approval."""
+        from provider_integrations import (
+            run_approved_action, send_gmail_email, send_outlook_email,
+            send_telegram_message, send_whatsapp_message,
+        )
+
+        if not isinstance(arguments, dict):
+            raise ValueError("External action arguments must be an object.")
+        if tool_name == "send_email":
+            if set(arguments) != {"provider", "recipient", "subject", "content"}:
+                raise ValueError("Email requires provider, recipient, subject, and final content.")
+            provider = arguments["provider"]
+            sender = {"gmail": send_gmail_email, "outlook": send_outlook_email}.get(provider)
+            if sender is None:
+                raise ValueError("Choose Gmail or Outlook.")
+            details = {
+                "recipient": arguments["recipient"],
+                "subject": arguments["subject"],
+                "content": arguments["content"],
+            }
+            return run_approved_action(
+                self, "email", details,
+                f"Send email to {details['recipient']} with subject {details['subject']}",
+                lambda consume: sender(
+                    details["recipient"], details["subject"], details["content"],
+                    consume_approval=consume,
+                ),
+            )
+        if tool_name == "send_message":
+            if set(arguments) != {"provider", "recipient", "content"}:
+                raise ValueError("Message requires provider, recipient, and final content.")
+            provider = arguments["provider"]
+            sender = {
+                "telegram": send_telegram_message,
+                "whatsapp": send_whatsapp_message,
+            }.get(provider)
+            if sender is None:
+                raise ValueError("Choose Telegram or WhatsApp.")
+            details = {"recipient": arguments["recipient"], "content": arguments["content"]}
+            return run_approved_action(
+                self, "message", details,
+                f"Send message to {details['recipient']} using {provider}",
+                lambda consume: sender(
+                    details["recipient"], details["content"], consume_approval=consume,
+                ),
+            )
+        raise ValueError("Unsupported external action.")
 
     def _run_browser_automation(self, arguments: dict) -> str:
         """Run a bounded visible-browser action; only sensitive controls prompt for voice approval."""
@@ -3001,6 +3056,7 @@ class JarvisDesktop:
                     prompt, self.history, memories,
                     browser_open_authorizer=self._authorize_browser_open,
                     browser_action_executor=self._run_browser_automation,
+                    sensitive_action_executor=self._run_sensitive_external_action,
                 )
             except RuntimeError as exc:
                 if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
