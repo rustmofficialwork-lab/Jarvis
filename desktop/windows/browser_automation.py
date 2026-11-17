@@ -22,7 +22,7 @@ MAX_STEPS_PER_SESSION = 40
 MAX_TEXT_CHARS = 5_000
 MAX_SELECTOR_CHARS = 240
 FINANCIAL_LABELS = re.compile(r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|cart|add to cart)\b", re.IGNORECASE)
-PERSONAL_FIELD_PATTERN = re.compile(r"\\b(name|email|phone|mobile|address|postal|zip|date of birth|dob|passport|national id)\\b", re.IGNORECASE)\nSENSITIVE_LABELS = re.compile(
+PERSONAL_FIELD_PATTERN = re.compile(r"\b(name|email|phone|mobile|address|postal|zip|date of birth|dob|passport|national id)\b", re.IGNORECASE)\nSENSITIVE_LABELS = re.compile(
     r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|"
     r"send|transfer|delete|remove account|change password|change email|change username|update account|save changes|edit profile|security settings|export|confirm booking|submit|confirm|log in|login|sign in|logout|post|publish|share)\b",
     re.IGNORECASE,
