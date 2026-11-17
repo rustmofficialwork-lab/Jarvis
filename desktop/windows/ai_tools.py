@@ -6,6 +6,7 @@ never executes shell commands, Python supplied by a model, or filesystem work.
 from __future__ import annotations
 
 import ast
+import json
 import math
 import operator
 import subprocess
@@ -110,6 +111,14 @@ TOOL_DEFINITIONS = [
         "function": {
             "name": "get_available_capabilities",
             "description": "Return the currently implemented JARVIS tool capabilities and important limitations. Use when asked what JARVIS can do or before promising an action.",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_provider_integration_status",
+            "description": "Report which optional provider adapters are configured without exposing credential values. Read-only status only; this tool never sends messages or changes accounts.",
             "parameters": {"type": "object", "properties": {}, "additionalProperties": False}
         }
     },
@@ -369,6 +378,11 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> str:
         if arguments:
             raise ValueError("The capabilities tool does not accept arguments.")
         return _available_capabilities()
+    if name == "get_provider_integration_status":
+        if arguments:
+            raise ValueError("Provider integration status does not accept arguments.")
+        from provider_integrations import integration_status
+        return json.dumps(integration_status(), sort_keys=True)
     if name == "list_user_files":
         if set(arguments) - {"folder", "limit"} or "folder" not in arguments:
             raise ValueError("File listing requires folder and optional limit.")
