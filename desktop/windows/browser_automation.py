@@ -86,7 +86,7 @@ class BrowserAutomation:
             self._context = self._playwright.chromium.launch_persistent_context(
                 user_data_dir=str(self.profile_dir),
                 headless=False,
-                accept_downloads=False,
+                accept_downloads=True,
                 args=["--disable-sync", "--no-first-run"],
             )
             self._context.set_default_timeout(8_000)
@@ -160,7 +160,7 @@ class BrowserAutomation:
     def act(self, action: str, *, selector: str = "", value: str = "", url: str = "", approval_callback=None) -> str:
         if action == "navigate":
             return self.navigate(url)
-        if action not in {"read", "click", "fill", "select", "press", "scroll"}:
+        if action not in {"read", "click", "fill", "select", "press", "scroll", "download", "upload"}:
             raise ValueError("Unsupported browser action.")
         if not isinstance(selector, str) or len(selector) > MAX_SELECTOR_CHARS:
             raise ValueError("Selector must be 240 characters or fewer.")
@@ -171,6 +171,54 @@ class BrowserAutomation:
             page = self._require_page()
             if action == "read":
                 return self._describe_page()
+            if action == "download":
+                if not selector.strip():
+                    raise ValueError("Select the download link or button.")
+                downloads = Path.home() / "Downloads"
+                downloads.mkdir(parents=True, exist_ok=True)
+                with page.expect_download(timeout=20_000) as pending:
+                    page.locator(selector).first.click()
+                download = pending.value
+                filename = Path(download.suggested_filename).name
+                suffix = Path(filename).suffix.casefold()
+                if suffix in {".exe", ".msi", ".bat", ".cmd", ".ps1", ".scr", ".com",
+                              ".dll", ".sys", ".js", ".vbs", ".jar", ".reg", ".lnk"}:
+                    download.cancel()
+                    raise PermissionError("Executable or script downloads are blocked.")
+                destination = (downloads / filename).resolve()
+                if destination.parent != downloads.resolve():
+                    raise BrowserAutomationError("Unsafe download filename was blocked.")
+                download.save_as(str(destination))
+                if destination.stat().st_size > 50 * 1024 * 1024:
+                    destination.unlink(missing_ok=True)
+                    raise BrowserAutomationError("Download exceeded the 50 MB safety limit.")
+                return f"Downloaded {filename} to the Windows Downloads folder."
+            if action == "upload":
+                file_path = Path(value).expanduser().resolve()
+                allowed_roots = [
+                    (Path.home() / "Desktop").resolve(),
+                    (Path.home() / "Documents").resolve(),
+                    (Path.home() / "Downloads").resolve(),
+                ]
+                if not file_path.is_file() or not any(
+                    file_path == root or root in file_path.parents for root in allowed_roots
+                ):
+                    raise ValueError("Choose one existing file from Desktop, Documents, or Downloads.")
+                if file_path.stat().st_size > 25 * 1024 * 1024:
+                    raise ValueError("Uploads are limited to 25 MB.")
+                details = {"domain": self._host, "action": "upload_file",
+                           "file": str(file_path), "selector": selector[:240]}
+                if not callable(approval_callback) or not approval_callback(
+                    details, f"Upload the selected file {file_path.name} to {self._host}"
+                ):
+                    raise PermissionError("File upload was not approved; no file was uploaded.")
+                if not selector.strip():
+                    raise ValueError("Select the file input element.")
+                locator = page.locator(selector).first
+                if locator.count() != 1:
+                    raise BrowserAutomationError("The file input selector did not identify one element.")
+                locator.set_input_files(str(file_path))
+                return f"Selected {file_path.name} for upload to {self._host}."
             if action == "scroll":
                 page.mouse.wheel(0, 650)
                 return "Scrolled the current page."
