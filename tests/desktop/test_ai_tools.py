@@ -135,7 +135,8 @@ class SafeToolTests(unittest.TestCase):
         result = execute_tool("get_available_capabilities", {})
         self.assertIn("web search, weather, and news", result)
         self.assertIn("payments", result)
-        self.assertIn("arbitrary browser automation", result)
+        self.assertIn("visible, bounded Playwright browser controller", result)
+        self.assertIn("checkout, purchases, and payments are disabled", result)
 
     def test_provider_status_is_read_only_and_hides_secrets(self):
         import json
