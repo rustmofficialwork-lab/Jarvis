@@ -2550,10 +2550,13 @@ class HudShortcutWiringTests(unittest.TestCase):
             "callBridge('open_folder', 'This PC')",
             "callBridge('open_folder', 'Network')",
             "callBridge('open_folder', 'Recycle Bin')",
+            "callBridge('open_folder', 'Downloads')",
             "callBridge('open_system_tool', 'control_panel')",
             "callBridge('open_system_tool', 'device_manager')",
             "callBridge('open_system_tool', 'task_manager')",
             "callBridge('open_system_tool', 'run')",
+            "callBridge('open_system_tool', 'start_menu')",
+            "callBridge('open_system_tool', 'network_settings')",
             "callBridge('open_settings')",
             "callBridge('close_window')",
             "callBridge('toggle_voice')",
@@ -2568,6 +2571,7 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn("if (api()) startBridgeRefresh()", runtime)
         self.assertIn("bridge.get_dashboard()", runtime)
         self.assertIn("bridge.get_runtime_state()", runtime)
+        self.assertIn("launch the Windows JARVIS desktop app", runtime)
 
     def test_hud_orb_is_only_used_for_runtime_visual_state(self):
         runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
