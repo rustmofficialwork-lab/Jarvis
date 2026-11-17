@@ -2046,7 +2046,8 @@ class JarvisDesktop:
             sender = {"gmail": send_gmail_email, "outlook": send_outlook_email}.get(provider)
             if sender is None:
                 raise ValueError("Choose Gmail or Outlook.")
-            if integration_status().get(provider) != "configured":
+            status_key = "microsoft_graph" if provider == "outlook" else "gmail"
+            if integration_status().get(status_key) != "configured":
                 raise IntegrationUnavailable(f"{provider} is not configured locally; no email was sent.")
             details = {
                 "recipient": arguments["recipient"],
