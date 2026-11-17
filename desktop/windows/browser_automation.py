@@ -447,14 +447,30 @@ class BrowserAutomation:
             if action == "press":
                 key = value.casefold()
                 if key in {"enter", "return"}:
-                    details = {"domain": self._host, "action": "submit_form",
-                               "selector": selector[:240], "key": "Enter"}
-                    if not callable(approval_callback) or not approval_callback(
-                        details, "Submit the current website form"
-                    ):
-                        raise PermissionError("Form submission was not approved; the form was not submitted.")
+                    field_type = (locator.get_attribute("type") or "").casefold()
+                    field_name = " ".join([
+                        str(locator.get_attribute("name") or ""),
+                        str(locator.get_attribute("aria-label") or ""),
+                        selector,
+                    ]).casefold()
+                    is_search_submit = (
+                        field_type == "search"
+                        or "search" in field_name
+                        or "query" in field_name
+                    )
+                    if not is_search_submit:
+                        details = {"domain": self._host, "action": "submit_form",
+                                   "selector": selector[:240], "key": "Enter"}
+                        if not callable(approval_callback) or not approval_callback(
+                            details, "Submit the current website form"
+                        ):
+                            raise PermissionError("Form submission was not approved; the form was not submitted.")
                     locator.press("Enter")
-                    return "Submitted the selected website form after exact one-time voice approval."
+                    return (
+                        "Submitted the ordinary search form."
+                        if is_search_submit
+                        else "Submitted the selected website form after exact one-time voice approval."
+                    )
                 if key not in {"tab", "escape", "arrowdown", "arrowup", "home", "end"}:
                     raise ValueError("Only navigation keys or approval-gated Enter submission are supported.")
                 locator.press(key)
