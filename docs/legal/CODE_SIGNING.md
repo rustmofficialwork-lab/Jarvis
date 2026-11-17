@@ -11,9 +11,9 @@ In the repository's Actions secrets, add:
 
 Keep both values private. Never commit a PFX file, private key, certificate password, or decoded certificate to the repository. Use a certificate issued for the publisher identity that should appear in Windows signature details.
 
-The workflow decodes the PFX only into the temporary GitHub Actions runner directory, signs packaged `.exe`, `.dll`, and `.pyd` files plus `JARVIS-Setup-x64.exe`, applies a SHA-256 timestamp, verifies each signature, and removes the temporary PFX.
+The workflow decodes the PFX only into the temporary GitHub Actions runner directory, signs packaged `.exe`, `.dll`, and `.pyd` files plus `JARVIS-Setup-x64.exe`, applies a trusted timestamp, verifies each signature, and removes the temporary PFX.
 
-If either secret is missing, the workflow deliberately skips signing and uploads unsigned artifacts. A successful unsigned build must not be described as a signed release. The rolling release checksums are generated after the signing step, so they match the final published files.
+If either secret is missing, the workflow deliberately skips signing and uploads unsigned artifacts. A successful unsigned build must not be described as a signed release. 
 
 ## Local verification
 
