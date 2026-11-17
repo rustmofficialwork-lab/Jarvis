@@ -6,6 +6,18 @@ from browser_automation import BrowserAutomation, BrowserAutomationError
 
 
 class BrowserAutomationTests(unittest.TestCase):
+    def test_browser_commands_are_serialized_on_a_dedicated_worker(self):
+        import tempfile
+        from concurrent.futures import ThreadPoolExecutor
+
+        with tempfile.TemporaryDirectory() as directory:
+            browser = BrowserAutomation(directory)
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                statuses = list(pool.map(lambda _index: browser.status(), range(8)))
+            self.assertTrue(all(status["running"] is False for status in statuses))
+            browser.close()
+            self.assertFalse(browser._worker.is_alive())
+
     def test_url_validation_requires_public_https_and_blocks_private_dns(self):
         public = [(2, 1, 6, "", ("93.184.216.34", 443))]
         with patch("browser_automation.socket.getaddrinfo", return_value=public):
