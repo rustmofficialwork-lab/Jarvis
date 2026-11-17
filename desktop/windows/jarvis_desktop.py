@@ -1234,7 +1234,7 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
             messages.append({
                 "role": "tool",
                 "tool_call_id": call_id,
-                "content": str(output)[:1000],
+                "content": str(output)[:8000],
             })
         tool_evaluation = evaluate_task(tool_plan, completed_tool_steps)
         # Place the verification note before the assistant tool-call envelope.
