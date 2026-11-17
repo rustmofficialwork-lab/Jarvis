@@ -187,6 +187,19 @@ class BrowserAutomation:
             if action == "download":
                 if not selector.strip():
                     raise ValueError("Select the download link or button.")
+                download_matches = page.locator(selector)
+                if download_matches.count() != 1 or not download_matches.first.is_visible():
+                    raise BrowserAutomationError("The download selector must identify exactly one visible element.")
+                download_label = str(download_matches.first.inner_text(timeout=1500) or "")
+                if FINANCIAL_LABELS.search(download_label):
+                    raise PermissionError("Checkout and payment controls are disabled.")
+                if SENSITIVE_LABELS.search(download_label):
+                    details = {"domain": self._host, "action": "click_sensitive_control",
+                               "label": download_label[:240], "selector": selector[:240]}
+                    if not callable(approval_callback) or not approval_callback(
+                        details, f"Download sensitive website data from {self._host}"
+                    ):
+                        raise PermissionError("Sensitive download was not approved.")
                 downloads = Path.home() / "Downloads"
                 downloads.mkdir(parents=True, exist_ok=True)
                 with page.expect_download(timeout=20_000) as pending:
@@ -267,6 +280,18 @@ class BrowserAutomation:
                 locator.click()
                 return f"Clicked the selected page element: {label[:160] or selector}."
             if action == "fill":
+                field_type = (locator.get_attribute("type") or "").casefold()
+                field_name = " ".join([
+                    str(locator.get_attribute("name") or ""),
+                    str(locator.get_attribute("autocomplete") or ""),
+                    str(locator.get_attribute("aria-label") or ""),
+                    str(locator.get_attribute("placeholder") or ""),
+                ]).casefold()
+                if field_type == "password" or re.search(
+                    r"\\b(password|passcode|pin|otp|one.time.code|token|secret|cvv|cvc|card.number)\\b",
+                    field_name,
+                ):
+                    raise PermissionError("JARVIS will not enter passwords, PINs, OTPs, tokens, or payment-card secrets. Enter those yourself in the visible browser.")
                 locator.fill(value)
                 return "Filled the selected form field. The form was not submitted."
             if action == "select":
