@@ -153,12 +153,12 @@ def authorize_tool_call(
         if re.search(r"\b(don't|do not|never|avoid|mat|nahi|nahin)\b.{0,50}\b(open|visit|navigate|click|fill|type|select|press|scroll|download|upload|read|search)\b", prompt):
             return ToolDecision(False, "not_requested", "The user explicitly denied this browser action.")
         direct_verbs = {
-            "navigate": ("open", "visit", "go to", "navigate", "kholo", "khol do"),
-            "read": ("read", "show", "summarize", "check", "padho", "dikhao"),
-            "click": ("click", "press", "select", "dabao", "click karo"),
+            "navigate": ("open", "visit", "go to", "navigate", "search", "find", "kholo", "khol do"),
+            "read": ("read", "show", "summarize", "check", "search", "find", "compare", "product", "padho", "dikhao"),
+            "click": ("click", "press", "select", "search", "find", "dabao", "click karo"),
             "fill": ("fill", "type", "enter", "search", "likho", "bharo"),
             "select": ("select", "choose", "pick", "chuno"),
-            "press": ("press", "tab", "escape"),
+            "press": ("press", "tab", "escape", "search", "find"),
             "scroll": ("scroll", "neeche", "upar"),
             "download": ("download", "save", "download karo"),
             "upload": ("upload", "attach", "lagao", "bhejo"),
