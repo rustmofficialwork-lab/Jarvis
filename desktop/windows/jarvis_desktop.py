@@ -2032,8 +2032,9 @@ class JarvisDesktop:
     def _run_sensitive_external_action(self, tool_name: str, arguments: dict) -> str:
         """Send a message only after exact preview and one-time native voice approval."""
         from provider_integrations import (
-            run_approved_action, send_gmail_email, send_outlook_email,
-            send_telegram_message, send_whatsapp_message,
+            IntegrationUnavailable, integration_status, run_approved_action,
+            send_gmail_email, send_outlook_email, send_telegram_message,
+            send_whatsapp_message,
         )
 
         if not isinstance(arguments, dict):
@@ -2045,6 +2046,8 @@ class JarvisDesktop:
             sender = {"gmail": send_gmail_email, "outlook": send_outlook_email}.get(provider)
             if sender is None:
                 raise ValueError("Choose Gmail or Outlook.")
+            if integration_status().get(provider) != "configured":
+                raise IntegrationUnavailable(f"{provider} is not configured locally; no email was sent.")
             details = {
                 "recipient": arguments["recipient"],
                 "subject": arguments["subject"],
@@ -2068,6 +2071,8 @@ class JarvisDesktop:
             }.get(provider)
             if sender is None:
                 raise ValueError("Choose Telegram or WhatsApp.")
+            if integration_status().get(provider) != "configured":
+                raise IntegrationUnavailable(f"{provider} is not configured locally; no message was sent.")
             details = {"recipient": arguments["recipient"], "content": arguments["content"]}
             return run_approved_action(
                 self, "message", details,
