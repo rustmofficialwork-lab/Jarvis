@@ -35,11 +35,24 @@ class IntegrationRejected(RuntimeError):
     """A provider rejected the request or its response was unsafe."""
 
 
-def _required_env(name: str) -> str:
+def _credential_value(name: str) -> str:
+    """Read a provider secret from the process environment or Windows Credential Manager."""
     value = os.environ.get(name, "").strip()
+    if value:
+        return value
+    try:
+        import keyring
+        value = keyring.get_password("JARVIS-Desktop", name) or ""
+    except Exception:
+        value = ""
+    return value.strip()
+
+
+def _required_env(name: str) -> str:
+    value = _credential_value(name)
     if not value:
         raise IntegrationUnavailable(
-            f"{name} is not configured. Add it locally in JARVIS's trusted settings; do not paste secrets into chat."
+            f"{name} is not configured. Add it locally to Windows Credential Manager or the process environment; do not paste secrets into chat."
         )
     if len(value) > 8192 or any(ord(ch) < 32 for ch in value):
         raise IntegrationUnavailable(f"{name} has an invalid format.")
@@ -283,11 +296,15 @@ def integration_status() -> dict[str, str]:
     """Report configuration presence only; never expose credential values."""
     import importlib.util
     playwright_ready = importlib.util.find_spec("playwright") is not None
+    has_gmail = bool(_credential_value("JARVIS_GMAIL_ACCESS_TOKEN") and os.environ.get("JARVIS_GMAIL_USER"))
+    has_graph = bool(_credential_value("JARVIS_GRAPH_ACCESS_TOKEN"))
+    has_telegram = bool(_credential_value("JARVIS_TELEGRAM_BOT_TOKEN"))
+    has_whatsapp = bool(_credential_value("JARVIS_WHATSAPP_ACCESS_TOKEN") and os.environ.get("JARVIS_WHATSAPP_PHONE_NUMBER_ID") and os.environ.get("JARVIS_WHATSAPP_API_VERSION"))
     return {
-        "gmail": "configured" if os.environ.get("JARVIS_GMAIL_ACCESS_TOKEN") and os.environ.get("JARVIS_GMAIL_USER") else "needs_local_oauth_setup",
-        "microsoft_graph": "configured" if os.environ.get("JARVIS_GRAPH_ACCESS_TOKEN") else "needs_local_oauth_setup",
-        "telegram": "configured" if os.environ.get("JARVIS_TELEGRAM_BOT_TOKEN") else "needs_local_bot_setup",
-        "whatsapp": "configured" if all(os.environ.get(k) for k in ("JARVIS_WHATSAPP_ACCESS_TOKEN", "JARVIS_WHATSAPP_PHONE_NUMBER_ID", "JARVIS_WHATSAPP_API_VERSION")) else "needs_official_cloud_api_setup",
+        "gmail": "configured" if has_gmail else "needs_local_oauth_setup",
+        "microsoft_graph": "configured" if has_graph else "needs_local_oauth_setup",
+        "telegram": "configured" if has_telegram else "needs_local_bot_setup",
+        "whatsapp": "configured" if has_whatsapp else "needs_official_cloud_api_setup",
         "playwright": "installed" if playwright_ready else "optional_dependency_missing",
         "payments": "disabled_no_executor",
         "purchases": "disabled_no_executor",
