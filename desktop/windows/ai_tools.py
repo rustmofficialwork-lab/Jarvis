@@ -142,7 +142,7 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "provider": {"type": "string", "enum": ["telegram", "whatsapp"]},
                     "recipient": {"type": "string", "maxLength": 80},
-                    "content": {"type": "string", "maxLength": 10000}
+                    "content": {"type": "string", "maxLength": 2500}
                 },
                 "required": ["provider", "recipient", "content"],
                 "additionalProperties": false
