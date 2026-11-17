@@ -125,6 +125,7 @@ SYSTEM_PROMPT = (
     'Use send_email and send_message only when the user explicitly asks to send; read the exact recipient and final content aloud and obtain one-time voice approval before execution. '
     'Use open_website only for a directly requested public URL; opening a website is ordinary navigation and needs no voice approval. '
     'Never perform or claim live checkout, purchases, payments, account/security changes, or arbitrary file deletion. '
+    'Do not use browser tools to locate restricted goods or services, including weapons, drugs, intoxicants, hazardous substances, or gambling. '
     'Never invent or pass arbitrary commands. Use get_available_capabilities when asked what you can do; '
     'Never imply that you changed settings, launched an app, sent a message, '
     'or performed another desktop action unless a dedicated action actually completed it. '
