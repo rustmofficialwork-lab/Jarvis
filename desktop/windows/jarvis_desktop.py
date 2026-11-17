@@ -1053,8 +1053,9 @@ def register_device(device_id: str, timeout: float = 12.0) -> str:
 
 def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                      history: list[dict], memories: list[str] | None = None,
-                     browser_open_authorizer=None) -> str:
-    """Request a reply and run only a few explicitly allowlisted read-only tools."""
+                     browser_open_authorizer=None,
+                     browser_action_executor=None) -> str:
+    """Request a reply and run only explicitly allowlisted, bounded tools."""
     endpoint, model = validate_chat_configuration(endpoint, model)
     if not api_key.strip():
         raise ValueError("Please set the AI model and API key in Settings.")
@@ -1216,6 +1217,11 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                             output = "Tool blocked: browser domain approval was denied, expired, or did not match."
                         else:
                             output = execute_tool(name, arguments)
+                    elif name == "browser_automation":
+                        if not callable(browser_action_executor):
+                            output = "Tool blocked: the visible browser controller is unavailable."
+                        else:
+                            output = browser_action_executor(arguments)
                     else:
                         output = execute_tool(name, arguments)
                 except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
@@ -2018,6 +2024,29 @@ class JarvisDesktop:
             return False
         self._set_status("Exact action approved once by voice.")
         return True
+
+    def _run_browser_automation(self, arguments: dict) -> str:
+        """Run a bounded visible-browser action; only sensitive controls prompt for voice approval."""
+        from browser_automation import BrowserAutomation
+
+        if not isinstance(arguments, dict):
+            raise ValueError("Browser action arguments must be an object.")
+        if not hasattr(self, "_browser_automation"):
+            self._browser_automation = BrowserAutomation(SETTINGS_DIR / "browser-profile")
+
+        def approve_sensitive(details: dict, summary: str) -> bool:
+            if not self.request_sensitive_action_approval("browser", details, summary):
+                return False
+            result = self.brain_engine.consume_sensitive_approval("browser", details)
+            return bool(result.approved)
+
+        return self._browser_automation.act(
+            arguments.get("action", ""),
+            selector=arguments.get("selector", ""),
+            value=arguments.get("value", ""),
+            url=arguments.get("url", ""),
+            approval_callback=approve_sensitive,
+        )
 
     def _authorize_browser_open(self, url: str) -> bool:
         """Require a one-time, exact-host approval before opening a public website."""
@@ -2971,6 +3000,7 @@ class JarvisDesktop:
                     endpoint, self.settings.get("model", DEFAULT_MODEL), token,
                     prompt, self.history, memories,
                     browser_open_authorizer=self._authorize_browser_open,
+                    browser_action_executor=self._run_browser_automation,
                 )
             except RuntimeError as exc:
                 if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
