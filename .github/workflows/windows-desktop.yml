@@ -245,18 +245,6 @@ jobs:
           path: |
             dist-installer/JARVIS-Portable-x64.zip
           if-no-files-found: error
-      - name: Remove legacy checksum asset from rolling release
-        if: github.event_name != 'pull_request'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/jarvis-latest" | ConvertFrom-Json
-          $legacyAssets = @($release.assets | Where-Object { $_.name -eq "SHA256SUMS.txt" })
-          foreach ($asset in $legacyAssets) {
-            gh api --method DELETE "repos/$env:GITHUB_REPOSITORY/releases/assets/$($asset.id)"
-            if ($LASTEXITCODE -ne 0) { throw "Could not remove the legacy checksum release asset." }
-          }
       - name: Publish rolling Windows release
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v3
