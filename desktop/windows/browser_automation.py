@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import queue
 import re
 import socket
 import threading
+from concurrent.futures import Future
 import urllib.parse
 from pathlib import Path
 from typing import Any
@@ -43,6 +45,41 @@ class BrowserAutomation:
         self._page = None
         self._host: str | None = None
         self._steps = 0
+        self._commands: queue.Queue = queue.Queue()
+        self._worker = threading.Thread(
+            target=self._worker_loop, name="JARVIS-Browser", daemon=True
+        )
+        self._worker.start()
+
+    def _worker_loop(self):
+        while True:
+            item = self._commands.get()
+            if item is None:
+                return
+            future, method, args, kwargs = item
+            try:
+                if method == "act":
+                    result = self._act_local(*args, **kwargs)
+                elif method == "navigate":
+                    result = self._navigate_local(*args, **kwargs)
+                elif method == "status":
+                    result = self._status_local()
+                elif method == "close":
+                    result = self._close_local()
+                else:
+                    raise BrowserAutomationError("Unknown browser worker command.")
+                future.set_result(result)
+                if method == "close":
+                    return
+            except BaseException as exc:
+                future.set_exception(exc)
+
+    def _call_worker(self, method: str, *args, **kwargs):
+        if not self._worker.is_alive():
+            raise BrowserAutomationError("The JARVIS browser session has been closed.")
+        future = Future()
+        self._commands.put((future, method, args, kwargs))
+        return future.result(timeout=120)
 
     @staticmethod
     def _validate_url(url: str) -> tuple[str, str]:
@@ -121,7 +158,7 @@ class BrowserAutomation:
         except Exception:
             page.close()
 
-    def close(self):
+    def _close_local(self):
         with self._lock:
             try:
                 if self._context is not None:
@@ -162,6 +199,9 @@ class BrowserAutomation:
         page.route("**/*", route_request)
 
     def navigate(self, url: str) -> str:
+        return self._call_worker("navigate", url)
+
+    def _navigate_local(self, url: str) -> str:
         host, safe_url = self._validate_url(url)
         with self._lock:
             self._check_step()
@@ -186,8 +226,14 @@ class BrowserAutomation:
         return f"Page: {title}\nURL: {url}\n\n{text}"
 
     def act(self, action: str, *, selector: str = "", value: str = "", url: str = "", approval_callback=None) -> str:
+        return self._call_worker(
+            "act", action, selector=selector, value=value, url=url,
+            approval_callback=approval_callback,
+        )
+
+    def _act_local(self, action: str, *, selector: str = "", value: str = "", url: str = "", approval_callback=None) -> str:
         if action == "navigate":
-            return self.navigate(url)
+            return self._navigate_local(url)
         if action not in {"read", "click", "fill", "select", "press", "scroll", "download", "upload", "new_tab", "switch_tab"}:
             raise ValueError("Unsupported browser action.")
         if not isinstance(selector, str) or len(selector) > MAX_SELECTOR_CHARS:
@@ -358,6 +404,16 @@ class BrowserAutomation:
         raise BrowserAutomationError("The browser action did not complete.")
 
     def status(self) -> dict[str, Any]:
+        return self._call_worker("status")
+
+    def close(self):
+        if self._worker.is_alive():
+            try:
+                self._call_worker("close")
+            finally:
+                self._commands.put(None)
+
+    def _status_local(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "running": self._context is not None,
