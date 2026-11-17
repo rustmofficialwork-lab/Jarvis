@@ -21,7 +21,7 @@ from typing import Any
 MAX_STEPS_PER_SESSION = 40
 MAX_TEXT_CHARS = 5_000
 MAX_SELECTOR_CHARS = 240
-FINANCIAL_LABELS = re.compile(r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|cart|add to cart)\b", re.IGNORECASE)
+FINANCIAL_LABELS = re.compile(r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|cart|add to cart)\b", re.IGNORECASE)\nFINANCIAL_CONTEXT_PATTERN = re.compile(r"\b(checkout|payment|billing|cart|purchase|order)\b", re.IGNORECASE)
 PERSONAL_FIELD_PATTERN = re.compile(r"\b(name|email|phone|mobile|address|postal|zip|date of birth|dob|passport|national id)\b", re.IGNORECASE)\nSENSITIVE_LABELS = re.compile(
     r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|"
     r"send|transfer|delete|remove account|change password|change email|change username|update account|save changes|edit profile|security settings|export|confirm booking|submit|confirm|log in|login|sign in|logout|post|publish|share)\b",
@@ -226,6 +226,16 @@ class BrowserAutomation:
                 raise BrowserAutomationError("Cross-domain redirect blocked. Open the destination explicitly.")
             return self._describe_page()
 
+    @staticmethod
+    def _is_financial_context(page, selector: str = "") -> bool:
+        path = urllib.parse.urlsplit(page.url).path
+        title = page.title()
+        return bool(
+            FINANCIAL_CONTEXT_PATTERN.search(path)
+            or FINANCIAL_CONTEXT_PATTERN.search(title)
+            or FINANCIAL_CONTEXT_PATTERN.search(selector)
+        )
+
     def _describe_page(self) -> str:
         page = self._require_page()
         title = page.title()[:240]
@@ -322,6 +332,8 @@ class BrowserAutomation:
             if action == "read":
                 return self._describe_page()
             if action == "download":
+                if self._is_financial_context(page, selector):
+                    raise PermissionError("Checkout, cart, and payment workflows are disabled.")
                 if not selector.strip():
                     raise ValueError("Select the download link or button.")
                 download_matches = page.locator(selector)
@@ -399,6 +411,8 @@ class BrowserAutomation:
                 raise BrowserAutomationError("The selector must identify exactly one visible element.")
             locator = matches.first
             if action == "click":
+                if self._is_financial_context(page, selector):
+                    raise PermissionError("Checkout, cart, and payment workflows are disabled.")
                 label = " ".join([
                     str(locator.inner_text(timeout=1500) or ""),
                     str(locator.get_attribute("aria-label") or ""),
@@ -449,6 +463,8 @@ class BrowserAutomation:
             if action == "press":
                 key = value.casefold()
                 if key in {"enter", "return"}:
+                    if self._is_financial_context(page, selector):
+                        raise PermissionError("Checkout, cart, and payment form submission is disabled.")
                     field_type = (locator.get_attribute("type") or "").casefold()
                     field_name = " ".join([
                         str(locator.get_attribute("name") or ""),
