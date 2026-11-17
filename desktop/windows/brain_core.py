@@ -132,9 +132,9 @@ def authorize_tool_call(
     tool = name.strip().casefold()
     if tool in {"send_email", "send_message"}:
         prompt = str(user_prompt or "").casefold()
-        if not re.search(r"\\b(send|bhej|bhejo)\\b", prompt):
+        if not re.search(r"\b(send|bhej|bhejo)\b", prompt):
             return ToolDecision(False, "not_requested", "The user did not directly request sending a message.")
-        return ToolDecision(True, "confirmation_required", "A trusted one-time voice approval is mandatory before sending.")
+        return ToolDecision(True, "approval_required", "The trusted executor must obtain exact one-time voice approval before sending.")
     if tool in SENSITIVE_TOOL_NAMES:
         return ToolDecision(
             False, "confirmation_required",
