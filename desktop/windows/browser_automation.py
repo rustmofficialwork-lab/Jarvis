@@ -214,19 +214,20 @@ class BrowserAutomation:
                     raise PermissionError("File upload was not approved; no file was uploaded.")
                 if not selector.strip():
                     raise ValueError("Select the file input element.")
-                locator = page.locator(selector).first
-                if locator.count() != 1:
-                    raise BrowserAutomationError("The file input selector did not identify one element.")
-                locator.set_input_files(str(file_path))
+                matches = page.locator(selector)
+                if matches.count() != 1:
+                    raise BrowserAutomationError("The file input selector must identify exactly one element.")
+                matches.first.set_input_files(str(file_path))
                 return f"Selected {file_path.name} for upload to {self._host}."
             if action == "scroll":
                 page.mouse.wheel(0, 650)
                 return "Scrolled the current page."
             if not selector.strip():
                 raise ValueError("A visible text, label, role, or CSS selector is required.")
-            locator = page.locator(selector).first
-            if locator.count() != 1 or not locator.is_visible():
-                raise BrowserAutomationError("The selector did not identify one visible element.")
+            matches = page.locator(selector)
+            if matches.count() != 1 or not matches.first.is_visible():
+                raise BrowserAutomationError("The selector must identify exactly one visible element.")
+            locator = matches.first
             if action == "click":
                 label = " ".join([
                     str(locator.inner_text(timeout=1500) or ""),
@@ -249,6 +250,15 @@ class BrowserAutomation:
                 locator.fill(value)
                 return "Filled the selected form field. The form was not submitted."
             if action == "select":
+                if FINANCIAL_LABELS.search(value):
+                    raise PermissionError("Selecting checkout or payment options is disabled.")
+                if SENSITIVE_LABELS.search(value):
+                    details = {"domain": self._host, "action": "click_sensitive_control",
+                               "label": value[:240], "selector": selector[:240]}
+                    if not callable(approval_callback) or not approval_callback(
+                        details, f"Select sensitive website option: {value[:160]}"
+                    ):
+                        raise PermissionError("Sensitive website selection was not approved.")
                 locator.select_option(label=value)
                 return "Selected the requested option. The form was not submitted."
             if action == "press":
