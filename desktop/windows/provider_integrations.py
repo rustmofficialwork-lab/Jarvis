@@ -281,14 +281,15 @@ def read_browser_page(
 
 def integration_status() -> dict[str, str]:
     """Report configuration presence only; never expose credential values."""
+    import importlib.util
+    playwright_ready = importlib.util.find_spec("playwright") is not None
     return {
         "gmail": "configured" if os.environ.get("JARVIS_GMAIL_ACCESS_TOKEN") and os.environ.get("JARVIS_GMAIL_USER") else "needs_local_oauth_setup",
         "microsoft_graph": "configured" if os.environ.get("JARVIS_GRAPH_ACCESS_TOKEN") else "needs_local_oauth_setup",
         "telegram": "configured" if os.environ.get("JARVIS_TELEGRAM_BOT_TOKEN") else "needs_local_bot_setup",
         "whatsapp": "configured" if all(os.environ.get(k) for k in ("JARVIS_WHATSAPP_ACCESS_TOKEN", "JARVIS_WHATSAPP_PHONE_NUMBER_ID")) else "needs_official_cloud_api_setup",
-        "playwright": "optional_dependency_check_required",
+        "playwright": "installed" if playwright_ready else "optional_dependency_missing",
         "payments": "disabled_test_mode_only",
         "purchases": "disabled_test_mode_only",
         "account_mutations": "not_implemented_read_only_only",
-        
     }
