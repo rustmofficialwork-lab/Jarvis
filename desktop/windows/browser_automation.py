@@ -102,11 +102,24 @@ class BrowserAutomation:
                 self._context = self._playwright.chromium.launch_persistent_context(**launch_options)
             self._context.set_default_timeout(8_000)
             self._context.set_default_navigation_timeout(15_000)
-            self._context.on("page", lambda page: page.close() if page != self._page else None)
-            self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
+            self._context.on("page", self._attach_page)
+            pages = self._context.pages
+            if pages:
+                self._page = pages[0]
+                self._safe_target(self._page)
+            else:
+                self._page = self._context.new_page()
         except Exception:
             self.close()
             raise
+
+    def _attach_page(self, page):
+        """Keep newly opened tabs inside the same public-host navigation boundary."""
+        self._page = page
+        try:
+            self._safe_target(page)
+        except Exception:
+            page.close()
 
     def close(self):
         with self._lock:
@@ -173,7 +186,7 @@ class BrowserAutomation:
     def act(self, action: str, *, selector: str = "", value: str = "", url: str = "", approval_callback=None) -> str:
         if action == "navigate":
             return self.navigate(url)
-        if action not in {"read", "click", "fill", "select", "press", "scroll", "download", "upload"}:
+        if action not in {"read", "click", "fill", "select", "press", "scroll", "download", "upload", "new_tab", "switch_tab"}:
             raise ValueError("Unsupported browser action.")
         if not isinstance(selector, str) or len(selector) > MAX_SELECTOR_CHARS:
             raise ValueError("Selector must be 240 characters or fewer.")
@@ -183,6 +196,20 @@ class BrowserAutomation:
             self._check_step()
             page = self._require_page()
             if action == "read":
+                return self._describe_page()
+            if action == "new_tab":
+                page = self._context.new_page()
+                self._page = page
+                self._safe_target(page)
+                return "Opened a new JARVIS browser tab."
+            if action == "switch_tab":
+                if not value.isdigit():
+                    raise ValueError("Provide a zero-based tab number.")
+                pages = self._context.pages
+                index = int(value)
+                if index < 0 or index >= len(pages) or index >= 10:
+                    raise ValueError("That browser tab does not exist.")
+                self._page = pages[index]
                 return self._describe_page()
             if action == "download":
                 if not selector.strip():
