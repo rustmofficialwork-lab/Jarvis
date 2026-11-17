@@ -185,7 +185,7 @@ jobs:
           if (-not (Test-Path $helper)) { throw "Windows Hello helper was not built." }
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --onedir --windowed --add-binary "hello-auth/publish/JarvisHelloAuth.exe;hello-auth" --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_hud_runtime.js;." --add-data "jarvis_gesture_logic.js;." --add-data "vendor;vendor" --collect-all webview --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --exclude-module android --exclude-module onnxruntime.quantization --collect-all huggingface_hub --paths . --hidden-import build_version --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --onedir --windowed --add-binary "hello-auth/publish/JarvisHelloAuth.exe;hello-auth" --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_hud_runtime.js;." --add-data "jarvis_gesture_logic.js;." --add-data "vendor;vendor" --collect-all webview --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --exclude-module android --exclude-module onnxruntime.quantization --collect-all huggingface_hub --collect-all playwright --collect-all greenlet --paths . --hidden-import browser_automation --hidden-import build_version --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
       - name: Smoke-test packaged Windows executable
         shell: pwsh
         run: |
