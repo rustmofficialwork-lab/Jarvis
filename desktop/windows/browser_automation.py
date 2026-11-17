@@ -147,7 +147,7 @@ class BrowserAutomation:
             else:
                 self._page = self._context.new_page()
         except Exception:
-            self.close()
+            self._close_local()
             raise
 
     def _attach_page(self, page):
