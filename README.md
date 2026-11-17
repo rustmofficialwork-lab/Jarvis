@@ -27,7 +27,7 @@ Voice examples include “Jarvis Chrome kholo”, “Google Chrome kholo”, “
 
 The AI tool layer supports bounded, user-directed browser automation through `desktop/windows/browser_automation.py`. It opens a visible Microsoft Edge session on Windows (with Playwright Chromium fallback) using a dedicated JARVIS profile, not the user's everyday browser profile.
 
-- **Website interaction:** open public HTTPS sites, read pages, click one unambiguous visible element, navigate, and scroll. Ordinary navigation and non-sensitive clicks do not ask for voice permission.
+- **Website interaction:** open public HTTPS sites, open/switch tabs, read pages, click one unambiguous visible element, navigate, and scroll. Ordinary navigation and non-sensitive clicks do not ask for voice permission.
 - **Form automation:** fill ordinary search and form fields, choose dropdown options, and use navigation keys. JARVIS never enters passwords, PINs, OTPs, API tokens, or payment-card secrets. Pressing Enter to submit a form, or clicking a control identified as sensitive, requires exact one-time spoken approval.
 - **Email and messaging:** `send_email` supports configured Gmail and Microsoft Graph; `send_message` supports Telegram Bot API and official WhatsApp Cloud API. The exact recipient and final content are read aloud and a one-time voice approval is consumed immediately before sending. The user must explicitly request sending; drafting text alone never sends it.
 - **File operations:** safe downloads are saved in the Windows Downloads folder, limited to 50 MB, and executable/script file types are blocked. Uploads are limited to one user-selected file from Desktop, Documents, or Downloads, up to 25 MB, and require exact one-time voice approval.
