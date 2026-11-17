@@ -296,16 +296,16 @@ def integration_status() -> dict[str, str]:
     """Report configuration presence only; never expose credential values."""
     import importlib.util
     playwright_ready = importlib.util.find_spec("playwright") is not None
-    has_gmail = bool(_credential_value("JARVIS_GMAIL_ACCESS_TOKEN") and os.environ.get("JARVIS_GMAIL_USER"))
+    has_gmail = bool(_credential_value("JARVIS_GMAIL_ACCESS_TOKEN") and _credential_value("JARVIS_GMAIL_USER"))
     has_graph = bool(_credential_value("JARVIS_GRAPH_ACCESS_TOKEN"))
     has_telegram = bool(_credential_value("JARVIS_TELEGRAM_BOT_TOKEN"))
-    has_whatsapp = bool(_credential_value("JARVIS_WHATSAPP_ACCESS_TOKEN") and os.environ.get("JARVIS_WHATSAPP_PHONE_NUMBER_ID") and os.environ.get("JARVIS_WHATSAPP_API_VERSION"))
+    has_whatsapp = bool(_credential_value("JARVIS_WHATSAPP_ACCESS_TOKEN") and _credential_value("JARVIS_WHATSAPP_PHONE_NUMBER_ID") and _credential_value("JARVIS_WHATSAPP_API_VERSION"))
     return {
         "gmail": "configured" if has_gmail else "needs_local_oauth_setup",
         "microsoft_graph": "configured" if has_graph else "needs_local_oauth_setup",
         "telegram": "configured" if has_telegram else "needs_local_bot_setup",
         "whatsapp": "configured" if has_whatsapp else "needs_official_cloud_api_setup",
-        "playwright": "installed" if playwright_ready else "optional_dependency_missing",
+        "playwright": "python_package_installed_browser_not_verified" if playwright_ready else "optional_dependency_missing",
         "payments": "disabled_no_executor",
         "purchases": "disabled_no_executor",
         "account_mutations": "not_implemented_read_only_only",
