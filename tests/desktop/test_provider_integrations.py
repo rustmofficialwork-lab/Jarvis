@@ -63,6 +63,7 @@ class ProviderIntegrationTests(unittest.TestCase):
         env = {
             "JARVIS_WHATSAPP_ACCESS_TOKEN": "test-token",
             "JARVIS_WHATSAPP_PHONE_NUMBER_ID": "123456",
+            "JARVIS_WHATSAPP_API_VERSION": "v22.0",
         }
         with patch.dict(os.environ, env):
             with patch("provider_integrations._request_json",
