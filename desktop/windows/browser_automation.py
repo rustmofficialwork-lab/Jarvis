@@ -44,6 +44,7 @@ class BrowserAutomation:
         self._context = None
         self._page = None
         self._host: str | None = None
+        self._page_hosts: dict[int, str | None] = {}
         self._steps = 0
         self._commands: queue.Queue = queue.Queue()
         self._worker = threading.Thread(
@@ -151,8 +152,9 @@ class BrowserAutomation:
             raise
 
     def _attach_page(self, page):
-        """Keep newly opened tabs inside the same public-host navigation boundary."""
+        """Keep newly opened tabs inside their own public-host navigation boundary."""
         self._page = page
+        self._page_hosts[id(page)] = self._host
         try:
             self._safe_target(page)
         except Exception:
@@ -167,6 +169,7 @@ class BrowserAutomation:
                 self._context = None
                 self._page = None
                 self._host = None
+                self._page_hosts.clear()
                 if self._playwright is not None:
                     self._playwright.stop()
                 self._playwright = None
@@ -182,15 +185,20 @@ class BrowserAutomation:
         if self._page.url == "about:blank":
             return self._page
         current_host = (urllib.parse.urlsplit(self._page.url).hostname or "").casefold().rstrip(".")
-        if current_host != self._host:
+        expected_host = self._page_hosts.get(id(self._page))
+        if not expected_host or current_host != expected_host:
             raise BrowserAutomationError("The active page left its approved website; navigate again.")
+        self._host = expected_host
         return self._page
 
     def _safe_target(self, page):
+        page_id = id(page)
+
         def route_request(route):
             try:
                 request_host, _safe_url = self._validate_url(route.request.url)
-                if route.request.is_navigation_request and request_host != self._host:
+                expected_host = self._page_hosts.get(page_id)
+                if route.request.is_navigation_request and request_host != expected_host:
                     route.abort()
                     return
                 route.continue_()
@@ -206,9 +214,8 @@ class BrowserAutomation:
         with self._lock:
             self._check_step()
             self._ensure_browser()
-            if self._host is not None and host != self._host:
-                self._host = None
             self._host = host
+            self._page_hosts[id(self._page)] = host
             self._safe_target(self._page)
             self._page.goto(safe_url, wait_until="domcontentloaded")
             final_host = (urllib.parse.urlsplit(self._page.url).hostname or "").casefold().rstrip(".")
@@ -306,6 +313,7 @@ class BrowserAutomation:
                 if index < 0 or index >= len(pages) or index >= 10:
                     raise ValueError("That browser tab does not exist.")
                 self._page = pages[index]
+                self._host = self._page_hosts.get(id(self._page))
                 if self._page.url == "about:blank":
                     return "Switched to a blank browser tab. Navigate to a public HTTPS website to continue."
                 return self._describe_page()
