@@ -189,6 +189,10 @@
       callBridge('open_system_tool', 'network_settings');
       return;
     }
+    if (x >= 185 && x <= 315 && y >= 360 && y <= 405) {
+      callBridge('open_system_tool', 'power_options');
+      return;
+    }
   }
 
   document.addEventListener('click', handleHudClick, true);
