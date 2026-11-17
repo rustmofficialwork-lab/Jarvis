@@ -66,7 +66,7 @@ def _request_json(url: str, *, method: str, token: str, payload: dict[str, Any])
             raw = response.read(MAX_RESPONSE_BYTES + 1)
             if len(raw) > MAX_RESPONSE_BYTES:
                 raise IntegrationRejected("Provider response exceeded the safe size limit.")
-            result = json.loads(raw.decode("utf-8"))
+            result = json.loads(raw.decode("utf-8")) if raw.strip() else {}
     except urllib.error.HTTPError as exc:
         detail = exc.read(512).decode("utf-8", errors="replace")
         raise IntegrationRejected(f"Provider rejected the request (HTTP {exc.code}): {detail}") from exc
