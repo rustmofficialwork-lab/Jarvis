@@ -105,15 +105,24 @@
     }
   }
 
+  let bridgeWarningShown = false;
   function callBridge(name, ...args) {
     const bridge = api();
     if (!bridge || typeof bridge[name] !== 'function') {
-      console.warn('JARVIS action unavailable until desktop bridge is ready:', name);
-      return;
+      console.warn('JARVIS action unavailable: launch the Windows JARVIS desktop app (not jarvis_hud.html in a browser).', name);
+      if (!bridgeWarningShown) {
+        bridgeWarningShown = true;
+        window.alert('Windows controls are unavailable in a normal browser tab. Close this page and launch JARVIS.exe to use the working HUD controls.');
+      }
+      return Promise.resolve(false);
     }
-    Promise.resolve(bridge[name](...args)).then(result => {
+    return Promise.resolve().then(() => bridge[name](...args)).then(result => {
       if (result === false) console.warn('JARVIS action was not accepted:', name);
-    }).catch(error => console.warn('JARVIS action failed:', name, error));
+      return result;
+    }).catch(error => {
+      console.warn('JARVIS action failed:', name, error);
+      return false;
+    });
   }
 
   function svgPoint(event, svg) {
@@ -169,6 +178,16 @@
       if (y < 120) callBridge('open_folder', 'Pictures');
       else if (y < 235) callBridge('open_folder', 'Downloads');
       else callBridge('open_folder', 'This PC');
+      return;
+    }
+    // Additional visible controls in the supplied artwork.
+    if (x >= 330 && x <= 422 && y >= 615 && y <= 707) {
+      callBridge('open_system_tool', 'start_menu');
+      return;
+    }
+    if (x >= 72 && x <= 125 && y >= 480 && y <= 535) {
+      callBridge('open_system_tool', 'network_settings');
+      return;
     }
   }
 
