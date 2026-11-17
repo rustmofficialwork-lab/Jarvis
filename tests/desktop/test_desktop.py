@@ -2557,6 +2557,7 @@ class HudShortcutWiringTests(unittest.TestCase):
             "callBridge('open_system_tool', 'run')",
             "callBridge('open_system_tool', 'start_menu')",
             "callBridge('open_system_tool', 'network_settings')",
+            "callBridge('open_system_tool', 'power_options')",
             "callBridge('open_settings')",
             "callBridge('close_window')",
             "callBridge('toggle_voice')",
