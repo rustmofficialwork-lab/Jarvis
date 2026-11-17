@@ -117,6 +117,41 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "send_email",
+            "description": "Send one user-requested email using an already configured Gmail or Microsoft Graph connection. Always show exact recipient, subject, and final body aloud and obtain one-time voice approval before sending. Never send without approval.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "provider": {"type": "string", "enum": ["gmail", "outlook"]},
+                    "recipient": {"type": "string", "maxLength": 320},
+                    "subject": {"type": "string", "maxLength": 240},
+                    "content": {"type": "string", "maxLength": 10000}
+                },
+                "required": ["provider", "recipient", "subject", "content"],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_message",
+            "description": "Send one user-requested message using an already configured Telegram or WhatsApp Cloud API connection. Always show exact recipient and final message aloud and obtain one-time voice approval before sending. Never send without approval.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "provider": {"type": "string", "enum": ["telegram", "whatsapp"]},
+                    "recipient": {"type": "string", "maxLength": 80},
+                    "content": {"type": "string", "maxLength": 10000}
+                },
+                "required": ["provider", "recipient", "content"],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "open_app",
             "description": "Open one of the built-in safe Windows apps when the user explicitly asks to open it. Never pass arbitrary commands, paths, or arguments.",
             "parameters": {"type": "object", "properties": {
