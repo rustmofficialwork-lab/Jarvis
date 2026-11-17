@@ -150,7 +150,8 @@ def authorize_tool_call(
         restricted_terms = (
             "gun|guns|firearm|ammunition|ammo|explosive|bomb|weapon|knife|switchblade|"
             "taser|pepper spray|mace|cocaine|meth|heroin|fentanyl|mdma|ecstasy|lsd|"
-            "marijuana|cannabis|weed|intoxicant|vape|nicotine|casino|gambling|betting|"
+            "marijuana|cannabis|weed|intoxicant|alcohol|beer|wine|liquor|cigarette|tobacco|"
+            "vape|nicotine|steroid|diet pill|laxative|poison|toxin|casino|gambling|betting|"
             "sportsbook|sports betting|prediction market"
         )
         search_intent = (
