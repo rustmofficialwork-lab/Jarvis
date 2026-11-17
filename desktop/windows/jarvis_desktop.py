@@ -4407,16 +4407,19 @@ class JarvisWebBridge:
             "control_panel": ["control.exe"],
             "device_manager": ["mmc.exe", "devmgmt.msc"],
             "task_manager": ["taskmgr.exe"],
+            "network_settings": ["explorer.exe", "ms-settings:network"],
+            "power_options": ["control.exe", "/name", "Microsoft.PowerOptions"],
         }
         tool = str(tool or "")
-        if tool == "run":
-            def show_run_dialog():
+        if tool in {"run", "start_menu"}:
+            def show_windows_shortcut():
                 user32 = ctypes.windll.user32
                 user32.keybd_event(0x5B, 0, 0, 0)
-                user32.keybd_event(0x52, 0, 0, 0)
-                user32.keybd_event(0x52, 0, 2, 0)
+                if tool == "run":
+                    user32.keybd_event(0x52, 0, 0, 0)
+                    user32.keybd_event(0x52, 0, 2, 0)
                 user32.keybd_event(0x5B, 0, 2, 0)
-            return self._dispatch(show_run_dialog)
+            return self._dispatch(show_windows_shortcut)
         command = commands.get(tool)
         if command is None:
             return False
