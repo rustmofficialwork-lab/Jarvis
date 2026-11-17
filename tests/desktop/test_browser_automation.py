@@ -71,24 +71,31 @@ class BrowserAutomationTests(unittest.TestCase):
         with self.assertRaises(BrowserAutomationError):
             browser._act_local("click", selector="button")
 
-    def test_enter_submission_requires_approval_and_executes_after_approval(self):
+    def test_search_submission_needs_no_voice_approval(self):
         browser, locator = self._fake_browser("Search")
+        result = browser._act_local(
+            "press", selector="form.search", value="Enter"
+        )
+        self.assertIn("ordinary search form", result)
+        locator.press.assert_called_once_with("Enter")
+
+    def test_sensitive_form_submission_requires_approval(self):
+        browser, locator = self._fake_browser("Contact form")
         with self.assertRaises(PermissionError):
-            browser._act_local("press", selector="form.search", value="Enter")
+            browser._act_local("press", selector="form.contact", value="Enter")
         locator.press.assert_not_called()
 
         approved = []
         result = browser._act_local(
-            "press", selector="form.search", value="Enter",
+            "press", selector="form.contact", value="Enter",
             approval_callback=lambda details, summary: approved.append(details) or True,
         )
-        self.assertIn("Pressed Enter", result)
+        self.assertIn("exact one-time voice approval", result)
         self.assertEqual(approved[0], {
             "domain": "example.com", "action": "submit_form",
-            "selector": "form.search", "key": "Enter",
+            "selector": "form.contact", "key": "Enter",
         })
         locator.press.assert_called_once_with("Enter")
-
 
     def test_secret_fields_are_blocked_and_ordinary_fields_remain_fillable(self):
         sensitive_names = (
