@@ -376,6 +376,8 @@ class BrowserAutomation:
                 download.save_as(str(destination))
                 return f"Downloaded {filename} to the Windows Downloads folder."
             if action == "upload":
+                if self._is_financial_context(page, selector):
+                    raise PermissionError("File uploads inside checkout and payment workflows are disabled.")
                 file_path = Path(value).expanduser().resolve()
                 allowed_roots = [
                     (Path.home() / "Desktop").resolve(),
@@ -431,6 +433,8 @@ class BrowserAutomation:
                 locator.click()
                 return f"Clicked the selected page element: {label[:160] or selector}."
             if action == "fill":
+                if self._is_financial_context(page, selector):
+                    raise PermissionError("Checkout and payment form changes are disabled.")
                 field_type = (locator.get_attribute("type") or "").casefold()
                 field_name = " ".join([
                     str(locator.get_attribute("name") or ""),
@@ -449,6 +453,8 @@ class BrowserAutomation:
                 locator.fill(value)
                 return "Filled the selected form field. The form was not submitted."
             if action == "select":
+                if self._is_financial_context(page, selector):
+                    raise PermissionError("Checkout and payment form changes are disabled.")
                 if FINANCIAL_LABELS.search(value):
                     raise PermissionError("Selecting checkout or payment options is disabled.")
                 if SENSITIVE_LABELS.search(value):
