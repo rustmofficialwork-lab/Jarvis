@@ -4278,9 +4278,13 @@ class JarvisDesktop:
 
 
 
+def _is_windows_platform():
+    return os.name == "nt"
+
+
 def get_foreground_window_handle():
     """Return the foreground HWND so Windows Hello can parent its consent UI."""
-    if os.name != "nt":
+    if not _is_windows_platform():
         return 0
     try:
         return int(ctypes.windll.user32.GetForegroundWindow())
@@ -4343,7 +4347,7 @@ class JarvisWebBridge:
 
     def verify_windows_identity(self):
         """Ask Windows Hello to verify the signed-in user; never store biometric data."""
-        if os.name != "nt":
+        if not _is_windows_platform():
             return {"verified": False, "code": "unsupported_platform",
                     "message": "Windows Hello verification is available only on Windows."}
         hwnd = get_foreground_window_handle()
