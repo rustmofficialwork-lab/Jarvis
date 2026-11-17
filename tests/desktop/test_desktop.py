@@ -2862,10 +2862,11 @@ class WindowsHelloBridgeTests(unittest.TestCase):
         self.assertEqual(result["code"], "helper_missing")
         run.assert_not_called()
 
-    def test_face_presence_checks_saved_camera_consent_before_opening_camera(self):
+    def test_face_presence_feature_and_button_are_removed(self):
         extensions = (DESKTOP_DIR / "jarvis_hud_extensions.js").read_text(encoding="utf-8")
-        self.assertIn("nativeApi?.camera_access_allowed", extensions)
-        self.assertIn("enable optional camera access in JARVIS settings", extensions)
+        self.assertNotIn("jx-face-toggle", extensions)
+        self.assertNotIn("FACE PRESENCE", extensions)
+        self.assertNotIn("FaceDetector", extensions)
         self.assertIn("verify_windows_identity", extensions)
 
 
