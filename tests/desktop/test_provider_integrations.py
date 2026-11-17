@@ -132,6 +132,9 @@ class ProviderIntegrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_browser_page("http://example.com", allowed_domains=["example.com"],
                               consume_approval=self.consume)
+        with self.assertRaises(ValueError):
+            read_browser_page("https://127.0.0.1", allowed_domains=["127.0.0.1"],
+                              consume_approval=self.consume)
         self.assertEqual(self.approved_details, [])
 
     def test_browser_requires_approval_before_optional_dependency(self):
