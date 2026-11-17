@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from updater import API_URL, CHECKSUM_NAME, INSTALLER_NAME, check_for_update, download_verified_installer
+from updater import API_URL, INSTALLER_NAME, check_for_update, download_verified_installer
 
 
 class FakeResponse(io.BytesIO):
@@ -42,8 +42,7 @@ class UpdaterTests(unittest.TestCase):
             "tag_name": "v1.2.0",
             "html_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/tag/v1.2.0",
             "assets": [
-                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/v1.2.0/" + INSTALLER_NAME},
-                {"name": CHECKSUM_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/v1.2.0/" + CHECKSUM_NAME},
+                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/v1.2.0/" + INSTALLER_NAME, "digest": "sha256:" + "a" * 64},
             ],
         }
         result = check_for_update("1.1.0", FakeOpener([json.dumps(payload).encode()]))
@@ -55,8 +54,7 @@ class UpdaterTests(unittest.TestCase):
             "tag_name": "jarvis-latest",
             "body": "Latest successful Windows desktop build.\nVersion: 1.1.345\n",
             "assets": [
-                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + INSTALLER_NAME},
-                {"name": CHECKSUM_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + CHECKSUM_NAME},
+                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + INSTALLER_NAME, "digest": "sha256:" + "b" * 64},
             ],
         }
         result = check_for_update("1.1.344", FakeOpener([json.dumps(payload).encode()]))
@@ -78,8 +76,7 @@ class UpdaterTests(unittest.TestCase):
         payload = {
             "tag_name": "v2.0.0",
             "assets": [
-                {"name": INSTALLER_NAME, "browser_download_url": "https://example.com/setup.exe"},
-                {"name": CHECKSUM_NAME, "browser_download_url": "https://github.com/org/repo/checksums"},
+                {"name": INSTALLER_NAME, "browser_download_url": "https://example.com/setup.exe", "digest": "sha256:" + "c" * 64},
             ],
         }
         with self.assertRaisesRegex(ValueError, "unsafe"):
@@ -88,38 +85,35 @@ class UpdaterTests(unittest.TestCase):
     def test_download_verifies_hash_before_writing(self):
         installer = b"sample installer bytes"
         digest = hashlib.sha256(installer).hexdigest()
-        checksum = f"{digest}  {INSTALLER_NAME}\n".encode()
-        opener = FakeOpener([checksum, installer])
+        opener = FakeOpener([installer])
         with tempfile.TemporaryDirectory() as folder:
             path = download_verified_installer(
                 "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                "https://github.com/org/repo/releases/download/v1/" + CHECKSUM_NAME,
+                digest,
                 folder, opener,
             )
             self.assertEqual(path.read_bytes(), installer)
 
     def test_rejects_tampered_installer(self):
-        checksum = ("0" * 64 + "  " + INSTALLER_NAME + "\n").encode()
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(ValueError, "SHA-256"):
                 download_verified_installer(
                     "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                    "https://github.com/org/repo/releases/download/v1/" + CHECKSUM_NAME,
-                    folder, FakeOpener([checksum, b"tampered"]),
+                    "0" * 64,
+                    folder, FakeOpener([b"tampered"]),
                 )
             self.assertEqual(list(Path(folder).iterdir()), [])
 
     def test_streaming_download_enforces_size_limit_and_cleans_partial_file(self):
         import updater
         installer = b"12345"
-        checksum = (hashlib.sha256(installer).hexdigest() + "  " + INSTALLER_NAME + "\n").encode()
         with tempfile.TemporaryDirectory() as folder:
             with patch.object(updater, "MAX_INSTALLER_BYTES", 4):
                 with self.assertRaisesRegex(ValueError, "200 MB safety limit"):
                     download_verified_installer(
                         "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                        "https://github.com/org/repo/releases/download/v1/" + CHECKSUM_NAME,
-                        folder, FakeOpener([checksum, installer]),
+                        hashlib.sha256(installer).hexdigest(),
+                        folder, FakeOpener([installer]),
                     )
             self.assertEqual(list(Path(folder).iterdir()), [])
 
@@ -131,8 +125,8 @@ class UpdaterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "SHA-256"):
                 download_verified_installer(
                     "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                    "https://github.com/org/repo/releases/download/v1/" + CHECKSUM_NAME,
-                    folder, FakeOpener([checksum, b"tampered"]),
+                    "0" * 64,
+                    folder, FakeOpener([b"tampered"]),
                 )
             self.assertEqual(existing.read_bytes(), b"known-good installer")
             self.assertEqual([p.name for p in Path(folder).iterdir()], [INSTALLER_NAME])
@@ -153,7 +147,7 @@ class UpdaterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "unsafe"):
                 download_verified_installer(
                     "https://example.com/" + INSTALLER_NAME,
-                    "https://github.com/org/repo/" + CHECKSUM_NAME,
+                    "0" * 64,
                     folder,
                 )
 
