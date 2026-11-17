@@ -104,7 +104,7 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload"]},
+                    "action": {"type": "string", "enum": ["navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload", "new_tab", "switch_tab"]},
                     "url": {"type": "string", "maxLength": 2048},
                     "selector": {"type": "string", "maxLength": 240},
                     "value": {"type": "string", "maxLength": 4000}
