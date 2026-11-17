@@ -80,6 +80,21 @@ class SensitiveActionGuardTests(unittest.TestCase):
         )
         self.assertEqual(request.action_type, "payment")
 
+    def test_payment_and_purchase_reject_non_finite_amounts(self):
+        for amount in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(action="payment", amount=amount), self.assertRaises(ValueError):
+                build_approval_request(
+                    "payment",
+                    {"amount": amount, "currency": "INR", "recipient": "Example", "purpose": "Test"},
+                    "Payment preview",
+                )
+            with self.subTest(action="purchase", amount=amount), self.assertRaises(ValueError):
+                build_approval_request(
+                    "purchase",
+                    {"product": "Item", "price": amount, "currency": "INR", "order": "1 item"},
+                    "Purchase preview",
+                )
+
     def test_purchase_preview_requires_product_price_and_order(self):
         with self.assertRaises(ValueError):
             build_approval_request("purchase", {"product": "Item"}, "Purchase")
