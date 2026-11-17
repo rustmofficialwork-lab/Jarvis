@@ -140,7 +140,16 @@
   }
 
   function handleHudClick(event) {
-    const svg = event.target && event.target.closest && event.target.closest('svg');
+    // SVG <use> instances can retarget clicks into their referenced tree.
+    // In that case target.closest('svg') may not reach the visible panel SVG.
+    // composedPath() reliably includes the rendered outer SVG in scene/row/stack layouts.
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    const svg = path.find(node =>
+      node && node.namespaceURI === 'http://www.w3.org/2000/svg'
+      && String(node.tagName).toLowerCase() === 'svg'
+      && typeof node.matches === 'function'
+      && node.matches('.scene, .row svg, .stack svg')
+    ) || (event.target && event.target.closest && event.target.closest('svg'));
     if (!svg || !svg.matches('.scene, .row svg, .stack svg')) return;
     const point = svgPoint(event, svg);
     if (!point) return;
