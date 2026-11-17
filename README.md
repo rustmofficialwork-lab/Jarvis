@@ -18,11 +18,7 @@ Wake-word inference runs locally through openWakeWord after its ONNX model and s
 
 ## 3D hologram and optional hand gestures
 
-The HUD includes an animated Three.js reactor overlay. The **ENABLE GESTURES** control is opt-in and requests webcam permission only after it is clicked. Hand landmarks are processed locally in the browser with MediaPipe; camera frames are not uploaded. Pinch clicks an enabled HUD control under the index fingertip, a fist toggles the reactor glow, and a deliberate horizontal swipe rotates the hologram. Gesture geometry, mirrored pointer mapping, and swipe timing have automated Node tests. The Windows build bundles pinned Three.js, MediaPipe runtime/WASM, and the Hand Landmarker task model, so gesture detection does not need a first-use model download. Disable gestures or close JARVIS to stop its camera stream. Camera support depends on the Windows WebView runtime and Windows camera privacy permissions. Face presence is a separate opt-in feature and still downloads its detector model on first activation.
-
-### Face presence (not biometric identity unlock)
-
-The **FACE PRESENCE** control is a separate opt-in camera feature. It runs MediaPipe face detection locally and changes the HUD reactor glow while a face is in view. It does not identify whose face is present, does not enroll or store biometric templates, and must not be used to unlock Windows or protect accounts. Stop Face Check to release the camera. The first activation downloads the detector runtime/model.
+The HUD includes an animated Three.js reactor overlay. The **ENABLE GESTURES** control is opt-in and requests webcam permission only after it is clicked. Hand landmarks are processed locally in the browser with MediaPipe; camera frames are not uploaded. Pinch clicks an enabled HUD control under the index fingertip, a fist toggles the reactor glow, and a deliberate horizontal swipe rotates the hologram. Gesture geometry, mirrored pointer mapping, and swipe timing have automated Node tests. The Windows build bundles pinned Three.js, MediaPipe runtime/WASM, and the Hand Landmarker task model, so gesture detection does not need a first-use model download. Disable gestures or close JARVIS to stop its camera stream. Camera support depends on the Windows WebView runtime and Windows camera privacy permissions.
 
 Voice examples include “Jarvis Chrome kholo”, “Google Chrome kholo”, “volume kam kar do”, and “awaaz badhao”. Local desktop actions remain restricted to the fixed allowlist.
 
