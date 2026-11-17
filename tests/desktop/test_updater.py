@@ -49,6 +49,16 @@ class UpdaterTests(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertEqual(result["latest_version"], "1.2.0")
 
+    def test_newer_release_requires_valid_asset_digest(self):
+        payload = {
+            "tag_name": "v1.2.0",
+            "assets": [
+                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/v1.2.0/" + INSTALLER_NAME},
+            ],
+        }
+        with self.assertRaisesRegex(RuntimeError, "digest is missing or invalid"):
+            check_for_update("1.1.0", FakeOpener([json.dumps(payload).encode()]))
+
     def test_rolling_latest_tag_uses_numeric_version_from_release_body(self):
         payload = {
             "tag_name": "jarvis-latest",
@@ -118,7 +128,6 @@ class UpdaterTests(unittest.TestCase):
             self.assertEqual(list(Path(folder).iterdir()), [])
 
     def test_failed_verification_preserves_previous_installer(self):
-        checksum = ("0" * 64 + "  " + INSTALLER_NAME + "\n").encode()
         with tempfile.TemporaryDirectory() as folder:
             existing = Path(folder) / INSTALLER_NAME
             existing.write_bytes(b"known-good installer")
