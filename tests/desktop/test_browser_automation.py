@@ -49,6 +49,7 @@ class BrowserAutomationTests(unittest.TestCase):
         page = Mock()
         page.is_closed.return_value = False
         page.url = "https://example.com/"
+        page.title.return_value = "Example page"
         page.locator.return_value = locator
         browser._page = page
         browser._page_hosts = {id(page): "example.com"}
@@ -77,6 +78,24 @@ class BrowserAutomationTests(unittest.TestCase):
             browser._act_local("click", selector="button.buy",
                         approval_callback=lambda *_: True)
         locator.click.assert_not_called()
+
+    def test_checkout_context_blocks_generic_continue_and_form_submission(self):
+        browser, locator = self._fake_browser("Continue")
+        browser._page.url = "https://example.com/checkout"
+        browser._page.title.return_value = "Checkout"
+        with self.assertRaises(PermissionError):
+            browser._act_local(
+                "click", selector="button.continue",
+                approval_callback=lambda *_: True,
+            )
+        locator.click.assert_not_called()
+
+        with self.assertRaises(PermissionError):
+            browser._act_local(
+                "press", selector="form.continue", value="Enter",
+                approval_callback=lambda *_: True,
+            )
+        locator.press.assert_not_called()
 
     def test_ambiguous_selectors_are_rejected(self):
         browser, locator = self._fake_browser("Search")
