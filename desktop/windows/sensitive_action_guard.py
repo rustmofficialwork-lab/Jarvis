@@ -30,6 +30,9 @@ ALLOWED_BROWSER_ACTIONS = frozenset({
     "open_page", "read_page", "extract_text", "scroll_page",
     "click_sensitive_control", "submit_form", "upload_file",
 })
+ALLOWED_BROWSER_SESSION_ACTIONS = frozenset({
+    "open_page", "read_page", "extract_text", "scroll_page",
+})
 
 
 @dataclass(frozen=True)
@@ -137,7 +140,7 @@ def build_approval_request(
             raise ValueError("Browser domain and requested action are required.")
         host = _normalize_exact_hostname(domain)
         normalized_action = action.strip().casefold()
-        if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_ACTIONS:
+        if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_SESSION_ACTIONS:
             raise PermissionError("Only explicitly allowlisted read-only browser actions can be approved.")
     current = time.time() if now is None else now
     safe_details = json.loads(json.dumps(details, sort_keys=True))
