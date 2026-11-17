@@ -56,6 +56,7 @@ from recoverable_file_actions import validate_selected_files, move_files_to_tras
 from tk_thread_dispatch import TkThreadDispatcher
 from owner_voice_setup import enroll_owner_voice
 from owner_voice_verification import load_owner_profile, load_encoder, verify_pcm_bytes
+from voice_permission import request_voice_permission
 
 APP_NAME = "JARVIS"
 try:
@@ -1971,7 +1972,7 @@ class JarvisDesktop:
         )
 
     def _request_sensitive_action_approval_ui(self, action_type: str, details: dict, summary: str) -> bool:
-        """Show a native, exact-detail approval dialog without changing the HTML HUD."""
+        """Speak the exact action and require one local, one-time spoken decision."""
         try:
             token, request = self.brain_engine.request_sensitive_approval(
                 action_type, details, summary
@@ -1980,35 +1981,42 @@ class JarvisDesktop:
             messagebox.showerror("JARVIS — Action blocked", str(exc), parent=self.root)
             return False
 
-        # Show all action-defining fields. Never truncate recipient, amount, URL,
-        # message content, selected paths, or order details in the approval view.
-        lines = [
-            f"Action: {request.action_type.upper()}",
-            f"Summary: {request.summary}",
-            "",
-            "Exact details to be approved:",
-        ]
-        for key, value in request.details.items():
-            rendered = json.dumps(value, ensure_ascii=False, sort_keys=True)
-            lines.append(f"{key}: {rendered}")
-        lines.extend([
-            "",
-            "This approval applies only to these exact details, once, and expires in 120 seconds.",
-            "If any detail changes, JARVIS must ask again.",
-            "",
-            "Approve this action?",
-        ])
-        approved = messagebox.askyesno(
-            "JARVIS — Sensitive action approval",
-            "\n".join(lines),
-            parent=self.root,
-            icon="warning",
+        if not self.settings.get("microphone_consent_granted"):
+            self.brain_engine.decide_sensitive_approval(token, approved=False)
+            messagebox.showwarning(
+                "JARVIS — Microphone permission required",
+                "Voice approval is unavailable because microphone consent has not been granted. "
+                "No action was performed.",
+                parent=self.root,
+            )
+            return False
+
+        # Read every action-defining field aloud so the user knows exactly what
+        # will happen before the one-time spoken approval phrase is requested.
+        spoken_details = "; ".join(
+            f"{key}: {json.dumps(value, ensure_ascii=False, sort_keys=True)}"
+            for key, value in request.details.items()
+        )
+        spoken_summary = (
+            f"Action: {request.action_type}. Summary: {request.summary}. "
+            f"Exact details: {spoken_details}."
+        )
+        language = self.settings.get("offline_speech_language", "en-IN")
+        if language not in {"hi-IN", "en-IN", "en-US"}:
+            language = "en-IN"
+        approved = request_voice_permission(
+            self.root,
+            spoken_summary,
+            language=language,
         )
         result = self.brain_engine.decide_sensitive_approval(token, approved=approved)
         if not result.approved:
-            self._set_status("Sensitive action denied or approval expired; no action was executed.")
+            self._set_status(
+                "Sensitive action denied, unclear, expired, or voice approval unavailable; "
+                "no action was executed."
+            )
             return False
-        self._set_status("Exact action approved once. An approved action executor is still required.")
+        self._set_status("Exact action approved once by voice.")
         return True
 
     def _authorize_browser_open(self, url: str) -> bool:
