@@ -71,6 +71,24 @@ class BrowserAutomationTests(unittest.TestCase):
         with self.assertRaises(BrowserAutomationError):
             browser.act("click", selector="button")
 
+    def test_enter_submission_requires_approval_and_executes_after_approval(self):
+        browser, locator = self._fake_browser("Search")
+        with self.assertRaises(PermissionError):
+            browser.act("press", selector="form.search", value="Enter")
+        locator.press.assert_not_called()
+
+        approved = []
+        result = browser.act(
+            "press", selector="form.search", value="Enter",
+            approval_callback=lambda details, summary: approved.append(details) or True,
+        )
+        self.assertIn("Submitted", result)
+        self.assertEqual(approved[0], {
+            "domain": "example.com", "action": "submit_form",
+            "selector": "form.search", "key": "Enter",
+        })
+        locator.press.assert_called_once_with("Enter")
+
 
 if __name__ == "__main__":
     unittest.main()
