@@ -308,7 +308,7 @@ def _available_capabilities() -> str:
         "Offline AI depends on the local Ollama model being installed and running. "
         "Optional provider adapters exist for approval-gated email/messaging and read-only browser page extraction, "
         "but they are not wired as AI-callable action tools or HUD controls; use the read-only provider status tool to inspect setup. "
-        "Not implemented as general actions: website control/form submission, automatic email/message sending, payments, purchases, "
+        "Not implemented as general actions: website control/form submission, arbitrary browser automation, automatic email/message sending, payments, purchases, "
         "account changes, unrestricted shell commands, or arbitrary file deletion. "
         "Never claim these unsupported actions were completed."
     )
