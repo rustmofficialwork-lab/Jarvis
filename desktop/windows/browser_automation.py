@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 MAX_STEPS_PER_SESSION = 40
-MAX_TEXT_CHARS = 16_000
+MAX_TEXT_CHARS = 5_000
 MAX_SELECTOR_CHARS = 240
 FINANCIAL_LABELS = re.compile(r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|cart|add to cart)\b", re.IGNORECASE)
 SENSITIVE_LABELS = re.compile(
