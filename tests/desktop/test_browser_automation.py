@@ -49,7 +49,7 @@ class BrowserAutomationTests(unittest.TestCase):
         locator.click.assert_not_called()
 
         approved = []
-        result = browser.act(
+        result = browser._act_local(
             "click", selector="button.send",
             approval_callback=lambda details, summary: approved.append((details, summary)) or True,
         )
@@ -61,7 +61,7 @@ class BrowserAutomationTests(unittest.TestCase):
     def test_checkout_controls_are_blocked_even_if_approval_callback_exists(self):
         browser, locator = self._fake_browser("Buy now")
         with self.assertRaises(PermissionError):
-            browser.act("click", selector="button.buy",
+            browser._act_local("click", selector="button.buy",
                         approval_callback=lambda *_: True)
         locator.click.assert_not_called()
 
@@ -69,20 +69,20 @@ class BrowserAutomationTests(unittest.TestCase):
         browser, locator = self._fake_browser("Search")
         locator.count.return_value = 2
         with self.assertRaises(BrowserAutomationError):
-            browser.act("click", selector="button")
+            browser._act_local("click", selector="button")
 
     def test_enter_submission_requires_approval_and_executes_after_approval(self):
         browser, locator = self._fake_browser("Search")
         with self.assertRaises(PermissionError):
-            browser.act("press", selector="form.search", value="Enter")
+            browser._act_local("press", selector="form.search", value="Enter")
         locator.press.assert_not_called()
 
         approved = []
-        result = browser.act(
+        result = browser._act_local(
             "press", selector="form.search", value="Enter",
             approval_callback=lambda details, summary: approved.append(details) or True,
         )
-        self.assertIn("Submitted", result)
+        self.assertIn("Pressed Enter", result)
         self.assertEqual(approved[0], {
             "domain": "example.com", "action": "submit_form",
             "selector": "form.search", "key": "Enter",
