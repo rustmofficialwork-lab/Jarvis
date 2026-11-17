@@ -2540,6 +2540,12 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertNotIn("\\n    @keyframes jx-gesture-pulse", extensions)
         self.assertIn('window.__jarvisHudRuntimeAdapterLoaded', runtime)
 
+    def test_runtime_adapter_resolves_visible_svg_from_use_event_composed_path(self):
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        self.assertIn("event.composedPath()", runtime)
+        self.assertIn("node.matches('.scene, .row svg, .stack svg')", runtime)
+        self.assertIn("svgPoint(event, svg)", runtime)
+
     def test_runtime_adapter_wires_hud_click_actions_to_the_desktop_bridge(self):
         runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         for expression in (
