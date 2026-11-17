@@ -121,6 +121,8 @@ def check_for_update(current_version: str, opener=None) -> dict:
          if isinstance(item, dict) and item.get("name") == INSTALLER_NAME),
         None,
     )
+    if latest > current and installer is None:
+        raise RuntimeError("A newer release exists, but its installer asset is missing.")
 
     return {
         "available": latest > current,
