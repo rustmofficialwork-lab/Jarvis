@@ -10,6 +10,8 @@ from provider_integrations import (
     send_gmail_email,
     send_outlook_email,
     send_telegram_message,
+    send_whatsapp_message,
+    run_approved_action,
 )
 
 
@@ -74,6 +76,54 @@ class ProviderIntegrationTests(unittest.TestCase):
             status = integration_status()
         self.assertEqual(status["gmail"], "needs_local_oauth_setup")
         self.assertNotIn("TOKEN", repr(status))
+
+    def test_whatsapp_uses_official_cloud_api_and_exact_approval(self):
+        env = {
+            "JARVIS_WHATSAPP_ACCESS_TOKEN": "test-token",
+            "JARVIS_WHATSAPP_PHONE_NUMBER_ID": "123456",
+        }
+        with patch.dict(os.environ, env), \\
+             patch("provider_integrations._request_json", return_value={"messages": [{"id": "wamid.test"}]}) as request:
+            result = send_whatsapp_message("+14155550123", "Hello", consume_approval=self.consume)
+        self.assertIn("+14155550123", result)
+        self.assertEqual(request.call_args.kwargs["payload"]["to"], "+14155550123")
+
+    def test_native_approval_bridge_requests_and_consumes_same_details(self):
+        class Brain:
+            def __init__(self):
+                self.consumed = []
+            def consume_sensitive_approval(self, action_type, details):
+                self.consumed.append((action_type, details))
+                return Approved()
+
+        class App:
+            def __init__(self):
+                self.brain_engine = Brain()
+                self.requested = []
+            def request_sensitive_action_approval(self, action_type, details, summary):
+                self.requested.append((action_type, details, summary))
+                return True
+
+        app = App()
+        details = {"recipient": "person@example.com", "subject": "Hi", "content": "Exact"}
+        result = run_approved_action(
+            app, "email", details, "Send exact email",
+            lambda consume: ("sent" if consume(details).approved else "blocked"),
+        )
+        self.assertEqual(result, "sent")
+        self.assertEqual(app.requested[0][:2], ("email", details))
+        self.assertEqual(app.brain_engine.consumed, [("email", details)])
+
+    def test_native_approval_bridge_stops_when_user_denies(self):
+        class App:
+            brain_engine = object()
+            def request_sensitive_action_approval(self, *args):
+                return False
+        called = []
+        with self.assertRaises(PermissionError):
+            run_approved_action(App(), "message", {"recipient": "123", "content": "Hi"},
+                                "Send message", lambda consume: called.append(True))
+        self.assertEqual(called, [])
 
     def test_browser_requires_https_exact_allowlist_and_approval(self):
         with self.assertRaises(PermissionError):
