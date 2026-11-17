@@ -2823,7 +2823,7 @@ class WindowsHelloBridgeTests(unittest.TestCase):
         bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
         response = json.dumps({"verified": True, "code": "verified", "message": "Windows verified the signed-in user."})
         with (
-            patch.object(jarvis_desktop.os, "name", "nt"),
+            patch.object(jarvis_desktop, "_is_windows_platform", return_value=True),
             patch.object(jarvis_desktop, "get_foreground_window_handle", return_value=1234),
             patch.object(Path, "is_file", return_value=True),
             patch.object(jarvis_desktop.subprocess, "run", return_value=SimpleNamespace(stdout=response, returncode=0)) as run,
@@ -2840,7 +2840,7 @@ class WindowsHelloBridgeTests(unittest.TestCase):
         bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
         response = json.dumps({"verified": False, "code": "Canceled", "message": "Windows verification was not completed."})
         with (
-            patch.object(jarvis_desktop.os, "name", "nt"),
+            patch.object(jarvis_desktop, "_is_windows_platform", return_value=True),
             patch.object(jarvis_desktop, "get_foreground_window_handle", return_value=1234),
             patch.object(Path, "is_file", return_value=True),
             patch.object(jarvis_desktop.subprocess, "run", return_value=SimpleNamespace(stdout=response, returncode=1)),
@@ -2852,7 +2852,7 @@ class WindowsHelloBridgeTests(unittest.TestCase):
     def test_windows_hello_fails_closed_when_helper_is_missing(self):
         bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
         with (
-            patch.object(jarvis_desktop.os, "name", "nt"),
+            patch.object(jarvis_desktop, "_is_windows_platform", return_value=True),
             patch.object(jarvis_desktop, "get_foreground_window_handle", return_value=1234),
             patch.object(Path, "is_file", return_value=False),
             patch.object(jarvis_desktop.subprocess, "run") as run,
