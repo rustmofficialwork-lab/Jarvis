@@ -117,6 +117,7 @@ jobs:
     name: Build Windows desktop installer
     needs: [source-checks, backend-checks, web-checks]
     runs-on: windows-latest
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -183,8 +184,19 @@ jobs:
         run: |
           $executable = Join-Path $PWD "desktop/windows/dist/JARVIS/JARVIS.exe"
           if (-not (Test-Path $executable)) { throw "Packaged JARVIS.exe was not created." }
-          $reportedVersion = (& $executable --version | Out-String).Trim()
-          if ($LASTEXITCODE -ne 0) { throw "Packaged JARVIS.exe failed its version smoke test." }
+          $stdout = Join-Path $env:RUNNER_TEMP "jarvis-version.stdout.txt"
+          $stderr = Join-Path $env:RUNNER_TEMP "jarvis-version.stderr.txt"
+          $process = Start-Process -FilePath $executable -ArgumentList "--version" -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (-not $process.WaitForExit(90000)) {
+            $process.Kill()
+            $process.WaitForExit()
+            throw "Packaged JARVIS.exe did not exit within 90 seconds during its version smoke test."
+          }
+          $reportedVersion = if (Test-Path $stdout) { (Get-Content $stdout -Raw).Trim() } else { "" }
+          if ($process.ExitCode -ne 0) {
+            $errorOutput = if (Test-Path $stderr) { Get-Content $stderr -Raw } else { "No stderr output." }
+            throw "Packaged JARVIS.exe exited with code $($process.ExitCode): $errorOutput"
+          }
           $expectedVersion = "1.1.$env:GITHUB_RUN_NUMBER"
           if ($reportedVersion -ne $expectedVersion) {
             throw "Packaged executable reported '$reportedVersion'; expected '$expectedVersion'."
