@@ -359,9 +359,9 @@ def _available_capabilities() -> str:
         "Paint, File Explorer, and Task Manager on Windows; open a public website in the default browser when explicitly requested. "
         "Online services implemented separately: web search, weather, and news. "
         "Offline AI depends on the local Ollama model being installed and running. "
-        "A visible, bounded Playwright browser controller supports public HTTPS navigation, page reading, ordinary clicks, form filling, option selection, and scrolling; sensitive controls and form submission require exact one-time voice approval. "
-        "Email and messaging provider adapters require local provider setup and exact one-time voice approval; they are not exposed as general AI-callable send tools yet. "
-        "Shopping research and product comparison can use ordinary browser navigation, but checkout, purchases, and payments are disabled. "
+        "A visible, bounded Playwright browser controller supports public HTTPS navigation, page reading, ordinary clicks, form filling, option selection, scrolling, safe downloads, and approval-gated uploads. Sensitive controls and form submission require exact one-time voice approval. "
+        "Email and messaging tools support configured Gmail, Outlook, Telegram, and WhatsApp providers; every send requires exact one-time voice approval. "
+        "Shopping research and product comparison can use ordinary browser navigation and search forms; checkout, purchases, and payments are disabled. "
         "Account mutations, unrestricted shell commands, and arbitrary file deletion are not implemented. "
         "Never claim these unsupported actions were completed."
     )
