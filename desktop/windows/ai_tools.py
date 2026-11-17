@@ -99,6 +99,24 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "browser_automation",
+            "description": "Control the visible JARVIS browser for the user's directly requested ordinary website task. Actions: navigate to a public HTTPS URL, read the page, click a visible element, fill a form field, select an option, press a navigation key, or scroll. Form submission and sensitive controls require exact one-time voice approval. Purchases, checkout, and payments are disabled.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["navigate", "read", "click", "fill", "select", "press", "scroll"]},
+                    "url": {"type": "string", "maxLength": 2048},
+                    "selector": {"type": "string", "maxLength": 240},
+                    "value": {"type": "string", "maxLength": 4000}
+                },
+                "required": ["action"],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "open_app",
             "description": "Open one of the built-in safe Windows apps when the user explicitly asks to open it. Never pass arbitrary commands, paths, or arguments.",
             "parameters": {"type": "object", "properties": {
@@ -306,10 +324,10 @@ def _available_capabilities() -> str:
         "Paint, File Explorer, and Task Manager on Windows; open a public website in the default browser when explicitly requested. "
         "Online services implemented separately: web search, weather, and news. "
         "Offline AI depends on the local Ollama model being installed and running. "
-        "Optional provider adapters exist for approval-gated email/messaging and read-only browser page extraction, "
-        "but they are not wired as AI-callable action tools or HUD controls; use the read-only provider status tool to inspect setup. "
-        "Not implemented as general actions: website control/form submission, arbitrary browser automation, automatic email/message sending, payments, purchases, "
-        "account changes, unrestricted shell commands, or arbitrary file deletion. "
+        "A visible, bounded Playwright browser controller supports public HTTPS navigation, page reading, ordinary clicks, form filling, option selection, and scrolling; sensitive controls and form submission require exact one-time voice approval. "
+        "Email and messaging provider adapters require local provider setup and exact one-time voice approval; they are not exposed as general AI-callable send tools yet. "
+        "Shopping research and product comparison can use ordinary browser navigation, but checkout, purchases, and payments are disabled. "
+        "Account mutations, unrestricted shell commands, and arbitrary file deletion are not implemented. "
         "Never claim these unsupported actions were completed."
     )
 
@@ -368,6 +386,8 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> str:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PROCESS_RESULTS:
             raise ValueError("Process limit must be an integer from 1 to 10.")
         return get_top_processes(limit=limit)
+    if name == "browser_automation":
+        raise ValueError("Browser automation must be executed through JARVIS's trusted visible-browser controller.")
     if name == "open_website":
         if set(arguments) != {"url"}:
             raise ValueError("Website opening requires only a URL.")
