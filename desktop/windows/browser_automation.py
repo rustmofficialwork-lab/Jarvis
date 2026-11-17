@@ -144,6 +144,7 @@ class BrowserAutomation:
             pages = self._context.pages
             if pages:
                 self._page = pages[0]
+                self._page_hosts[id(self._page)] = self._host
                 self._safe_target(self._page)
             else:
                 self._page = self._context.new_page()
