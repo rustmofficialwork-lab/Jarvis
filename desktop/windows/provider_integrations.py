@@ -1,12 +1,12 @@
 """Optional, bounded integrations for JARVIS.
 
-Provider credentials are read only from the local process environment. This module
-never stores tokens, never follows HTTP redirects, and requires an exact one-time
-approval callback immediately before sending email or a message.
+Provider credentials are read from the local process environment or Windows Credential
+Manager. This module never stores tokens, never follows HTTP redirects, and requires
+an exact one-time approval callback immediately before sending email or a message.
 
-Browser support is read-only and requires Playwright plus an exact hostname
-allowlist. Payment, checkout, purchases, and account/security mutations are
-intentionally not implemented.
+Visible browser automation is implemented separately in browser_automation.py.
+Payment, checkout, purchases, and account/security mutations are intentionally
+not implemented.
 """
 from __future__ import annotations
 
