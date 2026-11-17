@@ -92,11 +92,15 @@ class ProviderIntegrationTests(unittest.TestCase):
                 self.assertEqual(_required_env("JARVIS_GRAPH_ACCESS_TOKEN"), "stored-token")
 
     def test_missing_credentials_are_reported_without_secret_values(self):
+        import sys
+        from types import SimpleNamespace
+        fake_keyring = SimpleNamespace(get_password=lambda service, name: None)
         with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(IntegrationUnavailable):
-                send_gmail_email("person@example.com", "Subject", "Body",
-                                 consume_approval=self.consume)
-            status = integration_status()
+            with patch.dict(sys.modules, {"keyring": fake_keyring}):
+                with self.assertRaises(IntegrationUnavailable):
+                    send_gmail_email("person@example.com", "Subject", "Body",
+                                     consume_approval=self.consume)
+                status = integration_status()
         self.assertEqual(status["gmail"], "needs_local_oauth_setup")
         self.assertNotIn("TOKEN", repr(status))
 
