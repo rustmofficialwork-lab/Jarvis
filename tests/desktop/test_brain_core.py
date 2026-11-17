@@ -131,6 +131,15 @@ class BrainCoreTests(unittest.TestCase):
                 self.assertFalse(decision.allowed)
                 self.assertEqual(decision.status, "restricted")
 
+    def test_open_website_also_blocks_restricted_destinations(self):
+        decision = authorize_tool_call(
+            "open_website",
+            {"url": "https://example.com"},
+            "Please open a gambling website",
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.status, "restricted")
+
     def test_email_and_message_tools_require_direct_send_intent(self):
         email = authorize_tool_call(
             "send_email",
