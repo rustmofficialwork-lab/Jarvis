@@ -307,17 +307,20 @@ class BrowserAutomation:
                 locator.select_option(label=value)
                 return "Selected the requested option. The form was not submitted."
             if action == "press":
-                if value.casefold() in {"enter", "return"}:
+                key = value.casefold()
+                if key in {"enter", "return"}:
                     details = {"domain": self._host, "action": "submit_form",
                                "selector": selector[:240], "key": "Enter"}
                     if not callable(approval_callback) or not approval_callback(
                         details, "Submit the current website form"
                     ):
                         raise PermissionError("Form submission was not approved; the form was not submitted.")
-                if value.casefold() not in {"tab", "escape", "arrowdown", "arrowup", "home", "end"}:
-                    raise ValueError("Only navigation keys are supported.")
-                locator.press(value)
-                return f"Pressed {value} on the selected element."
+                    locator.press("Enter")
+                    return "Submitted the selected website form after exact one-time voice approval."
+                if key not in {"tab", "escape", "arrowdown", "arrowup", "home", "end"}:
+                    raise ValueError("Only navigation keys or approval-gated Enter submission are supported.")
+                locator.press(key)
+                return f"Pressed {key} on the selected element."
         raise BrowserAutomationError("The browser action did not complete.")
 
     def status(self) -> dict[str, Any]:
