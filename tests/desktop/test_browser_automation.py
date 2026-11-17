@@ -39,6 +39,7 @@ class BrowserAutomationTests(unittest.TestCase):
         page.url = "https://example.com/"
         page.locator.return_value = locator
         browser._page = page
+        browser._page_hosts = {id(page): "example.com"}
         browser._context = object()
         return browser, locator
 
