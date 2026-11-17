@@ -90,5 +90,41 @@ class BrowserAutomationTests(unittest.TestCase):
         locator.press.assert_called_once_with("Enter")
 
 
+    def test_secret_fields_are_blocked_and_ordinary_fields_remain_fillable(self):
+        sensitive_names = (
+            "password", "passcode", "pin", "otp", "one_time_code",
+            "api_token", "client_secret", "cvv", "cvc", "card_number",
+        )
+        for field_name in sensitive_names:
+            with self.subTest(field_name=field_name):
+                browser, locator = self._fake_browser("Search")
+                locator.get_attribute.side_effect = (
+                    lambda attribute, name=field_name: (
+                        "text" if attribute == "type"
+                        else name if attribute == "name"
+                        else None
+                    )
+                )
+                with self.assertRaises(PermissionError):
+                    browser._act_local(
+                        "fill", selector="input", value="must-not-be-entered"
+                    )
+                locator.fill.assert_not_called()
+
+        browser, locator = self._fake_browser("Search")
+        locator.get_attribute.side_effect = (
+            lambda attribute: (
+                "text" if attribute == "type"
+                else "search_query" if attribute == "name"
+                else None
+            )
+        )
+        result = browser._act_local(
+            "fill", selector="input.search", value="weather today"
+        )
+        self.assertIn("Filled", result)
+        locator.fill.assert_called_once_with("weather today")
+
+
 if __name__ == "__main__":
     unittest.main()
