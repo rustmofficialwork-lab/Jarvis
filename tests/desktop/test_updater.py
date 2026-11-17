@@ -2,6 +2,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from updater import API_URL, INSTALLER_NAME, check_for_update, download_installer
@@ -95,7 +96,7 @@ class UpdaterTests(unittest.TestCase):
         import updater
         installer = b"12345"
         with tempfile.TemporaryDirectory() as folder:
-            with unittest.mock.patch.object(updater, "MAX_INSTALLER_BYTES", 4):
+            with patch.object(updater, "MAX_INSTALLER_BYTES", 4):
                 with self.assertRaisesRegex(ValueError, "200 MB safety limit"):
                     download_installer(
                         "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
