@@ -100,11 +100,11 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "browser_automation",
-            "description": "Control the visible JARVIS browser for the user's directly requested ordinary website task. Actions: navigate to a public HTTPS URL, read the page, click a visible element, fill a form field, select an option, press a navigation key, or scroll. Form submission and sensitive controls require exact one-time voice approval. Purchases, checkout, and payments are disabled.",
+            "description": "Control the visible JARVIS browser for the user's directly requested ordinary website task. Actions: navigate to a public HTTPS URL, read the page, click a visible element, fill a form field, select an option, press a navigation key, or scroll. Form submission, file uploads, and sensitive controls require exact one-time voice approval. Safe downloads are stored in Downloads. Purchases, checkout, and payments are disabled.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["navigate", "read", "click", "fill", "select", "press", "scroll"]},
+                    "action": {"type": "string", "enum": ["navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload"]},
                     "url": {"type": "string", "maxLength": 2048},
                     "selector": {"type": "string", "maxLength": 240},
                     "value": {"type": "string", "maxLength": 4000}
