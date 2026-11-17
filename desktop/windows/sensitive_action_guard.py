@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import hashlib
 import ipaddress
 import json
+import math
 import re
 import secrets
 import threading
@@ -105,7 +106,8 @@ def build_approval_request(
             raise ValueError("Recipient and final message content must be shown before approval.")
     if action_type == "payment":
         amount = details["amount"]
-        if isinstance(amount, bool) or not isinstance(amount, (int, float)) or amount <= 0:
+        if (isinstance(amount, bool) or not isinstance(amount, (int, float))
+                or amount <= 0 or (isinstance(amount, float) and not math.isfinite(amount)):
             raise ValueError("Payment amount must be a positive number.")
         if not all(isinstance(details[key], str) and details[key].strip()
                    for key in ("currency", "recipient", "purpose")):
@@ -115,7 +117,8 @@ def build_approval_request(
                    for key in ("product", "currency", "order")):
             raise ValueError("Product, currency, and order details must be explicit.")
         price = details["price"]
-        if isinstance(price, bool) or not isinstance(price, (int, float)) or price <= 0:
+        if (isinstance(price, bool) or not isinstance(price, (int, float))
+                or price <= 0 or (isinstance(price, float) and not math.isfinite(price)):
             raise ValueError("Purchase price must be a positive number.")
     if action_type == "delete":
         paths = details["paths"]
