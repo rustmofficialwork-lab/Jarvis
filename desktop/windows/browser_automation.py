@@ -24,7 +24,7 @@ MAX_SELECTOR_CHARS = 240
 FINANCIAL_LABELS = re.compile(r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|cart|add to cart)\b", re.IGNORECASE)
 SENSITIVE_LABELS = re.compile(
     r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|"
-    r"send|transfer|delete|remove account|change password|confirm booking|submit|confirm|log in|login|sign in|logout|post|publish|share)\b",
+    r"send|transfer|delete|remove account|change password|change email|change username|update account|save changes|edit profile|security settings|export|confirm booking|submit|confirm|log in|login|sign in|logout|post|publish|share)\b",
     re.IGNORECASE,
 )
 _BLOCKED_HOSTS = {"localhost", "localhost.localdomain"}
