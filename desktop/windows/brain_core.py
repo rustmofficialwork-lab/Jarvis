@@ -25,6 +25,7 @@ READ_ONLY_TOOLS = frozenset({
     "get_system_status",
     "get_top_processes",
     "get_available_capabilities",
+    "get_provider_integration_status",
 })
 # Personal file access is read-only but still privacy-sensitive: it must be
 # grounded in a direct file-related request, not merely a model suggestion.
