@@ -1,4 +1,4 @@
-"""HTTPS-only GitHub Releases updater with SHA-256 verification."""
+"""HTTPS-only GitHub Releases updater with GitHub asset-digest verification."""
 from __future__ import annotations
 
 import hashlib
@@ -11,9 +11,7 @@ from urllib.parse import urlparse
 
 API_URL = "https://api.github.com/repos/rustmofficialwork-lab/Jarvis/releases/tags/jarvis-latest"
 INSTALLER_NAME = "JARVIS-Setup-x64.exe"
-CHECKSUM_NAME = "SHA256SUMS.txt"
 MAX_API_BYTES = 1024 * 1024
-MAX_CHECKSUM_BYTES = 16 * 1024
 MAX_INSTALLER_BYTES = 200 * 1024 * 1024
 ALLOWED_REDIRECT_HOSTS = {
     "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
@@ -124,9 +122,10 @@ def check_for_update(current_version: str, opener=None) -> dict:
         if isinstance(item, dict) and isinstance(item.get("name"), str)
     }
     installer = by_name.get(INSTALLER_NAME)
-    checksums = by_name.get(CHECKSUM_NAME)
-    if latest > current and (not installer or not checksums):
-        raise RuntimeError("A newer release exists, but its verified installer assets are incomplete.")
+    digest_value = installer.get("digest", "") if installer else ""
+    digest_match = re.fullmatch(r"sha256:([0-9a-fA-F]{64})", digest_value)
+    if latest > current and (not installer or not digest_match):
+        raise RuntimeError("A newer release exists, but its installer asset digest is missing or invalid.")
 
     return {
         "available": latest > current,
@@ -136,31 +135,23 @@ def check_for_update(current_version: str, opener=None) -> dict:
         "tag": tag,
         "release_url": payload.get("html_url", "https://github.com/rustmofficialwork-lab/Jarvis/releases"),
         "installer_url": _safe_github_url(installer.get("browser_download_url")) if installer else None,
-        "checksums_url": _safe_github_url(checksums.get("browser_download_url")) if checksums else None,
+        "expected_sha256": digest_match.group(1).lower() if digest_match else None,
     }
 
 
-def download_verified_installer(installer_url: str, checksums_url: str,
+def download_verified_installer(installer_url: str, expected_sha256: str,
                                 destination_dir: str | Path, opener=None) -> Path:
-    """Stream the installer to a temporary file and publish it only after SHA-256 verification."""
+    """Download an installer and verify it against GitHub's release-asset SHA-256 digest."""
     installer_url = _safe_github_url(installer_url)
-    checksums_url = _safe_github_url(checksums_url)
+    if not isinstance(expected_sha256, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256):
+        raise ValueError("The GitHub release does not provide a valid installer SHA-256 digest.")
+    expected = expected_sha256.lower()
     destination = Path(destination_dir)
     destination.mkdir(parents=True, exist_ok=True)
     final_path = destination / INSTALLER_NAME
     temporary = destination / (INSTALLER_NAME + ".download")
 
     try:
-        with _open(checksums_url, timeout=20, opener=opener) as response:
-            checksum_text = _read_limited(response, MAX_CHECKSUM_BYTES).decode("utf-8", errors="strict")
-        match = re.search(
-            rf"(?im)^([0-9a-f]{{64}})\s+\*?{re.escape(INSTALLER_NAME)}\s*$",
-            checksum_text,
-        )
-        if not match:
-            raise ValueError("The release checksum file does not contain the expected installer hash.")
-        expected = match.group(1).lower()
-
         digest = hashlib.sha256()
         total = 0
         try:
@@ -185,7 +176,5 @@ def download_verified_installer(installer_url: str, checksums_url: str,
                 pass
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"Could not download the JARVIS update: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise ValueError("The release checksum file is not valid UTF-8.") from exc
 
     return final_path
