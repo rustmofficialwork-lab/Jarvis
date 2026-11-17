@@ -142,6 +142,8 @@ class BrowserAutomation:
     def _require_page(self):
         if self._page is None or self._page.is_closed():
             raise BrowserAutomationError("No active JARVIS browser page. Navigate to a website first.")
+        if self._page.url == "about:blank":
+            return self._page
         current_host = (urllib.parse.urlsplit(self._page.url).hostname or "").casefold().rstrip(".")
         if current_host != self._host:
             raise BrowserAutomationError("The active page left its approved website; navigate again.")
@@ -190,19 +192,19 @@ class BrowserAutomation:
             raise ValueError("Unsupported browser action.")
         if not isinstance(selector, str) or len(selector) > MAX_SELECTOR_CHARS:
             raise ValueError("Selector must be 240 characters or fewer.")
-        if action in {"fill", "select", "press"} and (not isinstance(value, str) or len(value) > 4000):
-            raise ValueError("Input value must be 4000 characters or fewer.")
+        if action in {"fill", "select", "press", "upload", "switch_tab"} and (
+            not isinstance(value, str) or len(value) > 4000
+        ):
+            raise ValueError("Input value must be text containing 4000 characters or fewer.")
         with self._lock:
             self._check_step()
-            page = self._require_page()
-            if action == "read":
-                return self._describe_page()
-            if action == "new_tab":
-                page = self._context.new_page()
-                self._page = page
-                self._safe_target(page)
-                return "Opened a new JARVIS browser tab."
-            if action == "switch_tab":
+            if action in {"new_tab", "switch_tab"}:
+                if self._context is None:
+                    raise BrowserAutomationError("Open a website before managing browser tabs.")
+                if action == "new_tab":
+                    page = self._context.new_page()
+                    self._page = page
+                    return "Opened a new JARVIS browser tab."
                 if not value.isdigit():
                     raise ValueError("Provide a zero-based tab number.")
                 pages = self._context.pages
@@ -210,6 +212,11 @@ class BrowserAutomation:
                 if index < 0 or index >= len(pages) or index >= 10:
                     raise ValueError("That browser tab does not exist.")
                 self._page = pages[index]
+                if self._page.url == "about:blank":
+                    return "Switched to a blank browser tab. Navigate to a public HTTPS website to continue."
+                return self._describe_page()
+            page = self._require_page()
+            if action == "read":
                 return self._describe_page()
             if action == "download":
                 if not selector.strip():
