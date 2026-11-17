@@ -48,8 +48,8 @@
   const controls=document.createElement('div');controls.id='jx-extensions';
   controls.innerHTML='<span id="jx-ext-status" role="status">HUD ready · Camera off</span><button id="jx-face-toggle" type="button" aria-pressed="false">FACE PRESENCE</button>';
   document.body.appendChild(controls);
-  // Keep the hand-gesture control anchored to the red-marked System Status
-  // area of the original SVG artwork, without changing the HUD HTML/layout.
+  // Place the hand-gesture control inside the red-marked area below ARCHITECTURE
+  // in SYSTEM INFORMATION, without changing the original HUD HTML/layout.
   const gestureToggle=document.createElement('button');
   gestureToggle.id='jx-gesture-toggle';
   gestureToggle.type='button';
@@ -60,7 +60,7 @@
   const positionGestureToggle=()=>{
     // The HUD switches between scene, row and stack SVG layouts by aspect
     // ratio. Pick the visible SVG whose viewBox actually contains the anchor.
-    const anchorX=504,anchorY=699;
+    const anchorX=845,anchorY=638;
     const svg=[...document.querySelectorAll('svg.scene, .row svg, .stack svg')].find(candidate=>{
       const rect=candidate.getBoundingClientRect();
       const viewBox=candidate.viewBox?.baseVal;
