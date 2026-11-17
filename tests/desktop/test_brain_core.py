@@ -95,6 +95,43 @@ class BrainCoreTests(unittest.TestCase):
             with self.subTest(name=name, prompt=prompt):
                 self.assertTrue(authorize_tool_call(name, arguments, prompt).allowed)
 
+    def test_browser_actions_require_direct_user_intent_and_allow_normal_clicks(self):
+        navigate = authorize_tool_call(
+            "browser_automation",
+            {"action": "navigate", "url": "https://www.amazon.com"},
+            "Please open Amazon",
+        )
+        click = authorize_tool_call(
+            "browser_automation",
+            {"action": "click", "selector": "text=Search"},
+            "Click the search button",
+        )
+        denied = authorize_tool_call(
+            "browser_automation",
+            {"action": "click", "selector": "text=Search"},
+            "Do not click the search button",
+        )
+        self.assertTrue(navigate.allowed)
+        self.assertTrue(click.allowed)
+        self.assertFalse(denied.allowed)
+
+    def test_email_and_message_tools_require_direct_send_intent(self):
+        email = authorize_tool_call(
+            "send_email",
+            {"provider": "gmail", "recipient": "person@example.com",
+             "subject": "Hello", "content": "Hi"},
+            "Please send an email to person@example.com",
+        )
+        denied = authorize_tool_call(
+            "send_email",
+            {"provider": "gmail", "recipient": "person@example.com",
+             "subject": "Hello", "content": "Hi"},
+            "Do not send an email",
+        )
+        self.assertTrue(email.allowed)
+        self.assertEqual(email.status, "approval_required")
+        self.assertFalse(denied.allowed)
+
     def test_sensitive_actions_never_run_from_model_tool_call(self):
         decision = authorize_tool_call("send_money", {"amount": 100}, "Send 100")
         self.assertFalse(decision.allowed)
