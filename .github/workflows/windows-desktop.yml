@@ -275,6 +275,5 @@ jobs:
           files: |
             dist-installer/JARVIS-Setup-x64.exe
             dist-installer/JARVIS-Portable-x64.zip
-            dist-installer/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
