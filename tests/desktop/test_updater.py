@@ -1,12 +1,10 @@
-import hashlib
 import io
 import json
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
 
-from updater import API_URL, INSTALLER_NAME, check_for_update, download_verified_installer
+from updater import API_URL, INSTALLER_NAME, check_for_update, download_installer
 
 
 class FakeResponse(io.BytesIO):
@@ -37,34 +35,25 @@ class UpdaterTests(unittest.TestCase):
         self.assertFalse(result["available"])
         self.assertFalse(result["release_exists"])
 
-    def test_check_finds_newer_release_and_expected_assets(self):
+    def test_check_finds_newer_release_without_digest_metadata(self):
         payload = {
             "tag_name": "v1.2.0",
             "html_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/tag/v1.2.0",
             "assets": [
-                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/v1.2.0/" + INSTALLER_NAME, "digest": "sha256:" + "a" * 64},
+                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/v1.2.0/" + INSTALLER_NAME},
             ],
         }
         result = check_for_update("1.1.0", FakeOpener([json.dumps(payload).encode()]))
         self.assertTrue(result["available"])
         self.assertEqual(result["latest_version"], "1.2.0")
-
-    def test_newer_release_requires_valid_asset_digest(self):
-        payload = {
-            "tag_name": "v1.2.0",
-            "assets": [
-                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/v1.2.0/" + INSTALLER_NAME},
-            ],
-        }
-        with self.assertRaisesRegex(RuntimeError, "digest is missing or invalid"):
-            check_for_update("1.1.0", FakeOpener([json.dumps(payload).encode()]))
+        self.assertNotIn("expected_sha256", result)
 
     def test_rolling_latest_tag_uses_numeric_version_from_release_body(self):
         payload = {
             "tag_name": "jarvis-latest",
             "body": "Latest successful Windows desktop build.\nVersion: 1.1.345\n",
             "assets": [
-                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + INSTALLER_NAME, "digest": "sha256:" + "b" * 64},
+                {"name": INSTALLER_NAME, "browser_download_url": "https://github.com/rustmofficialwork-lab/Jarvis/releases/download/jarvis-latest/" + INSTALLER_NAME},
             ],
         }
         result = check_for_update("1.1.344", FakeOpener([json.dumps(payload).encode()]))
@@ -86,59 +75,33 @@ class UpdaterTests(unittest.TestCase):
         payload = {
             "tag_name": "v2.0.0",
             "assets": [
-                {"name": INSTALLER_NAME, "browser_download_url": "https://example.com/setup.exe", "digest": "sha256:" + "c" * 64},
+                {"name": INSTALLER_NAME, "browser_download_url": "https://example.com/setup.exe"},
             ],
         }
         with self.assertRaisesRegex(ValueError, "unsafe"):
             check_for_update("1.0.0", FakeOpener([json.dumps(payload).encode()]))
 
-    def test_download_verifies_hash_before_writing(self):
+    def test_download_installer(self):
         installer = b"sample installer bytes"
-        digest = hashlib.sha256(installer).hexdigest()
         opener = FakeOpener([installer])
         with tempfile.TemporaryDirectory() as folder:
-            path = download_verified_installer(
+            path = download_installer(
                 "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                digest,
                 folder, opener,
             )
             self.assertEqual(path.read_bytes(), installer)
-
-    def test_rejects_tampered_installer(self):
-        with tempfile.TemporaryDirectory() as folder:
-            with self.assertRaisesRegex(ValueError, "SHA-256"):
-                download_verified_installer(
-                    "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                    "0" * 64,
-                    folder, FakeOpener([b"tampered"]),
-                )
-            self.assertEqual(list(Path(folder).iterdir()), [])
 
     def test_streaming_download_enforces_size_limit_and_cleans_partial_file(self):
         import updater
         installer = b"12345"
         with tempfile.TemporaryDirectory() as folder:
-            with patch.object(updater, "MAX_INSTALLER_BYTES", 4):
+            with unittest.mock.patch.object(updater, "MAX_INSTALLER_BYTES", 4):
                 with self.assertRaisesRegex(ValueError, "200 MB safety limit"):
-                    download_verified_installer(
+                    download_installer(
                         "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                        hashlib.sha256(installer).hexdigest(),
                         folder, FakeOpener([installer]),
                     )
             self.assertEqual(list(Path(folder).iterdir()), [])
-
-    def test_failed_verification_preserves_previous_installer(self):
-        with tempfile.TemporaryDirectory() as folder:
-            existing = Path(folder) / INSTALLER_NAME
-            existing.write_bytes(b"known-good installer")
-            with self.assertRaisesRegex(ValueError, "SHA-256"):
-                download_verified_installer(
-                    "https://github.com/org/repo/releases/download/v1/" + INSTALLER_NAME,
-                    "0" * 64,
-                    folder, FakeOpener([b"tampered"]),
-                )
-            self.assertEqual(existing.read_bytes(), b"known-good installer")
-            self.assertEqual([p.name for p in Path(folder).iterdir()], [INSTALLER_NAME])
 
     def test_redirect_allowlist_rejects_unapproved_hosts_and_nonstandard_ports(self):
         from updater import _is_allowed_redirect_url
@@ -154,9 +117,8 @@ class UpdaterTests(unittest.TestCase):
     def test_rejects_non_github_download_url(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(ValueError, "unsafe"):
-                download_verified_installer(
+                download_installer(
                     "https://example.com/" + INSTALLER_NAME,
-                    "0" * 64,
                     folder,
                 )
 
