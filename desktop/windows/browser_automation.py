@@ -8,6 +8,7 @@ trusted approval flow; checkout, purchases, and payments are never executable.
 from __future__ import annotations
 
 import ipaddress
+import os
 import re
 import socket
 import threading
@@ -83,12 +84,22 @@ class BrowserAutomation:
         self.profile_dir.mkdir(parents=True, exist_ok=True)
         self._playwright = sync_playwright().start()
         try:
-            self._context = self._playwright.chromium.launch_persistent_context(
-                user_data_dir=str(self.profile_dir),
-                headless=False,
-                accept_downloads=True,
-                args=["--disable-sync", "--no-first-run"],
-            )
+            launch_options = {
+                "user_data_dir": str(self.profile_dir),
+                "headless": False,
+                "accept_downloads": True,
+                "args": ["--disable-sync", "--no-first-run"],
+            }
+            if os.name == "nt":
+                launch_options["channel"] = "msedge"
+            try:
+                self._context = self._playwright.chromium.launch_persistent_context(**launch_options)
+            except Exception:
+                if os.name != "nt":
+                    raise
+                # Fall back to the Playwright-managed Chromium runtime if Edge is unavailable.
+                launch_options.pop("channel", None)
+                self._context = self._playwright.chromium.launch_persistent_context(**launch_options)
             self._context.set_default_timeout(8_000)
             self._context.set_default_navigation_timeout(15_000)
             self._context.on("page", lambda page: page.close() if page != self._page else None)
@@ -125,11 +136,13 @@ class BrowserAutomation:
 
     def _safe_target(self, page):
         def route_request(route):
-            parsed = urllib.parse.urlsplit(route.request.url)
-            request_host = (parsed.hostname or "").casefold().rstrip(".")
-            if parsed.scheme == "https" and request_host == self._host:
+            try:
+                request_host, _safe_url = self._validate_url(route.request.url)
+                if route.request.is_navigation_request() and request_host != self._host:
+                    route.abort()
+                    return
                 route.continue_()
-            else:
+            except (TypeError, ValueError, BrowserAutomationError):
                 route.abort()
         page.route("**/*", route_request)
 
@@ -188,10 +201,17 @@ class BrowserAutomation:
                 destination = (downloads / filename).resolve()
                 if destination.parent != downloads.resolve():
                     raise BrowserAutomationError("Unsafe download filename was blocked.")
-                download.save_as(str(destination))
-                if destination.stat().st_size > 50 * 1024 * 1024:
-                    destination.unlink(missing_ok=True)
+                temporary_path = download.path()
+                if temporary_path and Path(temporary_path).stat().st_size > 50 * 1024 * 1024:
+                    download.cancel()
                     raise BrowserAutomationError("Download exceeded the 50 MB safety limit.")
+                if destination.exists():
+                    stem, extension = destination.stem, destination.suffix
+                    index = 1
+                    while destination.exists():
+                        destination = downloads / f"{stem} ({index}){extension}"
+                        index += 1
+                download.save_as(str(destination))
                 return f"Downloaded {filename} to the Windows Downloads folder."
             if action == "upload":
                 file_path = Path(value).expanduser().resolve()
