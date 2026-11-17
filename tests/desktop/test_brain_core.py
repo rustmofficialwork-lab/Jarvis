@@ -115,6 +115,22 @@ class BrainCoreTests(unittest.TestCase):
         self.assertTrue(click.allowed)
         self.assertFalse(denied.allowed)
 
+    def test_browser_search_blocks_restricted_goods_and_gambling(self):
+        for prompt in (
+            "Search for a gun online",
+            "Find a sports betting site",
+            "Compare cannabis products",
+            "Where can I buy a knife",
+        ):
+            with self.subTest(prompt=prompt):
+                decision = authorize_tool_call(
+                    "browser_automation",
+                    {"action": "navigate", "url": "https://example.com"},
+                    prompt,
+                )
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.status, "restricted")
+
     def test_email_and_message_tools_require_direct_send_intent(self):
         email = authorize_tool_call(
             "send_email",
