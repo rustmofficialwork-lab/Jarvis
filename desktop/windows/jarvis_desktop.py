@@ -1230,8 +1230,9 @@ def chat_completion(endpoint: str, model: str, api_key: str, prompt: str,
                             output = sensitive_action_executor(name, arguments)
                     else:
                         output = execute_tool(name, arguments)
-                except (TypeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
-                    output = f"Tool unavailable: {str(exc)[:240]}"
+                except (TypeError, ValueError, PermissionError, RuntimeError, OSError, json.JSONDecodeError, RecursionError) as exc:
+                    prefix = "Tool blocked:" if isinstance(exc, PermissionError) else "Tool unavailable:"
+                    output = f"{prefix} {str(exc)[:240]}"
             if not str(output).casefold().startswith(("tool unavailable:", "tool blocked:")):
                 completed_tool_steps.append(f"{str(name)[:120]} [{call_id[:16]}]")
             messages.append({
