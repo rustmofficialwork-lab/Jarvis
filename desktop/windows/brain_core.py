@@ -147,7 +147,7 @@ def authorize_tool_call(
         return ToolDecision(True, "allowed", "Read-only tool is within the local allowlist.")
     if tool in BROWSER_ACTION_TOOLS:
         action = arguments.get("action")
-        if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload"}:
+        if action not in {"navigate", "read", "click", "fill", "select", "press", "scroll", "download", "upload", "new_tab", "switch_tab"}:
             return ToolDecision(False, "invalid", "Unsupported browser action.")
         prompt = str(user_prompt or "").casefold()
         if re.search(r"\b(don't|do not|never|avoid|mat|nahi|nahin)\b.{0,50}\b(open|visit|navigate|click|fill|type|select|press|scroll|download|upload|read|search)\b", prompt):
@@ -162,6 +162,8 @@ def authorize_tool_call(
             "scroll": ("scroll", "neeche", "upar"),
             "download": ("download", "save", "download karo"),
             "upload": ("upload", "attach", "lagao", "bhejo"),
+            "new_tab": ("new tab", "open tab", "tab kholo"),
+            "switch_tab": ("switch tab", "tab number", "change tab"),
         }[action]
         if not any(re.search(rf"\b{re.escape(verb)}\b", prompt) for verb in direct_verbs):
             return ToolDecision(False, "not_requested", "The user did not directly request this browser action.")
