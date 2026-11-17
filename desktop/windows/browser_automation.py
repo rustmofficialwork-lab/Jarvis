@@ -190,7 +190,7 @@ class BrowserAutomation:
         def route_request(route):
             try:
                 request_host, _safe_url = self._validate_url(route.request.url)
-                if route.request.is_navigation_request() and request_host != self._host:
+                if route.request.is_navigation_request and request_host != self._host:
                     route.abort()
                     return
                 route.continue_()
