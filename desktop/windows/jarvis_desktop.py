@@ -4385,19 +4385,6 @@ class JarvisDesktop:
 
 
 
-def _is_windows_platform():
-    return os.name == "nt"
-
-
-def get_foreground_window_handle():
-    """Return the foreground HWND so Windows Hello can parent its consent UI."""
-    if not _is_windows_platform():
-        return 0
-    try:
-        return int(ctypes.windll.user32.GetForegroundWindow())
-    except (AttributeError, OSError):
-        return 0
-
 
 class JarvisWebBridge:
     """Small, thread-safe API exposed to the HTML HUD through pywebview."""
@@ -4451,47 +4438,6 @@ class JarvisWebBridge:
         """Return the user's saved opt-in; never grant camera access implicitly."""
         app = self.app_state.get("app")
         return bool(app and app.settings.get("camera_consent_granted") is True)
-
-    def verify_windows_identity(self):
-        """Ask Windows Hello to verify the signed-in user; never store biometric data."""
-        if not _is_windows_platform():
-            return {"verified": False, "code": "unsupported_platform",
-                    "message": "Windows Hello verification is available only on Windows."}
-        hwnd = get_foreground_window_handle()
-        if not hwnd:
-            return {"verified": False, "code": "window_unavailable",
-                    "message": "JARVIS could not identify its active window."}
-        if getattr(sys, "frozen", False):
-            helper = Path(getattr(sys, "_MEIPASS", "")) / "hello-auth" / "JarvisHelloAuth.exe"
-        else:
-            helper = Path(__file__).with_name("hello-auth") / "JarvisHelloAuth.exe"
-        if not helper.is_file():
-            return {"verified": False, "code": "helper_missing",
-                    "message": "Windows Hello component is not installed. Update JARVIS and try again."}
-        try:
-            completed = subprocess.run(
-                [str(helper), str(hwnd)], capture_output=True, text=True,
-                timeout=90, check=False,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-            payload = json.loads(completed.stdout.strip().splitlines()[-1])
-            if not isinstance(payload, dict) or payload.get("verified") is not True:
-                return {
-                    "verified": False,
-                    "code": str(payload.get("code", "not_verified"))[:64] if isinstance(payload, dict) else "invalid_response",
-                    "message": str(payload.get("message", "Windows verification was not completed."))[:240] if isinstance(payload, dict) else "Windows verification returned an invalid response.",
-                }
-            return {
-                "verified": True, "code": "verified",
-                "message": "Windows verified the signed-in user. Verification method is chosen by Windows.",
-            }
-        except subprocess.TimeoutExpired:
-            return {"verified": False, "code": "timeout",
-                    "message": "Windows verification timed out. No authentication was granted."}
-        except (OSError, ValueError, IndexError, json.JSONDecodeError):
-            logger.exception("Windows Hello verification failed")
-            return {"verified": False, "code": "unavailable",
-                    "message": "Windows Hello verification is unavailable. No authentication was granted."}
 
     def get_settings(self):
         app = self.app_state.get("app")
