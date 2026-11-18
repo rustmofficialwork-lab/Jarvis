@@ -13,10 +13,10 @@ import urllib.request
 from dataclasses import dataclass, field
 
 OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
-DEFAULT_MODEL = "llama3.2:3b"
+DEFAULT_MODEL = "qwen3:4b"
 MAX_RESPONSE_BYTES = 1_000_000
-LOW_RAM_FREE_GB = 1.5      # below this even the 3B model will swap and crawl
-DEEP_THINK_FREE_GB = 2.5   # deep think keeps the model busy for several calls
+LOW_RAM_FREE_GB = 3.5      # Qwen3 4B needs several GB beyond Windows and other apps
+DEEP_THINK_FREE_GB = 5.0   # deep think makes multiple local model calls
 
 _COMMAND = re.compile(
     r"^(?:(?:please|hey jarvis|jarvis|zara|ek baar)\s+)*"
