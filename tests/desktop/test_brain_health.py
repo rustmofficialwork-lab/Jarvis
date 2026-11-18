@@ -45,7 +45,7 @@ class CommandParsingTests(unittest.TestCase):
 
 class CheckTests(unittest.TestCase):
     def test_ready_when_model_installed(self):
-        opener = opener_returning(["llama3.2:3b", "other:1b"])
+        opener = opener_returning(["qwen3:4b", "other:1b"])
         health = bh.check_local_brain(opener=opener, psutil_module=ram(8, 3.2))
         self.assertTrue(health.ready and health.deep_think_ok and not health.low_ram)
         self.assertEqual((health.ram_total_gb, health.ram_free_gb), (8.0, 3.2))
@@ -63,10 +63,10 @@ class CheckTests(unittest.TestCase):
     def test_missing_model_gives_exact_pull_command(self):
         health = bh.check_local_brain(opener=opener_returning(["phi3:mini"]), psutil_module=ram(8, 3))
         self.assertTrue(health.ollama_running and not health.model_installed)
-        self.assertIn("ollama pull llama3.2:3b", bh.format_brain_report(health))
+        self.assertIn("ollama pull qwen3:4b", bh.format_brain_report(health))
 
     def test_low_ram_warns_and_disables_deep_think(self):
-        health = bh.check_local_brain(opener=opener_returning(["llama3.2:3b"]), psutil_module=ram(8, 1.0))
+        health = bh.check_local_brain(opener=opener_returning(["qwen3:4b"]), psutil_module=ram(8, 1.0))
         self.assertTrue(health.low_ram and not health.deep_think_ok)
         self.assertIn("RAM kam", bh.format_brain_report(health))
 
@@ -80,7 +80,7 @@ class CheckTests(unittest.TestCase):
 
     def test_missing_psutil_still_reports(self):
         broken = SimpleNamespace(virtual_memory=lambda: (_ for _ in ()).throw(OSError("x")))
-        health = bh.check_local_brain(opener=opener_returning(["llama3.2:3b"]), psutil_module=broken)
+        health = bh.check_local_brain(opener=opener_returning(["qwen3:4b"]), psutil_module=broken)
         self.assertTrue(health.ready)
         self.assertIsNone(health.ram_free_gb)
         self.assertNotIn("RAM:", bh.format_brain_report(health))
