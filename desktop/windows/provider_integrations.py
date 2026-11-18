@@ -267,29 +267,39 @@ def read_browser_page(
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
         raise IntegrationUnavailable("Install the optional Playwright browser runtime to use read-only browser automation.") from exc
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        try:
-            page = browser.new_page()
-            page.set_default_navigation_timeout(10_000)
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page()
+                page.set_default_navigation_timeout(10_000)
 
-            def restrict_requests(route):
-                requested = urllib.parse.urlsplit(route.request.url)
-                request_host = (requested.hostname or "").casefold().rstrip(".")
-                if requested.scheme == "https" and request_host == host:
-                    route.continue_()
-                else:
-                    route.abort()
+                def restrict_requests(route):
+                    requested = urllib.parse.urlsplit(route.request.url)
+                    request_host = (requested.hostname or "").casefold().rstrip(".")
+                    if requested.scheme == "https" and request_host == host:
+                        route.continue_()
+                    else:
+                        route.abort()
 
-            page.route("**/*", restrict_requests)
-            page.goto(url, wait_until="domcontentloaded")
-            final_host = (urllib.parse.urlsplit(page.url).hostname or "").casefold().rstrip(".")
-            if final_host != host:
-                raise PermissionError("The page redirected to a different hostname; navigation was stopped.")
-            text = page.locator("body").inner_text(timeout=5_000)
-            return text[:MAX_BROWSER_TEXT_CHARS]
-        finally:
-            browser.close()
+                page.route("**/*", restrict_requests)
+                page.goto(url, wait_until="domcontentloaded")
+                final_host = (urllib.parse.urlsplit(page.url).hostname or "").casefold().rstrip(".")
+                if final_host != host:
+                    raise PermissionError("The page redirected to a different hostname; navigation was stopped.")
+                text = page.locator("body").inner_text(timeout=5_000)
+                return text[:MAX_BROWSER_TEXT_CHARS]
+            finally:
+                browser.close()
+    except PermissionError:
+        raise
+    except Exception as exc:
+        # The Python package may be present while its browser driver or Chromium
+        # binary is missing/broken (common on clean CI machines). Report this as
+        # an optional-runtime problem instead of leaking a raw Playwright traceback.
+        raise IntegrationUnavailable(
+            "The Playwright browser runtime is unavailable. Install the Chromium browser for Playwright, then try again."
+        ) from exc
 
 
 def integration_status() -> dict[str, str]:
