@@ -176,16 +176,9 @@ jobs:
           $version = "1.1.$env:GITHUB_RUN_NUMBER"
           Set-Content -Path "desktop/windows/build_version.py" -Value "APP_VERSION = `"$version`"" -Encoding utf8
           python -c "import runpy; assert runpy.run_path('desktop/windows/build_version.py')['APP_VERSION'] == '$version'"
-      - name: Build Windows Hello verification helper
-        run: dotnet publish desktop/windows/hello-auth/JarvisHelloAuth.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o desktop/windows/hello-auth/publish
-      - name: Verify Windows Hello helper output
-        shell: pwsh
-        run: |
-          $helper = "desktop/windows/hello-auth/publish/JarvisHelloAuth.exe"
-          if (-not (Test-Path $helper)) { throw "Windows Hello helper was not built." }
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --onedir --windowed --add-binary "hello-auth/publish/JarvisHelloAuth.exe;hello-auth" --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_hud_runtime.js;." --add-data "jarvis_gesture_logic.js;." --add-data "vendor;vendor" --collect-all webview --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --exclude-module android --exclude-module onnxruntime.quantization --collect-all huggingface_hub --collect-all playwright --collect-all greenlet --paths . --hidden-import browser_automation --hidden-import build_version --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_hud_runtime.js;." --add-data "jarvis_gesture_logic.js;." --add-data "vendor;vendor" --collect-all webview --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --exclude-module android --exclude-module onnxruntime.quantization --collect-all huggingface_hub --collect-all playwright --collect-all greenlet --paths . --hidden-import browser_automation --hidden-import build_version --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
       - name: Smoke-test packaged Windows executable
         shell: pwsh
         run: |
