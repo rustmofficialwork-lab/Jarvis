@@ -26,13 +26,15 @@ BLOCKED_BROWSER_ACTIONS = frozenset({
 })
 
 # Browser automation is intentionally read-only. Unknown actions fail closed.
-ALLOWED_BROWSER_ACTIONS = frozenset({
-    "open_page", "read_page", "extract_text", "scroll_page",
-    "click_sensitive_control", "submit_form", "upload_file",
-})
 ALLOWED_BROWSER_SESSION_ACTIONS = frozenset({
     "open_page", "read_page", "extract_text", "scroll_page",
 })
+# Sensitive actions can be previewed for an exact one-time voice approval,
+# but they are never allowed by the ordinary browser-session policy.
+ALLOWED_BROWSER_APPROVAL_ACTIONS = ALLOWED_BROWSER_SESSION_ACTIONS | frozenset({
+    "click_sensitive_control", "submit_form", "upload_file",
+})
+ALLOWED_BROWSER_ACTIONS = ALLOWED_BROWSER_SESSION_ACTIONS
 
 
 @dataclass(frozen=True)
@@ -140,8 +142,8 @@ def build_approval_request(
             raise ValueError("Browser domain and requested action are required.")
         host = _normalize_exact_hostname(domain)
         normalized_action = action.strip().casefold()
-        if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_SESSION_ACTIONS:
-            raise PermissionError("Only explicitly allowlisted read-only browser actions can be approved.")
+        if normalized_action in BLOCKED_BROWSER_ACTIONS or normalized_action not in ALLOWED_BROWSER_APPROVAL_ACTIONS:
+            raise PermissionError("Only explicitly allowlisted browser actions can be approved.")
     current = time.time() if now is None else now
     safe_details = json.loads(json.dumps(details, sort_keys=True))
     return ApprovalRequest(
