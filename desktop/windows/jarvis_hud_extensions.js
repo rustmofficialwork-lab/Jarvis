@@ -47,7 +47,7 @@
   `;
   document.head.appendChild(style);
   const controls=document.createElement('div');controls.id='jx-extensions';
-  controls.innerHTML='<span id="jx-ext-status" role="status">HUD ready · Camera off</span><button id="jx-hello-toggle" type="button">WINDOWS HELLO AUTH</button>';
+  controls.innerHTML='<span id="jx-ext-status" role="status">HUD ready · Camera off</span>';
   document.body.appendChild(controls);
   // Place the hand-gesture control inside the red-marked area below ARCHITECTURE
   // in SYSTEM INFORMATION, without changing the original HUD HTML/layout.
@@ -86,7 +86,7 @@
   window.addEventListener('scroll',positionGestureToggle,{passive:true});
   const preview=document.createElement('video');preview.id='jx-camera-preview';preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Local hand gesture camera preview');document.body.appendChild(preview);
   const artwork=document.getElementById('m');
-  const status=document.getElementById('jx-ext-status'),toggle=document.getElementById('jx-gesture-toggle'),helloToggle=document.getElementById('jx-hello-toggle'),hud=artwork,orb=document.querySelector('.orb-wrapper');
+  const status=document.getElementById('jx-ext-status'),toggle=document.getElementById('jx-gesture-toggle'),hud=artwork,orb=document.querySelector('.orb-wrapper');
   const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
   if(orb&&!reducedMotion){
     const canvas=document.createElement('canvas');canvas.id='jx-holo-canvas';orb.appendChild(canvas);
@@ -156,21 +156,6 @@
     return true;
   };
   const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus('HUD ready · Camera off');};
-  helloToggle.addEventListener('click',async()=>{
-    const api=window.pywebview?.api;
-    if(!api?.verify_windows_identity){setStatus('Windows Hello bridge unavailable · run the installed desktop app');return;}
-    helloToggle.disabled=true;
-    setStatus('Waiting for Windows Hello verification…');
-    try{
-      const result=await api.verify_windows_identity();
-      setStatus(result?.verified
-        ?'Windows verified the signed-in user · method selected by Windows'
-        :(result?.message||'Windows verification was not completed · access not granted'));
-    }catch(error){
-      console.warn('JARVIS Windows Hello verification failed',error);
-      setStatus('Windows Hello unavailable · access not granted');
-    }finally{helloToggle.disabled=false;}
-  });
   let lastInferenceAt=0,lastVideoTime=-1,swipeState=gesture?.emptySwipeState?.()||{startX:null,startAt:0,lastAt:-Infinity};
   const detect=results=>{
     const hand=results.landmarks?.[0],now=performance.now();
