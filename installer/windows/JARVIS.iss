@@ -29,6 +29,7 @@ Name: "offlineai"; Description: "Install offline AI now (Ollama + Qwen3 4B; appr
 [Files]
 Source: "..\..\desktop\windows\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\desktop\windows\setup_offline_ai.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\desktop\windows\offline-ai-bundle\*"; DestDir: "{app}\offline-ai-bundle"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"
