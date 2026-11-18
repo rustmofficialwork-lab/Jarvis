@@ -33,7 +33,7 @@
     #jx-extensions button[aria-pressed=true]{color:#fff;border-color:#8eeeff;background:rgba(0,170,205,.18);box-shadow:inset 0 0 9px rgba(25,211,255,.16),0 0 9px rgba(25,211,255,.2)}
     #jx-extensions button:disabled,#jx-gesture-toggle:disabled{opacity:.55;cursor:wait}
     /* Match the legacy-injected gesture toggle to the other HUD controls. */
-    #jx-gesture-toggle{min-height:32px!important;width:auto!important;padding:6px 12px!important;border:1px solid rgba(25,211,255,.78)!important;border-radius:1px!important;background:rgba(0,0,0,.72)!important;color:#e8fbff!important;font:600 14px Rajdhani,"Segoe UI",sans-serif!important;letter-spacing:.55px!important;text-transform:uppercase!important;text-shadow:0 0 7px rgba(25,211,255,.45)!important;box-shadow:none!important;cursor:pointer!important;backdrop-filter:none!important;transition:background .18s ease,border-color .18s ease,box-shadow .18s ease!important}
+    #jx-gesture-toggle{min-height:32px!important;width:auto!important;padding:6px 12px!important;border:1px solid rgba(25,211,255,.78)!important;border-radius:1px!important;background:rgba(0,0,0,.72)!important;color:#e8fbff!important;font:600 14px Rajdhani,"Segoe UI",sans-serif!important;letter-spacing:.55px!important;text-transform:none!important;text-shadow:0 0 7px rgba(25,211,255,.45)!important;box-shadow:none!important;cursor:pointer!important;backdrop-filter:none!important;transition:background .18s ease,border-color .18s ease,box-shadow .18s ease!important}
     #jx-gesture-toggle:hover:not(:disabled){background:rgba(25,211,255,.16);border-color:#e6fcff;box-shadow:0 0 12px rgba(25,211,255,.4)}
     #jx-gesture-toggle[aria-pressed=true]{color:#fff;border-color:#8eeeff;background:rgba(0,170,205,.24);box-shadow:inset 0 0 9px rgba(25,211,255,.16),0 0 9px rgba(25,211,255,.3)}
     #jx-ext-status{position:relative;max-width:210px;min-width:130px;padding:3px 4px 3px 15px;color:#c8f7ff;border-left:1px solid rgba(25,211,255,.28);font:600 13px Rajdhani,"Segoe UI",sans-serif;line-height:1.2}
@@ -56,7 +56,7 @@
     gestureToggle.id='jx-gesture-toggle';
     gestureToggle.type='button';
     gestureToggle.setAttribute('aria-pressed','false');
-    gestureToggle.textContent='ENABLE GESTURES';
+    gestureToggle.textContent='gesture';
     document.body.appendChild(gestureToggle);
   }
   gestureToggle.style.cssText='position:fixed;z-index:261;width:112px;min-height:26px;padding:3px 5px;font-size:11px;letter-spacing:.25px;transform:translate(-50%,-50%);';
@@ -164,7 +164,7 @@
     }));
     return true;
   };
-  const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus('HUD ready · Camera off');};
+  const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','false');toggle.textContent='gesture';hud?.classList.remove('jx-gesture-active');setStatus('HUD ready · Camera off');};
   let lastInferenceAt=0,lastVideoTime=-1,swipeState=gesture?.emptySwipeState?.()||{startX:null,startAt:0,lastAt:-Infinity};
   const detect=results=>{
     const hand=results.landmarks?.[0],now=performance.now();
@@ -218,7 +218,7 @@
         minHandDetectionConfidence:.35,minHandPresenceConfidence:.35,minTrackingConfidence:.35
       });
       swipeState=gesture.emptySwipeState();lastPinch=false;lastFist=false;lastHandVisible=null;lastVideoTime=-1;lastInferenceAt=0;
-      toggle.setAttribute('aria-pressed','true');toggle.textContent='DISABLE GESTURES';
+      toggle.setAttribute('aria-pressed','true');toggle.textContent='gesture';
       setStatus('Camera on · searching for hand…');
       raf=requestAnimationFrame(frame);
     }catch(err){
