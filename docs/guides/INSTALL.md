@@ -13,7 +13,7 @@ Windows installer GitHub Actions automatically banata hai. App install karne ke 
 ## Install
 
 1. Downloaded ZIP artifact ko extract karo (agar artifact ZIP hai), phir `JARVIS-Setup-x64.exe` chalao.
-2. Installer mein **Install offline AI now** select karne par Ollama aur Llama 3.2 3B ka lagbhag 2 GB download hoga. Isse local offline AI setup hota hai; internet/cloud-only features offline available nahi honge.
+2. Installer mein **Install offline AI now** select karne par Ollama aur Qwen3 4B ka lagbhag 2 GB download hoga. Isse local offline AI setup hota hai; internet/cloud-only features offline available nahi honge.
 3. App abhi code-signed nahi hai, isliye Windows SmartScreen warning dikha sakta hai. Publisher verify kiye bina kisi unexpected installer ko run mat karo.
 4. JARVIS kholo. Typing se chat use kar sakte ho. Try: `good morning jarvis`, `notepad kholo aur phir calculator kholo`, `brain check`.
 
