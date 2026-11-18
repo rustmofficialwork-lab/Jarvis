@@ -2816,58 +2816,14 @@ class HybridAiTests(unittest.TestCase):
 
 
 
-class WindowsHelloBridgeTests(unittest.TestCase):
-    def test_windows_hello_verified_result_is_returned_only_after_native_success(self):
-        from types import SimpleNamespace
-
-        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
-        response = json.dumps({"verified": True, "code": "verified", "message": "Windows verified the signed-in user."})
-        with (
-            patch.object(jarvis_desktop, "_is_windows_platform", return_value=True),
-            patch.object(jarvis_desktop, "get_foreground_window_handle", return_value=1234),
-            patch.object(Path, "is_file", return_value=True),
-            patch.object(jarvis_desktop.subprocess, "run", return_value=SimpleNamespace(stdout=response, returncode=0)) as run,
-        ):
-            result = bridge.verify_windows_identity()
-        self.assertTrue(result["verified"])
-        self.assertEqual(result["code"], "verified")
-        self.assertEqual(run.call_args.args[0][-1], "1234")
-        self.assertEqual(run.call_args.kwargs["timeout"], 90)
-
-    def test_windows_hello_cancelled_or_failed_verification_never_authenticates(self):
-        from types import SimpleNamespace
-
-        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
-        response = json.dumps({"verified": False, "code": "Canceled", "message": "Windows verification was not completed."})
-        with (
-            patch.object(jarvis_desktop, "_is_windows_platform", return_value=True),
-            patch.object(jarvis_desktop, "get_foreground_window_handle", return_value=1234),
-            patch.object(Path, "is_file", return_value=True),
-            patch.object(jarvis_desktop.subprocess, "run", return_value=SimpleNamespace(stdout=response, returncode=1)),
-        ):
-            result = bridge.verify_windows_identity()
-        self.assertFalse(result["verified"])
-        self.assertEqual(result["code"], "Canceled")
-
-    def test_windows_hello_fails_closed_when_helper_is_missing(self):
-        bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": None})
-        with (
-            patch.object(jarvis_desktop, "_is_windows_platform", return_value=True),
-            patch.object(jarvis_desktop, "get_foreground_window_handle", return_value=1234),
-            patch.object(Path, "is_file", return_value=False),
-            patch.object(jarvis_desktop.subprocess, "run") as run,
-        ):
-            result = bridge.verify_windows_identity()
-        self.assertFalse(result["verified"])
-        self.assertEqual(result["code"], "helper_missing")
-        run.assert_not_called()
-
-    def test_face_presence_feature_and_button_are_removed(self):
+class RemovedWindowsHelloFeatureTests(unittest.TestCase):
+    def test_windows_hello_button_and_bridge_are_removed(self):
         extensions = (DESKTOP_DIR / "jarvis_hud_extensions.js").read_text(encoding="utf-8")
-        self.assertNotIn("jx-face-toggle", extensions)
-        self.assertNotIn("FACE PRESENCE", extensions)
-        self.assertNotIn("FaceDetector", extensions)
-        self.assertIn("verify_windows_identity", extensions)
+        desktop_source = (DESKTOP_DIR / "jarvis_desktop.py").read_text(encoding="utf-8")
+        self.assertNotIn("jx-hello-toggle", extensions)
+        self.assertNotIn("WINDOWS HELLO AUTH", extensions)
+        self.assertNotIn("verify_windows_identity", extensions)
+        self.assertNotIn("verify_windows_identity", desktop_source)
 
 
 if __name__ == "__main__":
