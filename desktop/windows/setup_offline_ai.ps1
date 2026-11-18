@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "JARVIS Offline AI setup" -ForegroundColor Cyan
-Write-Host "This installs Ollama (if needed) and downloads the Llama 3.2 3B model."
-Write-Host "The model download is approximately 2 GB; keep an internet connection during setup."
+Write-Host "This installs Ollama (if needed) and downloads the Qwen3 4B model."
+Write-Host "The model download is approximately 2.5 GB; keep an internet connection during setup."
 
 $ollamaCommand = Get-Command ollama -ErrorAction SilentlyContinue
 $ollamaExe = if ($ollamaCommand) { $ollamaCommand.Source } else { $null }
@@ -63,9 +63,9 @@ if (-not $serverReady) {
     throw "Ollama did not start. Restart Windows, open Ollama, and run this script again."
 }
 
-& $ollamaExe pull llama3.2:3b
+& $ollamaExe pull qwen3:4b
 if ($LASTEXITCODE -ne 0) {
-    throw "The Llama 3.2 3B model download failed. Check your internet connection and rerun this script."
+    throw "The Qwen3 4B model download failed. Check your internet connection and rerun this script."
 }
 
 Write-Host ""
