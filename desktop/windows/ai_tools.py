@@ -110,7 +110,7 @@ TOOL_DEFINITIONS = [
                     "value": {"type": "string", "maxLength": 4000}
                 },
                 "required": ["action"],
-                "additionalProperties": false
+                "additionalProperties": False
             }
         }
     },
@@ -128,7 +128,7 @@ TOOL_DEFINITIONS = [
                     "content": {"type": "string", "maxLength": 2500}
                 },
                 "required": ["provider", "recipient", "subject", "content"],
-                "additionalProperties": false
+                "additionalProperties": False
             }
         }
     },
@@ -145,7 +145,7 @@ TOOL_DEFINITIONS = [
                     "content": {"type": "string", "maxLength": 2500}
                 },
                 "required": ["provider", "recipient", "content"],
-                "additionalProperties": false
+                "additionalProperties": False
             }
         }
     },
