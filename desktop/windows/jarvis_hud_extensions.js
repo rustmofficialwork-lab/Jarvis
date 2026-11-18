@@ -105,7 +105,7 @@
       status.textContent='HUD ready · Camera off';
     }).catch(err=>{console.warn('JARVIS Three.js hologram unavailable; starting native canvas fallback',err);const ctx=canvas.getContext('2d');if(!ctx){status.textContent='Hologram unavailable · HUD remains active';return;}let active=true,angle=0;const resize=()=>{const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);};const observer=new ResizeObserver(resize);observer.observe(orb);resize();const draw=()=>{if(!active)return;const w=canvas.clientWidth,h=canvas.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)*.34;ctx.clearRect(0,0,w,h);angle+=.012;for(let ring=0;ring<3;ring++){ctx.beginPath();ctx.ellipse(cx,cy,r*(1-ring*.19),r*(.34+ring*.12),angle*(ring%2?-.7:1),0,Math.PI*2);ctx.strokeStyle=ring===1?'rgba(255,138,50,.8)':'rgba(0,220,255,.78)';ctx.lineWidth=1.5;ctx.shadowBlur=12;ctx.shadowColor=ctx.strokeStyle;ctx.stroke();}ctx.beginPath();ctx.arc(cx,cy,r*.16,0,Math.PI*2);ctx.fillStyle='rgba(0,220,255,.22)';ctx.fill();ctx.strokeStyle='#8eeaff';ctx.stroke();ctx.shadowBlur=0;requestAnimationFrame(draw);};draw();window.addEventListener('pagehide',()=>{active=false;observer.disconnect();},{once:true});status.textContent='HUD ready · Camera off';});
   }
-  let stream=null,cameraUsers=0,cameraPromise=null,landmarker=null,raf=0,lastPinch=false,lastFist=false,lastGestureAt=0,hologramRig=null;
+  let stream=null,cameraUsers=0,cameraPromise=null,landmarker=null,raf=0,lastPinch=false,lastFist=false,lastGestureAt=0,hologramRig=null,lastHandVisible=null;
   const acquireCamera=async video=>{
     if(!stream){
       if(!cameraPromise){
@@ -168,7 +168,8 @@
   let lastInferenceAt=0,lastVideoTime=-1,swipeState=gesture?.emptySwipeState?.()||{startX:null,startAt:0,lastAt:-Infinity};
   const detect=results=>{
     const hand=results.landmarks?.[0],now=performance.now();
-    if(!hand){lastPinch=false;lastFist=false;swipeState=gesture.emptySwipeState();return;}
+    if(!hand){lastPinch=false;lastFist=false;swipeState=gesture.emptySwipeState();if(lastHandVisible!==false){lastHandVisible=false;setStatus('Camera on · no hand detected · show your hand clearly');}return;}
+    if(lastHandVisible!==true){lastHandVisible=true;setStatus('Hand tracked · pinch to click · fist to pulse · swipe to rotate');}
     const pinch=gesture.isPinching(hand),fist=gesture.isFist(hand);
     if(pinch&&!lastPinch&&now-lastGestureAt>650){
       if(clickHudTarget(hand)){lastGestureAt=now;setStatus('Gesture: pinch · HUD action triggered');}
@@ -190,7 +191,7 @@
     if(preview.currentTime!==lastVideoTime&&now-lastInferenceAt>=80){
       lastVideoTime=preview.currentTime;lastInferenceAt=now;
       try{detect(landmarker.detectForVideo(preview,now));}
-      catch(err){console.warn('Gesture frame skipped',err);setStatus('Tracking paused · move into camera view');}
+      catch(err){console.warn('Gesture frame skipped',err);setStatus('Tracking error · check JARVIS startup log');}
     }
     raf=requestAnimationFrame(frame);
   };
@@ -214,11 +215,11 @@
       const modelUrl=new URL('mediapipe/models/hand_landmarker.task',vendorBase).href;
       landmarker=await createVisionTask(opts=>vision.HandLandmarker.createFromOptions(fileset,opts),{
         baseOptions:{modelAssetPath:modelUrl},runningMode:'VIDEO',numHands:1,
-        minHandDetectionConfidence:.55,minHandPresenceConfidence:.5,minTrackingConfidence:.5
+        minHandDetectionConfidence:.35,minHandPresenceConfidence:.35,minTrackingConfidence:.35
       });
-      swipeState=gesture.emptySwipeState();lastPinch=false;lastFist=false;lastVideoTime=-1;lastInferenceAt=0;
+      swipeState=gesture.emptySwipeState();lastPinch=false;lastFist=false;lastHandVisible=null;lastVideoTime=-1;lastInferenceAt=0;
       toggle.setAttribute('aria-pressed','true');toggle.textContent='DISABLE GESTURES';
-      setStatus('Gestures active · show one hand · pinch to click · fist to pulse · swipe to rotate');
+      setStatus('Camera on · searching for hand…');
       raf=requestAnimationFrame(frame);
     }catch(err){
       console.warn('JARVIS gesture setup failed',err);stop();
