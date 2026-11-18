@@ -1,7 +1,7 @@
 # JARVIS smart brain (free)
 
 JARVIS does not contain its own AI model. The "mind" is a free model (cloud free tier or local
-Ollama `llama3.2:3b`). `smart_brain.py` is the layer that makes those free models behave better.
+Ollama `qwen3:4b`). `smart_brain.py` is the layer that makes those free models behave better.
 It is plain Python (no extra packages), runs on the PC, and sits *under* the safety policy in
 `brain_core.py` - it can never run a tool the policy would not already allow.
 
@@ -19,7 +19,7 @@ It is plain Python (no extra packages), runs on the PC, and sits *under* the saf
 ## Brain check
 
 Type `brain check` (or `brain status karo`, `ollama check`) in JARVIS. `brain_health.py` asks the
-loopback Ollama service whether it is running and whether `llama3.2:3b` is installed, reads free RAM,
+loopback Ollama service whether it is running and whether `qwen3:4b` is installed, reads free RAM,
 and prints one concrete next step (for example the exact `ollama pull` command). It is read-only: it
 never starts, installs, or changes anything. On an 8 GB laptop it warns when free RAM is low and tells
 you to skip deep think.
@@ -45,7 +45,7 @@ you to skip deep think.
 
 ## Honest limits
 
-- A 3B model is still a 3B model. This layer reduces slips; it does not turn it into a frontier model.
+- A 4B model is still a 4B model. This layer reduces slips; it does not turn it into a frontier model.
 - Deep-think triples local latency on a CPU-only laptop. Simple chat always uses exactly one call.
 - The cloud path is unchanged apart from better memory selection; cloud models already use tools.
 - Nothing here trains or fine-tunes a model, and nothing is uploaded anywhere.
@@ -56,6 +56,6 @@ you to skip deep think.
   and falls back between them (see `backend/README.md`). Adding more free-tier providers
   increases uptime.
 - Local: a larger Ollama model gives better answers but needs more RAM; the app currently
-  supports only `llama3.2:3b`.
+  supports only `qwen3:4b`.
 
 Tests: `python -m unittest test_smart_brain test_smart_brain_integration` (run in `desktop/windows`).
