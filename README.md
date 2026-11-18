@@ -51,7 +51,7 @@ JARVIS prefers its secured cloud AI gateway while internet and the configured pr
 2. If you skip it during installation, run `powershell -ExecutionPolicy Bypass -File .\\setup_offline_ai.ps1` from the installed JARVIS folder while online.
 3. After the model is downloaded once, JARVIS checks cloud AI first on every request and automatically uses local Ollama when the cloud route is unavailable. If Windows restarted and Ollama is not running, JARVIS starts its local service automatically; when cloud access returns, the next request uses cloud AI again.
 
-The local model is downloaded once per PC and is not embedded in the application binary. If the model has not been downloaded, JARVIS reports that offline setup is required rather than pretending offline AI is ready. The 4B model is a local fallback; response quality and speed are lower than cloud AI and depend on available RAM/CPU. Close other memory-heavy apps if an 8 GB PC struggles.
+The setup script supports an optional preloaded Ollama model-store bundle at `desktop/windows/offline-ai-bundle/models`; when that folder is shipped with the installer, Qwen3 4B is registered locally without downloading model weights. If no bundle is shipped, setup downloads the model from the official Ollama registry. The model weights are not stored in Git source history. If the model has not been downloaded, JARVIS reports that offline setup is required rather than pretending offline AI is ready. The 4B model is a local fallback; response quality and speed are lower than cloud AI and depend on available RAM/CPU. Close other memory-heavy apps if an 8 GB PC struggles.
 
 ## Offline reminders
 
