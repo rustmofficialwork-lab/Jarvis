@@ -147,12 +147,21 @@
   });
   const clickHudTarget=hand=>{
     const point=gesture.toViewport(hand[8].x,hand[8].y,window.innerWidth,window.innerHeight,true);
-    // The current HUD is SVG artwork and has no HTML [data-hud] controls.
-    // Dispatch on the SVG so the runtime adapter can route supported hotspots.
-    const hit=document.elementFromPoint(point.x,point.y);
-    const svg=hit?.closest?.('svg.scene, .row svg, .stack svg');
+    // Do not depend on elementFromPoint(): the preview, status bar, SVG <use>
+    // instances or transparent HUD layers can sit above the artwork. Dispatch
+    // directly to the visible HUD SVG; the runtime adapter resolves its hotspot
+    // from clientX/clientY using the SVG's current screen transform.
+    const svg=[...document.querySelectorAll('svg.scene, .row svg, .stack svg')]
+      .find(candidate=>{
+        const rect=candidate.getBoundingClientRect();
+        return rect.width>0&&rect.height>0
+          &&point.x>=rect.left&&point.x<=rect.right
+          &&point.y>=rect.top&&point.y<=rect.bottom;
+      });
     if(!svg)return false;
-    svg.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:point.x,clientY:point.y}));
+    svg.dispatchEvent(new MouseEvent('click',{
+      bubbles:true,cancelable:true,view:window,clientX:point.x,clientY:point.y
+    }));
     return true;
   };
   const stop=()=>{cancelAnimationFrame(raf);raf=0;if(preview.srcObject){releaseCamera(preview);}preview.style.display='none';landmarker?.close?.();landmarker=null;lastPinch=false;lastFist=false;toggle.setAttribute('aria-pressed','false');toggle.textContent='ENABLE GESTURES';hud?.classList.remove('jx-gesture-active');setStatus('HUD ready · Camera off');};
@@ -163,7 +172,7 @@
     const pinch=gesture.isPinching(hand),fist=gesture.isFist(hand);
     if(pinch&&!lastPinch&&now-lastGestureAt>650){
       if(clickHudTarget(hand)){lastGestureAt=now;setStatus('Gesture: pinch · HUD action triggered');}
-      else setStatus('Pinch detected · point at a highlighted HUD control');
+      else setStatus('Pinch detected · move your hand inside the HUD area');
     }
     if(fist&&!lastFist&&now-lastGestureAt>650){
       hud?.classList.toggle('jx-gesture-active');lastGestureAt=now;setStatus('Gesture: fist · reactor pulse');
@@ -209,7 +218,7 @@
       });
       swipeState=gesture.emptySwipeState();lastPinch=false;lastFist=false;lastVideoTime=-1;lastInferenceAt=0;
       toggle.setAttribute('aria-pressed','true');toggle.textContent='DISABLE GESTURES';
-      setStatus('Gestures active · pinch HUD · fist pulse');
+      setStatus('Gestures active · show one hand · pinch to click · fist to pulse · swipe to rotate');
       raf=requestAnimationFrame(frame);
     }catch(err){
       console.warn('JARVIS gesture setup failed',err);stop();
