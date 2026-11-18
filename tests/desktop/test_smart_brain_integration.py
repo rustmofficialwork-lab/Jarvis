@@ -175,7 +175,7 @@ class BrainCheckCommandTests(unittest.TestCase):
     def test_brain_check_shows_report_and_is_wired_into_local_commands(self):
         app = self.app()
         health = jarvis_desktop.check_local_brain.__globals__["BrainHealth"](
-            True, "llama3.2:3b", False, (), 8.0, 3.0, None)
+            True, "qwen3:4b", False, (), 8.0, 3.0, None)
         with (
             patch.object(jarvis_desktop, "check_local_brain", return_value=health),
             patch.object(jarvis_desktop, "save_chat_history"),
@@ -184,7 +184,7 @@ class BrainCheckCommandTests(unittest.TestCase):
         ):
             self.assertTrue(app._try_local_command("brain check karo"))
         self.assertEqual(app.shown[0], ("YOU", "brain check karo"))
-        self.assertIn("ollama pull llama3.2:3b", app.shown[1][1])
+        self.assertIn("ollama pull qwen3:4b", app.shown[1][1])
         self.assertEqual(app.history[-1]["role"], "assistant")
 
     def test_ordinary_prompts_are_not_intercepted(self):
