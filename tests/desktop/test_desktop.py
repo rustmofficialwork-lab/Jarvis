@@ -2690,7 +2690,7 @@ class HybridAiTests(unittest.TestCase):
 
         self.assertEqual(result, "Offline reply")
         self.assertEqual(captured["url"], "http://127.0.0.1:11434/api/chat")
-        self.assertEqual(captured["payload"]["model"], "llama3.2:3b")
+        self.assertEqual(captured["payload"]["model"], "qwen3:4b")
         self.assertEqual(captured["payload"]["options"]["num_ctx"], 2048)
         self.assertFalse(captured["payload"]["stream"])
         self.assertEqual(captured["payload"]["messages"][-1]["content"], "hello")
@@ -2709,7 +2709,7 @@ class HybridAiTests(unittest.TestCase):
                 "open": lambda self, request, timeout: (_ for _ in ()).throw(error)
             })(),
         ):
-            with self.assertRaisesRegex(RuntimeError, "ollama pull llama3.2:3b"):
+            with self.assertRaisesRegex(RuntimeError, "ollama pull qwen3:4b"):
                 jarvis_desktop.local_chat_completion("hello", [])
 
 
