@@ -1,7 +1,9 @@
-# JARVIS smart brain (free)
+# JARVIS smart brain
 
-JARVIS does not contain its own AI model. The "mind" is a free model (cloud free tier or local
-Ollama `qwen3.5:4b`). `smart_brain.py` is the layer that makes those free models behave better.
+JARVIS uses one general-chat model in both online and offline modes: local Ollama
+`qwen3.5:4b`. Internet connectivity is used only by separate live-information services;
+it does not switch general chat to a cloud model. `smart_brain.py` is the local reasoning,
+context, and memory-selection layer around that model.
 It is plain Python (no extra packages), runs on the PC, and sits *under* the safety policy in
 `brain_core.py` - it can never run a tool the policy would not already allow.
 
@@ -47,15 +49,14 @@ you to skip deep think.
 
 - A 4B model is still a 4B model. This layer reduces slips; it does not turn it into a frontier model.
 - Deep-think triples local latency on a CPU-only laptop. Simple chat always uses exactly one call.
-- The cloud path is unchanged apart from better memory selection; cloud models already use tools.
+- General chat has no cloud-provider fallback. If the local Qwen model is unavailable, JARVIS reports the local runtime problem instead of switching models.
 - Nothing here trains or fine-tunes a model, and nothing is uploaded anywhere.
 
-## Making the free brain stronger
+## Model boundary
 
-- Cloud: the backend accepts up to 5 OpenAI-compatible providers in `JARVIS_AI_PROVIDERS`
-  and falls back between them (see `backend/README.md`). Adding more free-tier providers
-  increases uptime.
-- Local: a larger Ollama model gives better answers but needs more RAM; the app currently
-  supports only `qwen3.5:4b`.
+- The supported general-chat model is `qwen3.5:4b` through the local Ollama runtime.
+- Online mode does not select OpenRouter, Groq, or another hosted chat model.
+- Live web information is handled by the dedicated online-services layer, separately from general chat.
+- A larger local model may need more RAM; the app currently supports only `qwen3.5:4b`.
 
 Tests: `python -m unittest test_smart_brain test_smart_brain_integration` (run in `desktop/windows`).
