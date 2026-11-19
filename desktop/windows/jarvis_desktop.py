@@ -646,35 +646,49 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
         # Do not start an online recognition request after the user has stopped listening.
         if stop_event.is_set():
             return None
-        try:
-            return recognizer.recognize_google(audio, language=language)
-        except Exception as online_error:
-            network_failure = (
-                request_error is not None and isinstance(online_error, request_error)
-            )
-            unclear_audio = (
-                unknown_value_error is not None
-                and isinstance(online_error, unknown_value_error)
-            )
-            if not network_failure and not unclear_audio:
-                raise
+        # Try the selected locale first, then the other Indian English/Hindi
+        # locale. This lets one microphone session understand English, Hindi,
+        # and common Hinglish without asking the user to switch settings.
+        locales = [language]
+        for candidate in ("en-IN", "hi-IN"):
+            if candidate not in locales:
+                locales.append(candidate)
+        network_failure = False
+        recognition_error = None
+        for locale in locales:
             try:
-                offline_text = transcribe_offline_vosk(audio, language)
-            except Exception as offline_error:
-                if network_failure and isinstance(offline_error, OfflineModelUnavailable):
-                    raise request_error(
-                        f"Online speech recognition is unavailable. {offline_error}"
-                    ) from offline_error
-                # Keep the original Google error if local recovery is unavailable.
-                raise online_error
-            if offline_text:
-                return offline_text
-            if network_failure:
+                return recognizer.recognize_google(audio, language=locale)
+            except Exception as online_error:
+                is_network_error = (
+                    request_error is not None and isinstance(online_error, request_error)
+                )
+                is_unclear_audio = (
+                    unknown_value_error is not None
+                    and isinstance(online_error, unknown_value_error)
+                )
+                if not is_network_error and not is_unclear_audio:
+                    raise
+                recognition_error = online_error
+                if is_network_error:
+                    network_failure = True
+                    break
+        try:
+            offline_text = transcribe_offline_vosk(audio, language)
+        except Exception as offline_error:
+            if network_failure and isinstance(offline_error, OfflineModelUnavailable):
                 raise request_error(
-                    "Online speech recognition is unavailable and offline speech did not detect words."
-                ) from online_error
-            # Preserve the unclear-audio error so the UI can ask the user to try again.
-            raise online_error
+                    f"Online speech recognition is unavailable. {offline_error}"
+                ) from offline_error
+            # Keep the last recognition error if local recovery is unavailable.
+            raise recognition_error
+        if offline_text:
+            return offline_text
+        if network_failure:
+            raise request_error(
+                "Online speech recognition is unavailable and offline speech did not detect words."
+            ) from recognition_error
+        # Preserve the unclear-audio error so the UI can ask the user to try again.
+        raise recognition_error
     return None
 
 
