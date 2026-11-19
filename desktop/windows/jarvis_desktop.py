@@ -521,7 +521,7 @@ def normalize_local_command(command: str) -> str:
 STOP_LISTENING_COMMANDS = frozenset({
     "stop listening", "stop voice listening", "turn off voice listening",
     "sunna band karo", "sunna band kar do", "listening band karo",
-    "jarvis so jao", "so jao jarvis",
+    "so jao", "so jao jarvis",
 })
 
 
