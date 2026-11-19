@@ -405,9 +405,9 @@ class DocumentSummaryConsentTests(unittest.TestCase):
     def test_ai_summary_history_contains_metadata_only(self):
         document = {"name": "private.txt", "characters": 10, "text": "private source text"}
         entries = jarvis_desktop.build_document_history_entries(
-            "summarize document", document, shared_with_ai=True
+            "summarize document", document, processed_with_ai=True
         )
-        self.assertIn("after user confirmation", entries[1]["content"])
+        self.assertIn("processed locally with Qwen3.5 4B", entries[1]["content"])
         self.assertNotIn(document["text"], json.dumps(entries))
 
 
