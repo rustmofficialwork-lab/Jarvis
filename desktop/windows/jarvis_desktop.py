@@ -64,6 +64,7 @@ MAX_CHAT_RESPONSE_BYTES = 2_000_000
 SETTINGS_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "JARVISDesktop"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 JARVIS_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "Jarvis_20260313_215039.onnx"
+
 JARVIS_WAKEWORD_MODEL_PAGE = "https://openwakeword.com/library/422"
 JARVIS_FIRST_PARTY_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "jarvis_first_party.onnx"
 OWNER_VOICE_MODEL_DIR = SETTINGS_DIR / "speaker_model"
@@ -171,6 +172,234 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
     except (OSError, ValueError):
         return defaults
 
+
+
+def prepare_wakeword_setup_folder(settings_dir: Path = SETTINGS_DIR) -> Path:
+    """Create the user-local wake-word folder and return the exact model destination."""
+    folder = Path(settings_dir) / "wakewords"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / JARVIS_WAKEWORD_MODEL.name
+
+def prepare_openwakeword_assets(
+    openwakeword_module,
+    model_path: Path,
+    settings_dir: Path = SETTINGS_DIR,
+) -> dict[str, str]:
+    """Download shared openWakeWord assets into a user-writable app-data folder."""
+    models_dir = Path(settings_dir) / "wakeword_runtime" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    # A custom-trained ONNX file is already present; only the shared feature
+    # extractors are needed. The legacy publisher model is selected by its name.
+    model_names = (
+        ["__jarvis_custom__"] if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name
+        else [Path(model_path).stem]
+    )
+    openwakeword_module.utils.download_models(
+        model_names=model_names,
+        target_directory=str(models_dir),
+    )
+    melspec_path = models_dir / "melspectrogram.onnx"
+    embedding_path = models_dir / "embedding_model.onnx"
+    missing = [path.name for path in (melspec_path, embedding_path) if not path.is_file()]
+    if missing:
+        raise RuntimeError(
+            "The openWakeWord runtime assets could not be installed: " + ", ".join(missing)
+        )
+    return {
+        "melspec_model_path": str(melspec_path),
+        "embedding_model_path": str(embedding_path),
+    }
+
+def install_downloaded_wakeword_model(
+    downloads_dir: Path | None = None,
+    model_path: Path = JARVIS_WAKEWORD_MODEL,
+) -> Path:
+    """Validate the publisher-downloaded ONNX model and install it atomically."""
+    downloads_dir = Path(downloads_dir or (Path.home() / "Downloads"))
+    model_path = Path(model_path)
+    source = downloads_dir / model_path.name
+    if not source.is_file():
+        raise FileNotFoundError(f"Expected model download was not found: {source}")
+    size = source.stat().st_size
+    if size < 1024 or size > 25 * 1024 * 1024:
+        raise ValueError("The downloaded wake-word model has an unexpected file size.")
+    try:
+        import onnxruntime as ort
+        session = ort.InferenceSession(str(source), providers=["CPUExecutionProvider"])
+        if not session.get_inputs() or not session.get_outputs():
+            raise ValueError("The downloaded ONNX model has no usable inputs or outputs.")
+    except ImportError as exc:
+        raise RuntimeError("ONNX Runtime is missing. Reinstall JARVIS voice dependencies.") from exc
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = model_path.with_name(model_path.name + ".part")
+    try:
+        shutil.copyfile(source, temporary_path)
+        if temporary_path.stat().st_size != size:
+            raise OSError("The wake-word model changed while it was being installed.")
+        os.replace(temporary_path, model_path)
+    finally:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return model_path
+
+def active_wakeword_model_path() -> Path:
+    """Prefer the project's custom-trained model; retain the licensed legacy model as fallback."""
+    if JARVIS_FIRST_PARTY_WAKEWORD_MODEL.is_file():
+        return JARVIS_FIRST_PARTY_WAKEWORD_MODEL
+    return JARVIS_WAKEWORD_MODEL
+
+def install_first_party_wakeword_model(source_path: Path,
+                                       model_path: Path = JARVIS_FIRST_PARTY_WAKEWORD_MODEL) -> Path:
+    """Validate and atomically install a locally trained JARVIS ONNX wake-word model."""
+    source = Path(source_path)
+    destination = Path(model_path)
+    if not source.is_file() or source.suffix.casefold() != ".onnx":
+        raise ValueError("Choose a trained .onnx wake-word model file.")
+    size = source.stat().st_size
+    if size < 1024 or size > 25 * 1024 * 1024:
+        raise ValueError("The custom wake-word model has an unexpected file size.")
+    try:
+        import onnxruntime as ort
+        session = ort.InferenceSession(str(source), providers=["CPUExecutionProvider"])
+        inputs = session.get_inputs()
+        outputs = session.get_outputs()
+        if not inputs or not outputs:
+            raise ValueError("The ONNX model has no usable inputs or outputs.")
+        input_shape = inputs[0].shape
+        output_shape = outputs[0].shape
+        if (len(input_shape) != 3 or input_shape[-2:] != [16, 96]
+                or not output_shape or output_shape[-1] != 1):
+            raise ValueError(
+                "The ONNX file is not an openWakeWord classifier "
+                "(expected input [batch, 16, 96] and one score output)."
+            )
+    except ImportError as exc:
+        raise RuntimeError("ONNX Runtime is missing. Reinstall JARVIS voice dependencies.") from exc
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".part")
+    try:
+        shutil.copyfile(source, temporary)
+        if temporary.stat().st_size != size:
+            raise OSError("The model file changed while it was being installed.")
+        # Verify the copied artifact, not just the original path.
+        session = ort.InferenceSession(str(temporary), providers=["CPUExecutionProvider"])
+        if not session.get_inputs() or not session.get_outputs():
+            raise ValueError("The installed model failed ONNX validation.")
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return destination
+
+def update_wakeword_activation(
+    confidence: float,
+    consecutive_frames: int,
+    threshold: float = 0.5,
+    required_frames: int = 2,
+) -> tuple[bool, int]:
+    """Require stable confidence across consecutive audio frames before activation."""
+    import math
+    try:
+        score = float(confidence)
+    except (TypeError, ValueError):
+        score = 0.0
+    if not math.isfinite(score) or not math.isfinite(float(threshold)):
+        score = 0.0
+    if required_frames < 1:
+        raise ValueError("required_frames must be at least one.")
+    count = min(consecutive_frames + 1, required_frames) if score >= threshold else 0
+    return count >= required_frames, count
+
+
+WAKEWORD_SETUP_REQUIRED_ACTIVATIONS = 3
+
+def wakeword_setup_test_passed(activations: int, required: int = WAKEWORD_SETUP_REQUIRED_ACTIVATIONS) -> bool:
+    """Only pass onboarding after the number of spoken wake-word repetitions requested."""
+    if required < 1:
+        raise ValueError("required must be at least one.")
+    if isinstance(activations, bool):
+        return False
+    try:
+        count = int(activations)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return count >= required
+
+
+MICROPHONE_CONSENT_VERSION = 2
+CAMERA_CONSENT_VERSION = 1
+
+def microphone_consent_required(settings: dict) -> bool:
+    """Ask once for each consent version; legacy completion flags are not consent."""
+    return settings.get("microphone_consent_version") != MICROPHONE_CONSENT_VERSION
+
+def record_microphone_consent(settings: dict, accepted: bool) -> None:
+    """Persist the user's explicit choice without implying Windows granted access."""
+    settings["microphone_consent_version"] = MICROPHONE_CONSENT_VERSION
+    settings["microphone_consent_granted"] = bool(accepted)
+
+def camera_consent_required(settings: dict) -> bool:
+    """Ask once for the optional webcam capability for each consent version."""
+    return settings.get("camera_consent_version") != CAMERA_CONSENT_VERSION
+
+def record_camera_consent(settings: dict, accepted: bool) -> None:
+    """Persist webcam consent without opening the camera automatically."""
+    settings["camera_consent_version"] = CAMERA_CONSENT_VERSION
+    settings["camera_consent_granted"] = bool(accepted)
+
+def ask_camera_consent(parent=None, platform_name=None, user32=None,
+                       messagebox_module=messagebox) -> bool:
+    """Show a foreground native consent prompt for optional hand-gesture camera use."""
+    platform_name = os.name if platform_name is None else platform_name
+    title = "JARVIS camera permission"
+    message = (
+        "JARVIS would like permission to request webcam access for optional hand gestures.\n\n"
+        "The camera will remain OFF during startup and will start only when you press ENABLE GESTURES. "
+        "Camera frames are processed locally and are not uploaded.\n\n"
+        "Allow JARVIS to request camera access for gestures?"
+    )
+    if platform_name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        if user32 is None:
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+        message_box = user32.MessageBoxW
+        if hasattr(message_box, "argtypes"):
+            message_box.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
+            message_box.restype = wintypes.INT
+        flags = 0x00000004 | 0x00000020 | 0x00040000 | 0x00010000
+        return message_box(None, message, title, flags) == 6
+    return bool(messagebox_module.askyesno(title, message, parent=parent))
+
+def ask_microphone_consent(parent=None, platform_name=None, user32=None,
+                           messagebox_module=messagebox) -> bool:
+    """Show consent above the fullscreen HUD instead of behind its hidden Tk owner."""
+    platform_name = os.name if platform_name is None else platform_name
+    title = "JARVIS microphone permission"
+    message = (
+        "JARVIS would like permission to check microphone access for voice commands "
+        "and the optional “Jarvis” wake word.\n\n"
+        "The microphone is not continuously used during startup. Listening starts "
+        "only when you activate voice listening.\n\n"
+        "Allow JARVIS to check microphone access?"
+    )
+    if platform_name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        if user32 is None:
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+        message_box = user32.MessageBoxW
+        # Explicit signatures are required for reliable Unicode and HWND marshalling.
+        if hasattr(message_box, "argtypes"):
+            message_box.argtypes = [
+                wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT,
+            ]
+            message_box.restype = wintypes.INT
+        # MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND.
+        flags = 0x00000004 | 0x00000020 | 0x00040000 | 0x00010000
+        return message_box(None, message, title, flags) == 6  # IDYES
+    return bool(messagebox_module.askyesno(title, message, parent=parent))
 
 def save_settings(data: dict, path: Path = SETTINGS_FILE) -> None:
     """Durably persist non-secret preferences; credentials belong in Credential Manager."""
