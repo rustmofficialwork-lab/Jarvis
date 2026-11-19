@@ -573,13 +573,12 @@ class InterruptibleSpeechTests(unittest.TestCase):
         import threading
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.events = queue.Queue()
-        app.settings = {"endpoint": "https://example.com/chat", "model": "test-model"}
-        app.ai_api_key = "test-key"
+        app.settings = {}
         app.history = []
         app.request_lock = threading.Lock()
         app.speech_stop_event = threading.Event()
         with (
-            patch.object(jarvis_desktop, "chat_completion", return_value="Namaste"),
+            patch.object(app, "_get_online_reply", return_value="Namaste"),
             patch.object(jarvis_desktop, "save_chat_history"),
             patch.object(jarvis_desktop, "speak_text_interruptibly", return_value=True) as speak,
         ):
@@ -607,296 +606,12 @@ class InterruptibleSpeechTests(unittest.TestCase):
             observed.append(stop_event.is_set())
             return False
         with (
-            patch.object(jarvis_desktop, "chat_completion", side_effect=finish_generation_with_stop),
+            patch.object(app, "_get_online_reply", side_effect=finish_generation_with_stop),
             patch.object(jarvis_desktop, "save_chat_history"),
             patch.object(jarvis_desktop, "speak_text_interruptibly", side_effect=fake_speak),
         ):
             app._answer_voice("hello JARVIS")
         self.assertEqual(observed, [True])
-
-
-class ChatConfigurationTests(unittest.TestCase):
-    def test_valid_configuration_is_trimmed(self):
-        self.assertEqual(
-            jarvis_desktop.validate_chat_configuration("  https://example.com/chat  ", " model-x "),
-            ("https://example.com/chat", "model-x"),
-        )
-
-    def test_rejects_http_missing_host_credentials_and_invalid_port(self):
-        for endpoint in (
-            "http://example.com/chat",
-            "https:///chat",
-            "https://user:pass@example.com/chat",
-            "https://example.com:99999/chat",
-        ):
-            with self.subTest(endpoint=endpoint):
-                with self.assertRaisesRegex(ValueError, "valid HTTPS"):
-                    jarvis_desktop.validate_chat_configuration(endpoint, "model")
-
-    def test_rejects_blank_or_oversized_model(self):
-        for model in (" ", "m" * 201):
-            with self.subTest(model_length=len(model)):
-                with self.assertRaisesRegex(ValueError, "model name"):
-                    jarvis_desktop.validate_chat_configuration("https://example.com/chat", model)
-
-
-class ChatCompletionValidationTests(unittest.TestCase):
-    def test_rejects_non_https_endpoint(self):
-        with self.assertRaisesRegex(ValueError, "HTTPS"):
-            jarvis_desktop.chat_completion(
-                "http://example.com/v1/chat/completions",
-                "model",
-                "not-a-real-key",
-                "hello",
-                [],
-            )
-
-    def test_rejects_endpoint_with_embedded_credentials(self):
-        with self.assertRaisesRegex(ValueError, "HTTPS"):
-            jarvis_desktop.chat_completion(
-                "https://user:password@example.com/v1/chat/completions",
-                "model",
-                "not-a-real-key",
-                "hello",
-                [],
-            )
-
-    def test_rejects_oversized_ai_response(self):
-        class FakeResponse:
-            def __enter__(self): return self
-            def __exit__(self, *_args): return False
-            def read(self, size=-1): return b"x" * size
-
-        class FakeOpener:
-            def open(self, _request, timeout):
-                self.timeout = timeout
-                return FakeResponse()
-
-        fake = FakeOpener()
-        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=fake):
-            with self.assertRaisesRegex(RuntimeError, "too large"):
-                jarvis_desktop.chat_completion(
-                    "https://example.com/chat", "model", "test-key", "hello", []
-                )
-        self.assertEqual(fake.timeout, 45)
-
-    def test_rejects_invalid_json_from_ai_endpoint(self):
-        class FakeResponse:
-            def __enter__(self): return self
-            def __exit__(self, *_args): return False
-            def read(self, _size=-1): return b"not-json"
-
-        class FakeOpener:
-            def open(self, _request, timeout): return FakeResponse()
-
-        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=FakeOpener()):
-            with self.assertRaisesRegex(RuntimeError, "invalid JSON"):
-                jarvis_desktop.chat_completion(
-                    "https://example.com/chat", "model", "test-key", "hello", []
-                )
-
-    def test_requires_model_name(self):
-        with self.assertRaisesRegex(ValueError, "model name"):
-            jarvis_desktop.chat_completion(
-                "https://example.com/v1/chat/completions",
-                "",
-                "test-key",
-                "hello",
-                [],
-            )
-
-    def test_requires_api_key(self):
-        with self.assertRaisesRegex(ValueError, "API key"):
-            jarvis_desktop.chat_completion(
-                "https://example.com/v1/chat/completions",
-                "test-model",
-                "",
-                "hello",
-                [],
-            )
-
-class ChatToolCallingTests(unittest.TestCase):
-    def test_calculator_tool_call_is_executed_and_returned_to_model(self):
-        first = {
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [{
-                        "id": "call_calc_1",
-                        "type": "function",
-                        "function": {
-                            "name": "calculator",
-                            "arguments": json.dumps({"expression": "6 * 7"}),
-                        },
-                    }],
-                },
-            }],
-        }
-        second = {"choices": [{"message": {"role": "assistant", "content": "42"}}]}
-
-        class FakeResponse:
-            def __init__(self, payload):
-                self.payload = json.dumps(payload).encode("utf-8")
-            def __enter__(self):
-                return self
-            def __exit__(self, *_args):
-                return False
-            def read(self, _size=-1):
-                return self.payload
-
-        class FakeOpener:
-            def __init__(self):
-                self.requests = []
-                self.responses = [first, second]
-            def open(self, request, timeout):
-                self.requests.append(json.loads(request.data.decode("utf-8")))
-                return FakeResponse(self.responses.pop(0))
-
-        opener = FakeOpener()
-        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=opener):
-            answer = jarvis_desktop.chat_completion(
-                "https://example.com/chat", "model", "test-key", "What is 6 times 7?", []
-            )
-
-        self.assertEqual(answer, "42")
-        self.assertEqual(len(opener.requests), 2)
-        self.assertIn("tools", opener.requests[0])
-        tool_message = opener.requests[1]["messages"][-1]
-        self.assertEqual(tool_message["role"], "tool")
-        self.assertEqual(tool_message["tool_call_id"], "call_calc_1")
-        self.assertEqual(tool_message["content"], "42")
-
-    def test_mixed_allowed_and_sensitive_tool_batch_executes_nothing(self):
-        first = {
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {"id": "call_calc", "type": "function", "function": {
-                            "name": "calculator",
-                            "arguments": json.dumps({"expression": "6 * 7"}),
-                        }},
-                        {"id": "call_payment", "type": "function", "function": {
-                            "name": "send_money",
-                            "arguments": json.dumps({"amount": 100}),
-                        }},
-                    ],
-                },
-            }],
-        }
-        second = {"choices": [{"message": {"role": "assistant", "content": "I blocked that mixed batch."}}]}
-
-        class FakeResponse:
-            def __init__(self, payload):
-                self.payload = json.dumps(payload).encode("utf-8")
-            def __enter__(self):
-                return self
-            def __exit__(self, *_args):
-                return False
-            def read(self, _size=-1):
-                return self.payload
-
-        class FakeOpener:
-            def __init__(self):
-                self.responses = [first, second]
-                self.requests = []
-            def open(self, request, timeout):
-                self.requests.append(json.loads(request.data.decode("utf-8")))
-                return FakeResponse(self.responses.pop(0))
-
-        opener = FakeOpener()
-        with (
-            patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=opener),
-            patch.object(jarvis_desktop, "execute_tool") as execute,
-        ):
-            answer = jarvis_desktop.chat_completion(
-                "https://example.com/chat", "model", "test-key", "What is 6 times 7?", []
-            )
-
-        self.assertEqual(answer, "I blocked that mixed batch.")
-        execute.assert_not_called()
-        tool_messages = [
-            item for item in opener.requests[1]["messages"] if item.get("role") == "tool"
-        ]
-        self.assertEqual(len(tool_messages), 2)
-        self.assertTrue(all("No tools in this batch were executed" in item["content"] for item in tool_messages))
-
-    def test_malformed_tool_envelope_is_rejected_before_execution(self):
-        malformed = {
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {"id": "call_1", "type": "function",
-                         "function": {"name": "calculator", "arguments": '{"expression":"1+1"}'}},
-                        {"id": "call_1", "type": "function",
-                         "function": {"name": "calculator", "arguments": '{"expression":"2+2"}'}},
-                    ],
-                },
-            }],
-        }
-
-        class FakeResponse:
-            def __enter__(self):
-                return self
-            def __exit__(self, *_args):
-                return False
-            def read(self, _size=-1):
-                return json.dumps(malformed).encode("utf-8")
-
-        class FakeOpener:
-            def open(self, request, timeout):
-                return FakeResponse()
-
-        with patch.object(jarvis_desktop.urllib.request, "build_opener",
-                          return_value=FakeOpener()), \
-             patch.object(jarvis_desktop, "execute_tool") as execute:
-            with self.assertRaisesRegex(RuntimeError, "malformed or duplicate"):
-                jarvis_desktop.chat_completion(
-                    "https://example.com/chat", "model", "test-key", "calculate", []
-                )
-        execute.assert_not_called()
-
-
-    def test_oversized_tool_arguments_are_rejected_before_execution(self):
-        malformed = {
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [{
-                        "id": "call_large",
-                        "type": "function",
-                        "function": {
-                            "name": "calculator",
-                            "arguments": " " * (jarvis_desktop.MAX_TOOL_ARGUMENT_LENGTH + 1),
-                        },
-                    }],
-                },
-            }],
-        }
-
-        class FakeResponse:
-            def __enter__(self):
-                return self
-            def __exit__(self, *_args):
-                return False
-            def read(self, _size=-1):
-                return json.dumps(malformed).encode("utf-8")
-
-        class FakeOpener:
-            def open(self, request, timeout):
-                return FakeResponse()
-
-        with patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=FakeOpener()), patch.object(jarvis_desktop, "execute_tool") as execute:
-            with self.assertRaisesRegex(RuntimeError, "malformed or duplicate"):
-                jarvis_desktop.chat_completion(
-                    "https://example.com/chat", "model", "test-key", "calculate", []
-                )
-        execute.assert_not_called()
 
 
 class TranscriptTests(unittest.TestCase):
@@ -1330,67 +1045,53 @@ class VoiceMemoryCommandTests(unittest.TestCase):
 
 
 class ServiceStatusTests(unittest.TestCase):
-    def test_service_status_does_not_claim_unconfigured_ai_or_voice_ready(self):
+    def test_ai_status_reports_local_model_readiness_without_credentials(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.ai_api_key = ""
-        app.picovoice_access_key = ""
-        statuses = app._get_service_statuses()
-        by_name = {name: ready for name, ready, _detail in statuses}
-        self.assertFalse(by_name["AI CHAT"])
-        self.assertFalse(by_name["VOICE ENGINE"])
-        self.assertTrue(by_name["MEMORY"])
-        self.assertEqual(len(statuses), 4)
-
-    def test_managed_backend_is_ready_after_automatic_device_registration(self):
-        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.ai_api_key = ""
-        app.device_id = "test-device-id"
-        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT}
-        app.device_token = "jdt1.test-device-token"
-        app.picovoice_access_key = ""
-        statuses = app._get_service_statuses()
+        app.memory_store = SimpleNamespace(list=lambda: [])
+        with patch.object(jarvis_desktop, "check_local_brain", return_value=SimpleNamespace(ready=True)):
+            statuses = app._get_service_statuses()
         ai_status = next(item for item in statuses if item[0] == "AI CHAT")
         self.assertTrue(ai_status[1])
-        self.assertEqual(ai_status[2], "AUTO-CONNECTED")
+        self.assertEqual(ai_status[2], "LOCAL QWEN3.5 4B")
 
-    def test_custom_endpoint_without_api_key_is_not_reported_as_ready(self):
+    def test_ai_status_reports_ollama_model_missing_without_cloud_fallback(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.ai_api_key = ""
-        app.settings = {"endpoint": "https://example.com/v1/chat/completions"}
-        app.device_token = "jdt1.test-device-token"
-        app.picovoice_access_key = ""
-        statuses = app._get_service_statuses()
+        app.memory_store = SimpleNamespace(list=lambda: [])
+        with patch.object(jarvis_desktop, "check_local_brain", return_value=SimpleNamespace(ready=False)):
+            statuses = app._get_service_statuses()
         ai_status = next(item for item in statuses if item[0] == "AI CHAT")
         self.assertFalse(ai_status[1])
-        self.assertEqual(ai_status[2], "ADD API TOKEN")
+        self.assertEqual(ai_status[2], "START OLLAMA / INSTALL MODEL")
 
     def test_voice_readiness_requires_the_custom_wakeword_model(self):
         from pathlib import Path
         from tempfile import TemporaryDirectory
+        from types import SimpleNamespace
         from unittest.mock import patch
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.ai_api_key = "test-token"
         with TemporaryDirectory() as temp:
             model_path = Path(temp) / "Jarvis.onnx"
             with (
                 patch("importlib.util.find_spec", return_value=object()),
-                patch.object(jarvis_desktop, "JARVIS_WAKEWORD_MODEL", model_path),
+                patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=model_path),
+                patch.object(jarvis_desktop, "check_local_brain", return_value=SimpleNamespace(ready=True)),
             ):
                 statuses = app._get_service_statuses()
                 voice = next(item for item in statuses if item[0] == "VOICE ENGINE")
                 self.assertFalse(voice[1])
                 self.assertEqual(voice[2], "INSTALL JARVIS WAKE MODEL")
-
                 model_path.write_bytes(b"test model placeholder")
                 statuses = app._get_service_statuses()
                 voice = next(item for item in statuses if item[0] == "VOICE ENGINE")
                 self.assertTrue(voice[1])
                 self.assertEqual(voice[2], "LOCAL WAKE WORD READY")
-
         details = {name: detail for name, _ready, detail in statuses}
-        self.assertEqual(details["AI CHAT"], "CONFIGURED")
-
+        self.assertEqual(details["AI CHAT"], "LOCAL QWEN3.5 4B")
 
 class SystemMetricsTests(unittest.TestCase):
     def test_battery_status_includes_charging_and_on_battery_state(self):
@@ -2320,81 +2021,6 @@ class DashboardIsolationTests(unittest.TestCase):
 
 
 
-class DeviceTokenCacheTests(unittest.TestCase):
-    @staticmethod
-    def _token(expires_at):
-        import base64
-
-        payload = json.dumps({"sub": "test-device", "exp": expires_at}).encode("utf-8")
-        encoded = base64.urlsafe_b64encode(payload).rstrip(b"=").decode("ascii")
-        return f"jdt1.{encoded}.test-signature"
-
-    def _make_app(self, token):
-        import threading
-
-        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.ai_api_key = ""
-        app.device_id = "test-device-id"
-        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT}
-        app.device_token = token
-        app.device_auth_lock = threading.Lock()
-        app.keyring = None
-        return app
-
-    def test_cached_device_token_is_reused_until_near_expiry(self):
-        import time
-
-        token = self._token(int(time.time()) + 3600)
-        self.assertTrue(jarvis_desktop.device_token_is_usable(token, now=1000))
-        app = self._make_app(token)
-
-        with patch.object(jarvis_desktop, "register_device") as register:
-            self.assertEqual(app._ensure_device_token(), token)
-
-        register.assert_not_called()
-
-    def test_expired_device_token_is_automatically_renewed(self):
-        app = self._make_app(self._token(1000))
-        renewed = self._token(9000)
-
-        with patch.object(jarvis_desktop, "register_device", return_value=renewed) as register:
-            self.assertEqual(app._ensure_device_token(), renewed)
-
-        register.assert_called_once_with(app.device_id)
-
-    def test_chat_renews_device_token_once_after_authentication_failure(self):
-        import time
-
-        cached = self._token(int(time.time()) + 3600)
-        renewed = self._token(int(time.time()) + 7200)
-        app = self._make_app(cached)
-        app.history = []
-        app.memory_store = None
-
-        with (
-            patch.object(jarvis_desktop, "handle_online_command", return_value=None),
-            patch.object(
-                jarvis_desktop,
-                "chat_completion",
-                side_effect=[RuntimeError("AI endpoint returned HTTP 401"), "Recovered"],
-            ) as completion,
-            patch.object(jarvis_desktop, "register_device", return_value=renewed) as register,
-        ):
-            result = app._get_online_reply("hello")
-
-        self.assertEqual(result, "Recovered")
-        register.assert_called_once_with(app.device_id)
-        self.assertEqual(completion.call_count, 2)
-        self.assertEqual(completion.call_args.args[2], renewed)
-        self.assertEqual(app.device_token, renewed)
-
-    def test_malformed_and_near_expiry_tokens_are_not_reused(self):
-        self.assertFalse(jarvis_desktop.device_token_is_usable("not-a-token", now=1000))
-        self.assertFalse(jarvis_desktop.device_token_is_usable("jdt1.é.signature", now=1000))
-        self.assertFalse(jarvis_desktop.device_token_is_usable(self._token(1200), now=1000))
-
-
-
 class HudRuntimeStateTests(unittest.TestCase):
     def test_runtime_state_reports_listener_and_busy_flags(self):
         import threading
@@ -2736,29 +2362,20 @@ class HybridAiTests(unittest.TestCase):
         import queue
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT, "model": jarvis_desktop.DEFAULT_MODEL}
-        app.ai_api_key = ""
-        app.device_token = "device-token"
+        app.settings = {}
         app.history = []
         app.events = queue.Queue()
         app.memory_store = SimpleNamespace(context=lambda query: [])
-        app._ensure_device_token = lambda force=False: "device-token"
 
         with (
             patch.object(jarvis_desktop, "handle_online_command", return_value=None),
-            patch.object(jarvis_desktop, "chat_completion", side_effect=[
-                RuntimeError("cloud unavailable"), "Cloud is back"
-            ]) as cloud,
-            patch.object(jarvis_desktop, "local_chat_completion", return_value="Offline answer") as local,
+            patch.object(jarvis_desktop, "local_chat_completion", return_value="Local Qwen answer") as local,
         ):
-            self.assertEqual(app._get_online_reply("hello"), "Offline answer")
-            self.assertEqual(app._get_online_reply("hello again"), "Cloud is back")
+            self.assertEqual(app._get_online_reply("hello"), "Local Qwen answer")
+            self.assertEqual(app._get_online_reply("hello again"), "Local Qwen answer")
 
-        self.assertEqual(cloud.call_count, 2)
-        local.assert_called_once()
-        statuses = [app.events.get_nowait()[1], app.events.get_nowait()[1]]
-        self.assertTrue(any("OFFLINE MODE" in status for status in statuses))
-        self.assertTrue(any("ONLINE MODE" in status for status in statuses))
+        self.assertEqual(local.call_count, 2)
+        self.assertEqual(local.call_args.args[0], "hello again")
 
 
     def test_live_web_commands_do_not_get_guessed_by_offline_model(self):
@@ -2776,7 +2393,6 @@ class HybridAiTests(unittest.TestCase):
 
         with (
             patch.object(jarvis_desktop, "handle_online_command", side_effect=RuntimeError("no internet")),
-            patch.object(jarvis_desktop, "chat_completion", side_effect=RuntimeError("no cloud")),
             patch.object(jarvis_desktop, "local_chat_completion") as local,
         ):
             answer = app._get_online_reply("weather in Bhopal")
@@ -2786,12 +2402,13 @@ class HybridAiTests(unittest.TestCase):
         self.assertIn("ONLINE TASK BLOCKED", app.events.get_nowait()[1])
 
 
-    def test_local_fallback_does_not_duplicate_cloud_provider_routing(self):
+    def test_general_chat_source_has_one_fixed_local_model_and_no_cloud_gateway(self):
         source = Path(jarvis_desktop.__file__).read_text(encoding="utf-8")
-        self.assertIn("chat_completion(", source)
+        self.assertIn("LOCAL_AI_MODEL = \"qwen3.5:4b\"", source)
+        self.assertIn("LOCAL_AI_ENDPOINT = \"http://127.0.0.1:11434/api/chat\"", source)
         self.assertIn("local_chat_completion(", source)
-        self.assertNotIn("GROQ_API_KEY", source)
-        self.assertNotIn("OPENROUTER_API_KEY", source)
+        for legacy in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "DEVICE_REGISTER_ENDPOINT", "register_device("):
+            self.assertNotIn(legacy, source)
 
     def test_ollama_service_autostart_uses_loopback_and_hidden_process(self):
         from unittest.mock import patch
