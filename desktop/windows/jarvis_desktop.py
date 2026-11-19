@@ -1417,10 +1417,8 @@ def local_chat_completion(prompt: str, history: list[dict],
         "Do not generate Hindi in Devanagari; keep Hindi words in Roman script."
     )
     mode_hint = (
-        "You are running in ONLINE mode. You are still the same local Qwen model. "
+        "You are JARVIS running locally on this PC. Internet connectivity does not change which model you are. "
         "Do not claim to have searched the web or accessed live information unless JARVIS supplied it."
-        if online_mode else
-        "You are running in OFFLINE mode. Do not claim to have searched the web or accessed live internet information."
     )
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT + " " + mode_hint
