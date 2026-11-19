@@ -3065,16 +3065,13 @@ class JarvisDesktop:
                 )
 
         # Both online and offline general chat always use exactly the same local model.
-        online_mode = self._internet_available()
         answer = local_chat_completion(
             prompt, self.history, memories,
             brain_plan=self._plan_local_brain(prompt, memories),
-            online_mode=online_mode,
         )
         self._post_ai_status(
-            "ONLINE MODE — local Qwen model is responding; internet features are available."
-            if online_mode else
-            "OFFLINE MODE — local Qwen model is responding; no internet or API key required."
+            "LOCAL AI — Qwen3.5 4B is responding. The same model works online and offline; "
+            "internet is used only for live internet features."
         )
         return answer
 
