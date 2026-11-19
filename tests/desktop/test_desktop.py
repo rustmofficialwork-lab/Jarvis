@@ -264,8 +264,6 @@ class WakewordSetupTests(unittest.TestCase):
         from unittest.mock import patch
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.ai_api_key = ""
-        app.device_token = ""
         app.settings = {}
         app.memory_store = SimpleNamespace(list=lambda: [])
 
@@ -592,8 +590,7 @@ class InterruptibleSpeechTests(unittest.TestCase):
         import threading
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.events = queue.Queue()
-        app.settings = {"endpoint": "https://example.com/chat", "model": "test-model"}
-        app.ai_api_key = "test-key"
+        app.settings = {}
         app.history = []
         app.request_lock = threading.Lock()
         app.speech_stop_event = threading.Event()
@@ -791,8 +788,6 @@ class SettingsPersistenceTests(unittest.TestCase):
         import tempfile
         path = Path(tempfile.mkdtemp()) / "settings.json"
         settings = {
-            "endpoint": "https://example.com/chat",
-            "model": "test-model",
             "language": "hi-IN",
             "start_with_windows": True,
             "share_memory_with_ai": False,
@@ -811,14 +806,17 @@ class SettingsPersistenceTests(unittest.TestCase):
         import tempfile
         path = Path(tempfile.mkdtemp()) / "settings.json"
         path.write_text(json.dumps({
-            "endpoint": ["not", "a", "string"],
-            "model": None,
+            "endpoint": "https://legacy.example/chat",
+            "model": "legacy-model",
+            "ai_key": "legacy-secret",
+            "device_id": "legacy-device-id",
             "language": "unsupported",
             "start_with_windows": "yes",
         }), encoding="utf-8")
         loaded = jarvis_desktop.load_settings(path)
-        self.assertEqual(loaded["endpoint"], jarvis_desktop.DEFAULT_ENDPOINT)
-        self.assertEqual(loaded["model"], jarvis_desktop.DEFAULT_MODEL)
+        self.assertNotIn("endpoint", loaded)
+        self.assertNotIn("model", loaded)
+        self.assertNotIn("device_id", loaded)
         self.assertEqual(loaded["language"], "en-IN")
         self.assertFalse(loaded["start_with_windows"])
 
@@ -1805,7 +1803,7 @@ class SharedOnlineReplyTests(unittest.TestCase):
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.settings = {}
         with patch.object(jarvis_desktop, "handle_online_command", return_value="Weather: sunny"):
-            with patch.object(jarvis_desktop, "chat_completion") as completion:
+            with patch.object(jarvis_desktop, "local_chat_completion") as completion:
                 self.assertEqual(app._get_online_reply("weather"), "Weather: sunny")
         completion.assert_not_called()
 
@@ -1822,18 +1820,18 @@ class SharedOnlineReplyTests(unittest.TestCase):
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.settings = {
-            "endpoint": "https://example.com/chat",
-            "model": "test-model",
             "share_memory_with_ai": True,
         }
-        app.ai_api_key = "test-token"
         app.history = [{"role": "user", "content": "previous"}]
         app.memory_store = Store()
+        app.brain_engine = SimpleNamespace(context_for=lambda prompt, enabled, limit: ["User prefers Hindi"])
+        app._smart_memories = lambda prompt, base: base
+        app._plan_local_brain = lambda prompt, memories: None
         with patch.object(jarvis_desktop, "handle_online_command", return_value=None):
-            with patch.object(jarvis_desktop, "chat_completion", return_value="Namaste") as completion:
+            with patch.object(jarvis_desktop, "local_chat_completion", return_value="Namaste") as completion:
                 self.assertEqual(app._get_online_reply("hello"), "Namaste")
-        self.assertEqual(completion.call_args.args[0], "https://example.com/chat")
-        self.assertEqual(completion.call_args.args[5], ["User prefers Hindi"])
+        self.assertEqual(completion.call_args.args[0], "hello")
+        self.assertEqual(completion.call_args.args[2], ["User prefers Hindi"])
         self.assertEqual(app.memory_store.query, "hello")
 
 class StartupLoggingTests(unittest.TestCase):
@@ -1899,7 +1897,7 @@ class DocumentConsentDeclineFlowTests(unittest.TestCase):
             "text": "PRIVATE DOCUMENT BODY",
         }))
         app.root = Mock()
-        app.settings = {"endpoint": "https://example.test/v1/chat/completions"}
+        app.settings = {}
         app.history = []
         app.request_lock = Mock()
         app._append = Mock()
@@ -2078,8 +2076,7 @@ class WebBridgeStartupTests(unittest.TestCase):
         from types import SimpleNamespace
 
         app = SimpleNamespace(
-            settings={"endpoint": "https://example.test", "model": "test-model", "language": "hi-IN"},
-            ai_api_key="",
+            settings={"language": "hi-IN"},
         )
         bridge = jarvis_desktop.JarvisWebBridge({"root": None, "app": app})
         result = bridge.get_settings()
@@ -2383,13 +2380,10 @@ class HybridAiTests(unittest.TestCase):
         import queue
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.settings = {"endpoint": jarvis_desktop.DEFAULT_ENDPOINT, "model": jarvis_desktop.DEFAULT_MODEL}
-        app.ai_api_key = ""
-        app.device_token = "device-token"
+        app.settings = {}
         app.history = []
         app.events = queue.Queue()
         app.memory_store = SimpleNamespace(context=lambda query: [])
-        app._ensure_device_token = lambda force=False: "device-token"
 
         with (
             patch.object(jarvis_desktop, "handle_online_command", side_effect=RuntimeError("no internet")),
@@ -2407,7 +2401,7 @@ class HybridAiTests(unittest.TestCase):
         self.assertIn("LOCAL_AI_MODEL = \"qwen3.5:4b\"", source)
         self.assertIn("LOCAL_AI_ENDPOINT = \"http://127.0.0.1:11434/api/chat\"", source)
         self.assertIn("local_chat_completion(", source)
-        for legacy in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "DEVICE_REGISTER_ENDPOINT", "register_device("):
+        for legacy in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "DEVICE_REGISTER_ENDPOINT", "register_device(", "DEFAULT_ENDPOINT", "DEFAULT_MODEL", "ai_api_key", "device_token"):
             self.assertNotIn(legacy, source)
 
     def test_ollama_service_autostart_uses_loopback_and_hidden_process(self):
