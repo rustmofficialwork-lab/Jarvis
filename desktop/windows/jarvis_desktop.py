@@ -518,6 +518,18 @@ def normalize_local_command(command: str) -> str:
         normalized = suffix.sub("", normalized).strip(" \t\r\n,;:.!?।॥")
     return normalized
 
+STOP_LISTENING_COMMANDS = frozenset({
+    "stop listening", "stop voice listening", "turn off voice listening",
+    "sunna band karo", "sunna band kar do", "listening band karo",
+    "jarvis so jao", "so jao jarvis",
+})
+
+
+def is_stop_listening_command(command: str) -> bool:
+    """Recognize explicit hands-free requests to stop the microphone listener."""
+    return normalize_local_command(command) in STOP_LISTENING_COMMANDS
+
+
 def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     """Run one allowlisted action, or a chain of them ("notepad kholo aur phir calculator kholo").
 
@@ -3315,6 +3327,16 @@ class JarvisDesktop:
             normalized_voice_command = " ".join(
                 str(prompt or "").casefold().strip().rstrip(" .!?।॥").split()
             )
+            if is_stop_listening_command(prompt):
+                self.stop_event.set()
+                response = "Voice listening stopped. Microphone is off."
+                self.events.put(("answer", response))
+                self.events.put(("status", "Voice listener stopped by voice command."))
+                try:
+                    speak_text_interruptibly(response, self.speech_stop_event)
+                except Exception as exc:
+                    self.events.put(("status", f"Voice listening stopped; speech output unavailable: {exc}"))
+                return
             if normalized_voice_command in {
                 "delete file", "delete files", "delete selected files",
                 "move file to recycle bin", "move files to recycle bin",
