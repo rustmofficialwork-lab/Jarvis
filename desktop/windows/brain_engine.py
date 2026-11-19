@@ -92,26 +92,14 @@ def evaluate_task(
 
 
 def diagnose_failure(error: object) -> Diagnostic:
-    """Translate common connectivity/provider failures into actionable guidance."""
+    """Translate local runtime and live-service failures into actionable guidance."""
     message = str(error or "").strip()
     lowered = message.casefold()
     if any(token in lowered for token in ("timed out", "timeout", "connection refused", "network is unreachable", "urlerror", "name or service not known")):
         return Diagnostic(
             "connectivity",
             "JARVIS could not establish a reliable connection to the requested service.",
-            "Check the internet connection and service URL, then retry. Use local AI for supported offline tasks.",
-        )
-    if any(token in lowered for token in ("401", "403", "unauthorized", "invalid api key", "invalid_credentials")):
-        return Diagnostic(
-            "authentication",
-            "The service rejected its credentials or access permission.",
-            "Check the provider key and account permissions in the trusted settings/backend environment; never paste secrets into chat.",
-        )
-    if any(token in lowered for token in ("429", "rate limit", "rate_limited", "quota")):
-        return Diagnostic(
-            "rate_limit",
-            "The provider is temporarily limiting requests or the configured quota is exhausted.",
-            "Wait and retry, or use another configured provider if one is available.",
+            "Check the internet connection and retry the requested live service. General AI chat remains local through Ollama.",
         )
     if any(token in lowered for token in ("ollama is not installed", "model is not installed", "model not found", "offline model")):
         return Diagnostic(
@@ -125,16 +113,10 @@ def diagnose_failure(error: object) -> Diagnostic:
             "The requested operation is blocked because the required permission was not granted.",
             "Review the exact action and approve it through JARVIS's trusted confirmation interface if supported.",
         )
-    if "404" in lowered or "model_not_found" in lowered:
-        return Diagnostic(
-            "model_unavailable",
-            "The selected provider does not expose the configured model or endpoint.",
-            "Verify the provider's current model ID and endpoint, or switch to another configured provider.",
-        )
     return Diagnostic(
         "unknown",
         "JARVIS encountered an error it cannot confidently classify.",
-        "Keep the error details in the local diagnostic log, check service health, and retry once the cause is understood.",
+        "Keep the error details in the local diagnostic log, check the local Ollama or requested live-service status, and retry once the cause is understood.",
     )
 
 
