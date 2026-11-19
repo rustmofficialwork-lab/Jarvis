@@ -313,15 +313,17 @@ class DocumentSummaryConsentTests(unittest.TestCase):
         self.assertLess(len(prompt), 41000)
         self.assertIn("notes.txt", prompt)
 
-    def test_consent_message_identifies_document_size_and_destination(self):
+    def test_consent_message_identifies_local_document_processing(self):
         message = jarvis_desktop.build_document_consent_message(
             {"name": "private.pdf", "characters": 1234},
             "https://ai.example.test/v1/chat/completions",
         )
         self.assertIn("private.pdf", message)
         self.assertIn("1,234 characters", message)
-        self.assertIn("ai.example.test", message)
-        self.assertIn("private information", message)
+        self.assertIn("Qwen3.5 4B", message)
+        self.assertIn("locally on this PC", message)
+        self.assertIn("not uploaded", message)
+        self.assertNotIn("ai.example.test", message)
 
     def test_summary_command_is_explicit(self):
         self.assertTrue(jarvis_desktop.is_document_summary_command("Summarize document"))
