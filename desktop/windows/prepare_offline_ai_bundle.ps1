@@ -1,15 +1,15 @@
 $ErrorActionPreference = "Stop"
 
-# Export only Qwen3 4B and the blobs it references from the local Ollama store.
-# Run after: ollama pull qwen3:4b
-$Model = "qwen3:4b"
+# Export only Qwen3.5 4B and the blobs it references from the local Ollama store.
+# Run after: ollama pull qwen3.5:4b
+$Model = "qwen3.5:4b"
 $Store = if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } else { Join-Path $HOME ".ollama\models" }
-$ManifestRelative = "manifests\registry.ollama.ai\library\qwen3\4b"
+$ManifestRelative = "manifests\registry.ollama.ai\library\qwen3.5\4b"
 $ManifestPath = Join-Path $Store $ManifestRelative
 $BundleRoot = Join-Path $PSScriptRoot "offline-ai-bundle\models"
 
 if (-not (Test-Path $ManifestPath -PathType Leaf)) {
-    throw "Qwen3 4B is not installed in Ollama's model store. Run 'ollama pull $Model' first."
+    throw "Qwen3.5 4B is not installed in Ollama's model store. Run 'ollama pull $Model' first."
 }
 
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
@@ -43,6 +43,6 @@ foreach ($digest in $digests) {
     }
 }
 
-Write-Host "Qwen3 4B bundle prepared successfully:" -ForegroundColor Green
+Write-Host "Qwen3.5 4B bundle prepared successfully:" -ForegroundColor Green
 Write-Host $BundleRoot
 Write-Host "Include this folder in the Windows installer build. Keep it out of normal Git source history."
