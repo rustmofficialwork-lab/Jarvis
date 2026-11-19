@@ -143,8 +143,9 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return defaults
+        language = data.get("language")
         settings = {
-            "language": data.get("language") if data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
+            "language": language if isinstance(language, str) and language in {"en-IN", "hi-IN", "en-US"} else "en-IN",
             "start_with_windows": data.get("start_with_windows") is True,
             "share_memory_with_ai": data.get("share_memory_with_ai") is True,
             "microphone_consent_version": (
