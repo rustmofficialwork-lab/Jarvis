@@ -730,6 +730,140 @@ def filter_memory_history(history: list[dict]) -> list[dict]:
     return filtered
 
 
+
+_OLLAMA_PROCESS = None
+_OLLAMA_START_LOCK = threading.Lock()
+
+
+def _find_ollama_executable() -> str | None:
+    """Find the per-user or machine-wide Ollama CLI without relying on a refreshed PATH."""
+    discovered = shutil.which("ollama")
+    if discovered:
+        return discovered
+    local_app_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local")))
+    program_files = Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+    candidates = (
+        local_app_data / "Programs" / "Ollama" / "ollama.exe",
+        program_files / "Ollama" / "ollama.exe",
+        Path("C:/Program Files/Ollama/ollama.exe"),
+    )
+    return next((str(path) for path in candidates if path.is_file()), None)
+
+
+def _start_ollama_service() -> None:
+    """Start the installed local Ollama server after a reboot, without opening a console."""
+    global _OLLAMA_PROCESS
+    executable = _find_ollama_executable()
+    if not executable:
+        raise RuntimeError(
+            "Ollama is not installed. Run the JARVIS Offline AI setup once while online."
+        )
+    with _OLLAMA_START_LOCK:
+        # Another JARVIS request may have started Ollama while this thread waited.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open("http://127.0.0.1:11434/api/tags", timeout=1):
+                return
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+        creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            _OLLAMA_PROCESS = subprocess.Popen(
+                [executable, "serve"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+                creationflags=creation_flags,
+            )
+        except OSError as exc:
+            raise RuntimeError("JARVIS could not start the local Ollama service.") from exc
+        for _ in range(30):
+            time.sleep(0.5)
+            try:
+                with opener.open("http://127.0.0.1:11434/api/tags", timeout=1):
+                    return
+            except (urllib.error.URLError, TimeoutError, OSError):
+                if _OLLAMA_PROCESS.poll() is not None:
+                    break
+        raise RuntimeError(
+            "The Ollama service did not start. Open Ollama once from the Windows Start menu and retry."
+        )
+
+
+def _ollama_chat(messages: list[dict], options: dict) -> str:
+    """Send one chat request to the loopback-only Ollama service.
+
+    The endpoint is deliberately fixed to loopback; no user-supplied URL or credential is
+    accepted. If the service is not running (for example after a Windows restart) it is
+    started once automatically and the request is retried.
+    """
+    payload = json.dumps({
+        "model": LOCAL_AI_MODEL,
+        "messages": messages,
+        "stream": False,
+        "keep_alive": "5m",
+        "options": {
+            "num_ctx": int(options["num_ctx"]),
+            "num_predict": int(options["num_predict"]),
+            "temperature": float(options["temperature"]),
+        },
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        LOCAL_AI_ENDPOINT,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    # Do not route local prompts through configured HTTP proxies.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+    def attempt() -> dict:
+        with opener.open(request, timeout=LOCAL_AI_TIMEOUT_SECONDS) as response:
+            raw = response.read(MAX_CHAT_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_CHAT_RESPONSE_BYTES:
+                raise RuntimeError("Offline AI response was too large; please try a shorter request.")
+            return json.loads(raw.decode("utf-8"))
+
+    def raise_for_http(exc: urllib.error.HTTPError):
+        if exc.code == 404:
+            raise RuntimeError(
+                "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once, or open PowerShell and run: ollama pull qwen3.5:4b."
+            ) from exc
+        detail = exc.read(1024).decode("utf-8", errors="replace")
+        raise RuntimeError(f"Local Ollama returned HTTP {exc.code}: {detail}") from exc
+
+    try:
+        try:
+            body = attempt()
+        except urllib.error.HTTPError as exc:
+            raise_for_http(exc)
+        except urllib.error.URLError:
+            # Ollama's model is installed once, but its local server may not be
+            # running after Windows restarts. Start it automatically and retry once.
+            _start_ollama_service()
+            try:
+                body = attempt()
+            except urllib.error.HTTPError as exc:
+                raise_for_http(exc)
+            except urllib.error.URLError as exc:
+                raise RuntimeError("Ollama did not become available after JARVIS tried to start it.") from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Local Ollama returned invalid JSON.") from exc
+    if not isinstance(body, dict):
+        raise RuntimeError("Local Ollama returned an unexpected response.")
+    message = body.get("message")
+    result = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(result, str) or not result.strip():
+        raise RuntimeError("Offline AI returned an empty response.")
+    return result.strip()
+
+
 def local_chat_completion(prompt: str, history: list[dict],
                           memories: list[str] | None = None,
                           model: str = LOCAL_AI_MODEL, *, brain_plan=None,
