@@ -104,13 +104,11 @@ if (-not $hasModel) {
         } finally { Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue }
     }
 
-    & $ollamaExe pull $Model
-    if ($LASTEXITCODE -ne 0) {
-        # The release assets are installed directly into Ollama's store; pull is only a recovery fallback.
-        $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 10
-        if (@($tags.models | Where-Object { $_.name -eq $Model -or $_.name -eq $latestModel }).Count -eq 0) {
-            throw "Ollama could not register the model. Check the model manifest and blobs."
-        }
+    # Refresh Ollama model discovery before using the network fallback.
+    $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 10
+    if (@($tags.models | Where-Object { $_.name -eq $Model -or $_.name -eq $latestModel }).Count -eq 0) {
+        & $ollamaExe pull $Model
+        if ($LASTEXITCODE -ne 0) { throw "Ollama could not register the local model or download the registry fallback." }
     }
 }
 Write-Host ""
