@@ -78,7 +78,7 @@ DEFAULT_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/chat/completions
 DEVICE_REGISTER_ENDPOINT = "https://jarvis-backend-zqlw.onrender.com/v1/devices/register"
 DEFAULT_MODEL = "openrouter/free"
 LOCAL_AI_ENDPOINT = "http://127.0.0.1:11434/api/chat"
-LOCAL_AI_MODEL = "qwen3:4b"
+LOCAL_AI_MODEL = "qwen3.5:4b"
 LOCAL_AI_TIMEOUT_SECONDS = 120
 
 
@@ -1368,7 +1368,7 @@ def _ollama_chat(messages: list[dict], options: dict) -> str:
     def raise_for_http(exc: urllib.error.HTTPError):
         if exc.code == 404:
             raise RuntimeError(
-                "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once, or open PowerShell and run: ollama pull qwen3:4b."
+                "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once, or open PowerShell and run: ollama pull qwen3.5:4b."
             ) from exc
         detail = exc.read(1024).decode("utf-8", errors="replace")
         raise RuntimeError(f"Local Ollama returned HTTP {exc.code}: {detail}") from exc
