@@ -2859,7 +2859,12 @@ class JarvisDesktop:
         self.speech_stop_event.set()
         worker = getattr(self, "voice_answer_thread", None)
         if worker is not None and worker.is_alive() and worker is not threading.current_thread():
-            worker.join(timeout=2.0)
+            worker.join(timeout=8.0)
+            if worker.is_alive():
+                self.events.put(("status", "Previous voice response is still stopping. Say Jarvis again in a moment."))
+                return False
+        self.speech_stop_event.clear()
+        return True
 
     def _wake_loop(self):
         """Detect the single word 'Jarvis' locally, then capture one command."""
@@ -2988,8 +2993,8 @@ class JarvisDesktop:
                     # Speaking before verification would announce an untrusted wake trigger.
                     self.events.put(("status", "Owner voice verified — JARVIS is active."))
                     try:
-                        self._interrupt_active_voice_response()
-                        self.speech_stop_event.clear()
+                        if not self._interrupt_active_voice_response():
+                            continue
                         announce_wake_activation(self.speech_stop_event)
                     except Exception as exc:
                         self.events.put(("status", f"JARVIS is active; voice confirmation unavailable: {exc}"))
@@ -3067,8 +3072,7 @@ class JarvisDesktop:
         if not self.request_lock.acquire(blocking=False):
             self.events.put(("status", "JARVIS is already answering; the voice request was skipped."))
             return
-        # Clear a previous stop request only after this voice request owns the worker.
-        self.speech_stop_event.clear()
+        # The wake loop clears the stop event only after the previous response exits.
         try:
             normalized_voice_command = " ".join(
                 str(prompt or "").casefold().strip().rstrip(" .!?।॥").split()
