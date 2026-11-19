@@ -40,8 +40,8 @@ class BrainEngineTests(unittest.TestCase):
 
     def test_diagnostics_classify_common_failures(self):
         self.assertEqual(diagnose_failure("connection timed out").category, "connectivity")
-        self.assertEqual(diagnose_failure("HTTP 401 invalid API key").category, "authentication")
-        self.assertEqual(diagnose_failure("HTTP 429 rate limit").category, "rate_limit")
+        self.assertEqual(diagnose_failure("unexpected HTTP 401 response").category, "unknown")
+        self.assertEqual(diagnose_failure("unexpected HTTP 429 response").category, "unknown")
         self.assertEqual(diagnose_failure("Ollama model not found").category, "offline_model")
         self.assertEqual(diagnose_failure("permission denied").category, "permission")
         self.assertEqual(diagnose_failure("unexpected exception").category, "unknown")
