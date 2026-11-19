@@ -316,7 +316,6 @@ class DocumentSummaryConsentTests(unittest.TestCase):
     def test_consent_message_identifies_local_document_processing(self):
         message = jarvis_desktop.build_document_consent_message(
             {"name": "private.pdf", "characters": 1234},
-            "https://ai.example.test/v1/chat/completions",
         )
         self.assertIn("private.pdf", message)
         self.assertIn("1,234 characters", message)
