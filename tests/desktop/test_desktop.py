@@ -11,6 +11,32 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class VoiceWindowCloseConfirmationTests(unittest.TestCase):
+    def test_close_active_window_requires_confirmation_and_sends_wm_close(self):
+        class FakeUser32:
+            def __init__(self):
+                self.message = None
+            def PostMessageW(self, hwnd, message, wparam, lparam):
+                self.message = (hwnd, message, wparam, lparam)
+                return 1
+        user32 = FakeUser32()
+        self.assertTrue(jarvis_desktop.close_captured_window(
+            123, 456, lambda: True, user32=user32, current_pid=789
+        ))
+        self.assertEqual(user32.message, (123, 0x0010, 0, 0))
+
+    def test_close_active_window_is_cancelled_or_rejects_jarvis_process(self):
+        class FakeUser32:
+            def PostMessageW(self, *_args):
+                raise AssertionError("No close message should be sent.")
+        self.assertFalse(jarvis_desktop.close_captured_window(
+            123, 456, lambda: False, user32=FakeUser32(), current_pid=789
+        ))
+        self.assertFalse(jarvis_desktop.close_captured_window(
+            123, 789, lambda: True, user32=FakeUser32(), current_pid=789
+        ))
+
+
 class VoiceHudAndQwenActionTests(unittest.TestCase):
     def test_hud_voice_commands_map_only_to_existing_bridge_actions(self):
         self.assertEqual(jarvis_desktop.parse_hud_voice_command("Jarvis settings kholo"), ("settings", ""))
