@@ -3086,9 +3086,7 @@ class JarvisDesktop:
             return
         # The wake loop clears the stop event only after the previous response exits.
         try:
-            normalized_voice_command = " ".join(
-                str(prompt or "").casefold().strip().rstrip(" .!?।॥").split()
-            )
+            normalized_voice_command = normalize_local_command(prompt)
             if normalized_voice_command in {
                 "stop speaking", "stop talking", "be quiet",
                 "bolna band karo", "chup ho jao", "awaaz band karo",
