@@ -11,6 +11,31 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class VoiceSpeechInterruptionTests(unittest.TestCase):
+    def test_new_verified_wake_interrupts_and_joins_previous_response(self):
+        import threading
+        from unittest.mock import Mock
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.speech_stop_event = threading.Event()
+        worker = Mock()
+        worker.is_alive.return_value = True
+        app.voice_answer_thread = worker
+        self.assertTrue(app._interrupt_active_voice_response())
+        self.assertEqual(worker.join.call_args.kwargs["timeout"], 8.0)
+        self.assertFalse(app.speech_stop_event.is_set())
+
+    def test_still_running_response_is_not_overlapped(self):
+        import threading
+        from unittest.mock import Mock
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.speech_stop_event = threading.Event()
+        worker = Mock()
+        worker.is_alive.return_value = True
+        app.voice_answer_thread = worker
+        self.assertFalse(app._interrupt_active_voice_response())
+        self.assertTrue(app.speech_stop_event.is_set())
+
+
 class VoiceWindowCloseConfirmationTests(unittest.TestCase):
     def test_close_active_window_requires_confirmation_and_sends_wm_close(self):
         class FakeUser32:
