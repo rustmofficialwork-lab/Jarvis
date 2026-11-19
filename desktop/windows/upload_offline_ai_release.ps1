@@ -10,10 +10,14 @@ $Store = if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } else { Join-Path $HOME "
 $ManifestRelative = "manifests\registry.ollama.ai\library\qwen3.5\4b"
 $ManifestPath = Join-Path $Store $ManifestRelative
 
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    throw "GitHub CLI (gh) is required. Install it from https://cli.github.com/ and sign in with: gh auth login"
-}
-& gh auth status | Out-Null
+ $ghCommand = Get-Command gh.exe -ErrorAction SilentlyContinue
+if (-not $ghCommand) { $ghCommand = Get-Command gh -ErrorAction SilentlyContinue }
+if (-not $ghCommand) {
+    $knownGhPath = Join-Path $env:ProgramFiles "GitHub CLI\gh.exe"
+    if (Test-Path -LiteralPath $knownGhPath -PathType Leaf) { $ghPath = $knownGhPath }
+    else { throw "GitHub CLI (gh.exe) was not found. Install GitHub CLI, then reopen PowerShell." }
+} else { $ghPath = $ghCommand.Source }
+& $ghPath auth status | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "GitHub CLI is not signed in. Run: gh auth login" }
 if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
     throw "The installed $Model manifest was not found in: $Store"
@@ -75,13 +79,13 @@ try {
     $index | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $indexPath -Encoding UTF8
     $assets.Add($indexPath)
 
-    & gh release view $Tag --repo $Repo *> $null
+    & $ghPath release view $Tag --repo $Repo *> $null
     if ($LASTEXITCODE -ne 0) {
-        & gh release create $Tag --repo $Repo --title "JARVIS Qwen3.5 4B Offline Model" --notes "Official JARVIS offline model assets. Uploaded from the user's existing Ollama model store; SHA-256 verified."
+        & $ghPath release create $Tag --repo $Repo --title "JARVIS Qwen3.5 4B Offline Model" --notes "Official JARVIS offline model assets. Uploaded from the user's existing Ollama model store; SHA-256 verified."
         if ($LASTEXITCODE -ne 0) { throw "Could not create the GitHub Release." }
     }
     $uploadArgs = @("release", "upload", $Tag, "--repo", $Repo, "--clobber") + @($assets.ToArray())
-    & gh @uploadArgs
+    & $ghPath @uploadArgs
     if ($LASTEXITCODE -ne 0) { throw "GitHub Release asset upload failed." }
     Write-Host "Qwen3.5 4B assets uploaded and source blobs SHA-256 verified." -ForegroundColor Green
     Write-Host "Release: https://github.com/$Repo/releases/tag/$Tag"
