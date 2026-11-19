@@ -3271,7 +3271,8 @@ class JarvisDesktop:
                             continue
                         self.events.put(("status", f"Heard: {command}"))
                         self._answer_voice(command)
-                        self.events.put(("status", "Listening locally for “Jarvis”."))
+                        if not self.stop_event.is_set():
+                            self.events.put(("status", "Listening locally for “Jarvis”."))
                     except sr.WaitTimeoutError:
                         self.events.put(("status", "No command heard. Listening for “Jarvis” again."))
                     except sr.UnknownValueError:
