@@ -858,7 +858,9 @@ def build_document_consent_message(document: dict) -> str:
     )
 
 
-def build_document_history_entries(prompt: str, document: dict) -> list[dict]:
+def build_document_history_entries(
+    prompt: str, document: dict, *, processed_with_ai: bool = False,
+) -> list[dict]:
     """Persist metadata only; never place extracted text or its AI summary in chat history."""
     name = str(document.get("name", "selected document"))[:260]
     try:
@@ -866,7 +868,11 @@ def build_document_history_entries(prompt: str, document: dict) -> list[dict]:
     except (TypeError, ValueError):
         characters = 0
     detail = f"Document processed: {name} ({characters:,} characters). "
-    detail += "Text was processed locally with Qwen3.5 4B and was not uploaded; "
+    detail += (
+        "Text was processed locally with Qwen3.5 4B and was not uploaded; "
+        if processed_with_ai else
+        "Text was displayed locally and was not uploaded; "
+    )
     detail += "document text and generated summary were not saved to chat history."
     return [
         {"role": "user", "content": str(prompt)[:12000]},
@@ -3251,7 +3257,7 @@ class JarvisDesktop:
                         self.request_lock.release()
                 elif kind == "document_ai_answer":
                     self.history.extend(build_document_history_entries(
-                        value["prompt"], value["document"]
+                        value["prompt"], value["document"], processed_with_ai=True
                     ))
                     try:
                         save_chat_history(self.history)
