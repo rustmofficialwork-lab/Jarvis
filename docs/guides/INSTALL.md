@@ -13,7 +13,7 @@ Windows installer GitHub Actions automatically banata hai. App install karne ke 
 ## Install
 
 1. Downloaded ZIP artifact ko extract karo (agar artifact ZIP hai), phir `JARVIS-Setup-x64.exe` chalao.
-2. Installer mein **Install offline AI now** select karne par Ollama install hota hai. Agar build ke saath `offline-ai-bundle` ship hua hai, to Qwen3.5 4B local bundle se register hota hai; warna Ollama registry se lagbhag 3.3–4.0 GB model download hota hai. Isse local Qwen3.5 4B setup hota hai. General AI chat online aur offline dono mein isi ek local model se chalega; AI API key ya cloud AI backend ki zaroorat nahi. Live web search aur internet-only features ke liye internet connection chahiye.
+2. JARVIS installer ke baad offline AI setup automatically chalta hai. Ye pehle official JARVIS GitHub Release se Qwen3.5 4B model assets download karke SHA-256 verify karta hai; agar release assets available na hon to Ollama registry se model download fallback use hota hai. Iske liye lagbhag 3.3–4.0 GB internet download aur disk space chahiye. General AI chat online aur offline dono mein isi ek local model se chalega; AI API key ya cloud AI backend ki zaroorat nahi. Live web search aur internet-only features ke liye internet connection chahiye.
 3. App abhi code-signed nahi hai, isliye Windows SmartScreen warning dikha sakta hai. Publisher verify kiye bina kisi unexpected installer ko run mat karo.
 4. JARVIS kholo. Typing se chat use kar sakte ho. Try: `good morning jarvis`, `notepad kholo aur phir calculator kholo`, `brain check`.
 
