@@ -116,7 +116,7 @@ pip install -r requirements.txt
 python jarvis_desktop.py
 ```
 
-On first launch, JARVIS does not need to register with a remote backend for general AI chat. The local Qwen3.5 4B model runs through Ollama on this PC. No account, API key, manual backend token, or OpenRouter key is required for general chat. Live web services use public endpoints and require internet access.
+On first launch, JARVIS does not need to register with a remote backend for general AI chat. The local Qwen3.5 4B model runs through Ollama on this PC. No account, API key, or remote AI gateway is required for general chat. Live web services use public endpoints and require internet access.
 
 For optional wake-word listening, install the single-word Jarvis ONNX model by following [JARVIS_WAKEWORD_SETUP.md](docs/guides/JARVIS_WAKEWORD_SETUP.md). The wake-word detector then runs locally; there is no wake-word API key to configure. General AI chat uses the local Qwen3.5 4B model and does not need endpoint configuration or a backend token.
 
