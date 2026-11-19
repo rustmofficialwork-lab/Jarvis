@@ -716,6 +716,38 @@ def _run_single_local_command(command: str, popen=None, open_url=None, dry_run: 
     return response
 
 
+def capture_foreground_window(user32=None, current_pid=None):
+    """Capture the foreground window before showing any JARVIS confirmation dialog."""
+    import ctypes
+    import os
+    if os.name != "nt" and user32 is None:
+        return None
+    api = user32 or ctypes.windll.user32
+    hwnd = api.GetForegroundWindow()
+    if not hwnd:
+        return None
+    process_id = ctypes.c_ulong()
+    api.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
+    pid = int(process_id.value)
+    if current_pid is not None and pid == int(current_pid):
+        return None
+    return int(hwnd), pid
+
+
+def close_captured_window(hwnd, process_id, confirm, user32=None, current_pid=None) -> bool:
+    """Close only the captured external window, and only after explicit confirmation."""
+    import ctypes
+    import os
+    if not hwnd or not process_id or (current_pid is not None and int(process_id) == int(current_pid)):
+        return False
+    if not callable(confirm) or not confirm():
+        return False
+    if os.name != "nt" and user32 is None:
+        return False
+    api = user32 or ctypes.windll.user32
+    return bool(api.PostMessageW(int(hwnd), 0x0010, 0, 0))  # WM_CLOSE; never force-kill.
+
+
 def schedule_windows_power_action(action: str, popen=None, platform_name=None) -> bool:
     """Schedule a fixed Windows power action with a 60-second cancellation window."""
     import os as _os
@@ -3036,6 +3068,23 @@ class JarvisDesktop:
                     self.events.put(("status", f"Voice listening stopped; speech output unavailable: {exc}"))
                 return
             if normalized_voice_command in {
+                "close active window", "close current app", "close active app",
+                "app band karo", "current app band karo", "active window band karo",
+                "close this window",
+            }:
+                target = capture_foreground_window()
+                if target is None:
+                    response = "I cannot close the JARVIS window or identify another active app window."
+                    self.events.put(("answer", response))
+                    threading.Thread(
+                        target=speak_text_interruptibly,
+                        args=(response, self.speech_stop_event),
+                        daemon=True,
+                    ).start()
+                else:
+                    self.events.put(("close_active_window_voice_request", target))
+                return
+            if normalized_voice_command in {
                 "delete file", "delete files", "delete selected files",
                 "move file to recycle bin", "move files to recycle bin",
                 "file delete karo", "files delete karo", "file hatao", "files hatao",
@@ -3644,6 +3693,31 @@ class JarvisDesktop:
                     self._append("JARVIS ERROR", value, "error")
                     self.busy = False
                     self._set_status("Something needs attention.")
+                elif kind == "close_active_window_voice_request":
+                    hwnd, process_id = value
+                    approved = messagebox.askyesno(
+                        "JARVIS | Close application",
+                        "Close the currently active application window?\n\n"
+                        "Save your work first. JARVIS will request a normal close; "
+                        "it will not force-terminate the app.",
+                        parent=self.root,
+                    )
+                    try:
+                        closed = close_captured_window(
+                            hwnd, process_id, lambda: approved, current_pid=os.getpid()
+                        )
+                        response = (
+                            "Close request sent to the active application."
+                            if closed else "Application close cancelled or unavailable."
+                        )
+                    except Exception as exc:
+                        response = f"Could not close the application: {exc}"
+                    self.events.put(("answer", response))
+                    threading.Thread(
+                        target=speak_text_interruptibly,
+                        args=(response, self.speech_stop_event),
+                        daemon=True,
+                    ).start()
                 elif kind == "advanced_voice_request":
                     self._handle_advanced_command(value)
                 elif kind == "focus_complete":
