@@ -55,7 +55,7 @@ you to skip deep think.
 ## Model boundary
 
 - The supported general-chat model is `qwen3.5:4b` through the local Ollama runtime.
-- Online mode does not select OpenRouter, Groq, or another hosted chat model.
+- Online mode never selects a hosted general-chat model; the local Ollama model remains fixed in both modes.
 - Live web information is handled by the dedicated online-services layer, separately from general chat.
 - A larger local model may need more RAM; the app currently supports only `qwen3.5:4b`.
 
