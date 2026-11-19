@@ -525,18 +525,16 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
 VOICE_QWEN_ACTIONS = (
     "open notepad", "open calculator", "open file explorer", "open task manager",
     "open downloads", "open browser", "open google", "open youtube", "open chrome",
-    "open documents", "open pictures", "open music", "open videos",
-    "open control panel", "open device manager", "open network settings",
-    "open power options", "open settings",
-    "increase volume", "decrease volume", "mute volume", "unmute volume",
-    "increase brightness", "decrease brightness",
+    "increase volume", "decrease volume", "mute", "play", "stop", "play pause",
+    "next track", "previous track", "system status", "top processes",
 )
 
 
-def resolve_voice_action_with_qwen(prompt: str, chat=_ollama_chat) -> str | None:
+def resolve_voice_action_with_qwen(prompt: str, chat=None) -> str | None:
     """Map a spoken request to one exact allowlisted action using local Qwen only."""
     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
         return None
+    chat = chat or _ollama_chat
     messages = [
         {"role": "system", "content": (
             "You are a strict voice-command classifier. Return JSON only: "
