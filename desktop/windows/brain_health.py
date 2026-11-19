@@ -114,7 +114,7 @@ def format_brain_report(health: BrainHealth) -> str:
             lines.append(f"• Model {health.model}: installed nahi hai ✘")
     if health.ram_total_gb is not None and health.ram_free_gb is not None:
         lines.append(f"• RAM: {health.ram_free_gb} GB free / {health.ram_total_gb} GB total")
-    lines.append("• Online AI: har sawal par pehle try hota hai; fail hone par offline brain use hota hai.")
+    lines.append("• AI chat: online aur offline dono mein wahi local Qwen3.5 4B model use hota hai; API key ya cloud AI backend nahi chahiye.")
 
     if health.error:
         lines.append(f"Dikkat: {health.error}. Ollama ko restart karke dobara check karo.")
