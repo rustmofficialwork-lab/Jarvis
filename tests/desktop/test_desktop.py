@@ -67,6 +67,8 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
         self.assertEqual(jarvis_desktop.parse_hud_voice_command("Jarvis settings kholo"), ("settings", ""))
         self.assertEqual(jarvis_desktop.parse_hud_voice_command("downloads kholo"), ("folder", "Downloads"))
         self.assertEqual(jarvis_desktop.parse_hud_voice_command("task manager kholo"), ("system", "task_manager"))
+        self.assertEqual(jarvis_desktop.parse_hud_voice_command("डाउनलोड खोलो"), ("folder", "Downloads"))
+        self.assertEqual(jarvis_desktop.parse_hud_voice_command("सेटिंग्स खोलो"), ("settings", ""))
         self.assertIsNone(jarvis_desktop.parse_hud_voice_command("delete everything"))
 
     def test_qwen_action_mapping_accepts_only_exact_allowlisted_json(self):
