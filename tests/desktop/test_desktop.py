@@ -11,6 +11,32 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class VoiceHudAndQwenActionTests(unittest.TestCase):
+    def test_hud_voice_commands_map_only_to_existing_bridge_actions(self):
+        self.assertEqual(jarvis_desktop.parse_hud_voice_command("Jarvis settings kholo"), ("settings", ""))
+        self.assertEqual(jarvis_desktop.parse_hud_voice_command("downloads kholo"), ("folder", "Downloads"))
+        self.assertEqual(jarvis_desktop.parse_hud_voice_command("task manager kholo"), ("system", "task_manager"))
+        self.assertIsNone(jarvis_desktop.parse_hud_voice_command("delete everything"))
+
+    def test_qwen_action_mapping_accepts_only_exact_allowlisted_json(self):
+        def good_chat(_messages, _options):
+            return '{"command":"open calculator"}'
+        def bad_chat(_messages, _options):
+            return '{"command":"format drive"}'
+        self.assertEqual(
+            jarvis_desktop.resolve_voice_action_with_qwen("calculator chala do", chat=good_chat),
+            "open calculator",
+        )
+        self.assertIsNone(
+            jarvis_desktop.resolve_voice_action_with_qwen("delete all files", chat=bad_chat)
+        )
+
+    def test_qwen_action_mapping_rejects_non_json_and_chat_questions(self):
+        self.assertIsNone(jarvis_desktop.resolve_voice_action_with_qwen(
+            "what is the weather?", chat=lambda *_: "It may rain today."
+        ))
+
+
 class VoiceListenerControlCommandTests(unittest.TestCase):
     def test_stop_listening_accepts_explicit_english_and_hinglish_phrases(self):
         phrases = (
