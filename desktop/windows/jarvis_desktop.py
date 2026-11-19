@@ -1,6 +1,6 @@
 """Native Windows companion app for JARVIS.
 
-Keys are stored in Windows Credential Manager via keyring, never in the settings JSON.
+General AI chat is local-only: Ollama runs the single supported Qwen3.5 4B model.
 """
 from __future__ import annotations
 
@@ -142,7 +142,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return defaults
-        return {
+        settings = {
             "language": data.get("language") if data.get("language") in {"en-IN", "hi-IN", "en-US"} else "en-IN",
             "start_with_windows": data.get("start_with_windows") is True,
             "share_memory_with_ai": data.get("share_memory_with_ai") is True,
@@ -160,6 +160,14 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
             "camera_consent_granted": data.get("camera_consent_granted") is True,
             "voice_setup_completed": data.get("voice_setup_completed") is True,
         }
+        # Remove obsolete cloud model, endpoint, and device-registration values
+        # from existing installations the first time their settings are loaded.
+        if any(key in data for key in ("endpoint", "model", "device_id")):
+            try:
+                save_settings(settings, path)
+            except OSError:
+                pass
+        return settings
     except (OSError, ValueError):
         return defaults
 
@@ -835,7 +843,7 @@ def build_document_ai_prompt(document: dict, question: str = "") -> str:
     )
 
 
-def build_document_consent_message(document: dict, endpoint: str | None = None) -> str:
+def build_document_consent_message(document: dict) -> str:
     """Explain that selected document text is processed only by the local Qwen model."""
     name = str(document.get("name", "selected document"))[:180]
     try:
@@ -3211,7 +3219,7 @@ class JarvisDesktop:
                     self.request_lock.release()
                 elif kind == "document_consent_required":
                     consent_text = build_document_consent_message(
-                        value, None
+                        value
                     )
                     approved = messagebox.askyesno(
                         "Process document locally?",
