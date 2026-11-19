@@ -500,6 +500,7 @@ STOP_LISTENING_COMMANDS = frozenset({
     "stop listening", "stop voice listening", "turn off voice listening",
     "sunna band karo", "sunna band kar do", "listening band karo",
     "so jao", "so jao jarvis",
+    "सुनना बंद करो", "सुनना बंद कर दो", "सो जाओ",
 })
 
 
@@ -3106,6 +3107,7 @@ class JarvisDesktop:
             if normalized_voice_command in {
                 "stop speaking", "stop talking", "be quiet",
                 "bolna band karo", "chup ho jao", "awaaz band karo",
+                "बोलना बंद करो", "चुप हो जाओ", "आवाज़ बंद करो",
             }:
                 self.speech_stop_event.set()
                 response = "Okay. I have stopped speaking."
