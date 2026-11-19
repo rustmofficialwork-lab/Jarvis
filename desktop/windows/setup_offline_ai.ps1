@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$Model = "qwen3:4b"
+$Model = "qwen3.5:4b"
 $BundleModels = Join-Path $PSScriptRoot "offline-ai-bundle\models"
 $DefaultModels = Join-Path $HOME ".ollama\models"
 
@@ -44,7 +44,7 @@ if (-not $ollamaExe) {
 }
 
 # An optional release may ship Ollama's native model-store layout here.
-$bundleManifest = Join-Path $BundleModels "manifests\registry.ollama.ai\library\qwen3\4b"
+$bundleManifest = Join-Path $BundleModels "manifests\registry.ollama.ai\library\qwen3.5\4b"
 $hasBundle = Test-Path $bundleManifest -PathType Leaf
 if ($hasBundle) {
     $blobDir = Join-Path $BundleModels "blobs"
@@ -53,10 +53,10 @@ if ($hasBundle) {
     }
     New-Item -ItemType Directory -Force -Path $DefaultModels | Out-Null
     Copy-Item -Path (Join-Path $BundleModels "*") -Destination $DefaultModels -Recurse -Force
-    Write-Host "Using the Qwen3 4B model bundled with this JARVIS installer." -ForegroundColor Green
+    Write-Host "Using the Qwen3.5 4B model bundled with this JARVIS installer." -ForegroundColor Green
 } else {
     Write-Host "No offline model bundle is present; the official Ollama registry will be used." -ForegroundColor Yellow
-    Write-Host "The first-time model download is approximately 2.5 GB."
+    Write-Host "The first-time model download is approximately 3.3–4.0 GB."
 }
 
 $serverReady = $false
@@ -89,7 +89,7 @@ if (-not $hasModel) {
     }
     & $ollamaExe pull $Model
     if ($LASTEXITCODE -ne 0) {
-        throw "The Qwen3 4B model download failed. Check your internet connection and rerun this script."
+        throw "The Qwen3.5 4B model download failed. Check your internet connection and rerun this script."
     }
 }
 Write-Host ""
