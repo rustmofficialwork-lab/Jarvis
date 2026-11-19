@@ -522,6 +522,85 @@ def run_local_command(command: str, popen=None, open_url=None) -> str | None:
     return _run_single_local_command(command, popen=popen, open_url=open_url)
 
 
+VOICE_QWEN_ACTIONS = (
+    "open notepad", "open calculator", "open file explorer", "open task manager",
+    "open downloads", "open browser", "open google", "open youtube", "open chrome",
+    "open documents", "open pictures", "open music", "open videos",
+    "open control panel", "open device manager", "open network settings",
+    "open power options", "open settings",
+    "increase volume", "decrease volume", "mute volume", "unmute volume",
+    "increase brightness", "decrease brightness",
+)
+
+
+def resolve_voice_action_with_qwen(prompt: str, chat=_ollama_chat) -> str | None:
+    """Map a spoken request to one exact allowlisted action using local Qwen only."""
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
+        return None
+    messages = [
+        {"role": "system", "content": (
+            "You are a strict voice-command classifier. Return JSON only: "
+            '{"command":"<one exact allowed command>"} or {"command":null}. '
+            "Only map a clear request to perform a desktop action. Questions, explanations, "
+            "ambiguous requests, and unsupported actions must return null. Never invent commands. "
+            "Allowed commands: " + ", ".join(VOICE_QWEN_ACTIONS)
+        )},
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        raw = chat(messages, {"num_ctx": 1024, "num_predict": 80, "temperature": 0.0})
+        import json as _json
+        import re as _re
+        match = _re.search(r"\{[^{}]{1,200}\}", str(raw))
+        if not match:
+            return None
+        payload = _json.loads(match.group(0))
+        command = payload.get("command") if isinstance(payload, dict) else None
+        return command if command in VOICE_QWEN_ACTIONS else None
+    except Exception:
+        return None
+
+
+def parse_hud_voice_command(prompt: str) -> tuple[str, str] | None:
+    """Resolve direct voice phrases to the existing HUD bridge actions."""
+    command = normalize_local_command(prompt)
+    actions = {
+        "open settings": ("settings", ""),
+        "settings kholo": ("settings", ""),
+        "open documents": ("folder", "Documents"),
+        "documents kholo": ("folder", "Documents"),
+        "open downloads": ("folder", "Downloads"),
+        "downloads kholo": ("folder", "Downloads"),
+        "open pictures": ("folder", "Pictures"),
+        "pictures kholo": ("folder", "Pictures"),
+        "open music": ("folder", "Music"),
+        "music kholo": ("folder", "Music"),
+        "open videos": ("folder", "Videos"),
+        "videos kholo": ("folder", "Videos"),
+        "open this pc": ("folder", "This PC"),
+        "this pc kholo": ("folder", "This PC"),
+        "open network": ("folder", "Network"),
+        "network kholo": ("folder", "Network"),
+        "open recycle bin": ("folder", "Recycle Bin"),
+        "recycle bin kholo": ("folder", "Recycle Bin"),
+        "open control panel": ("system", "control_panel"),
+        "control panel kholo": ("system", "control_panel"),
+        "open device manager": ("system", "device_manager"),
+        "device manager kholo": ("system", "device_manager"),
+        "open task manager": ("system", "task_manager"),
+        "task manager kholo": ("system", "task_manager"),
+        "open network settings": ("system", "network_settings"),
+        "network settings kholo": ("system", "network_settings"),
+        "open power options": ("system", "power_options"),
+        "power options kholo": ("system", "power_options"),
+        "open run": ("system", "run"),
+        "run kholo": ("system", "run"),
+        "open start menu": ("system", "start_menu"),
+        "start menu kholo": ("system", "start_menu"),
+    }
+    return actions.get(command)
+
+
 def _run_single_local_command(command: str, popen=None, open_url=None, dry_run: bool = False) -> str | None:
     """Run only fixed, explicitly allowlisted desktop actions; never invoke a shell.
 
@@ -2991,9 +3070,33 @@ class JarvisDesktop:
                 self.events.put(("file_search_request", prompt))
                 return
             try:
-                local_response = (
-                    self._compose_briefing() if is_briefing_command(prompt) else run_local_command(prompt)
-                )
+                hud_action = parse_hud_voice_command(prompt)
+                local_response = None
+                if hud_action is not None:
+                    bridge = getattr(self, "web_bridge", None)
+                    if bridge is None:
+                        local_response = "HUD controls are unavailable right now."
+                    elif hud_action[0] == "settings":
+                        local_response = "Opening JARVIS settings." if bridge.open_settings() else "Could not open settings."
+                    elif hud_action[0] == "folder":
+                        local_response = (
+                            f"Opening {hud_action[1]}." if bridge.open_folder(hud_action[1])
+                            else f"Could not open {hud_action[1]}."
+                        )
+                    else:
+                        local_response = (
+                            f"Opening {hud_action[1].replace('_', ' ')}."
+                            if bridge.open_system_tool(hud_action[1])
+                            else f"Could not open {hud_action[1].replace('_', ' ')}."
+                        )
+                if local_response is None:
+                    local_response = (
+                        self._compose_briefing() if is_briefing_command(prompt) else run_local_command(prompt)
+                    )
+                if local_response is None:
+                    qwen_action = resolve_voice_action_with_qwen(prompt)
+                    if qwen_action is not None:
+                        local_response = run_local_command(qwen_action)
             except Exception as exc:
                 self.events.put(("error", f"Could not run that approved action: {exc}"))
                 return
