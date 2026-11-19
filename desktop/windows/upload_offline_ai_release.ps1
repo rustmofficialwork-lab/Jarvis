@@ -46,19 +46,19 @@ try {
 
         $info = Get-Item -LiteralPath $source
         $parts = @()
-        $input = [IO.File]::OpenRead($source)
+        $sourceStream = [IO.File]::OpenRead($source)
         try {
             $partNumber = 0
-            while ($input.Position -lt $input.Length) {
+            while ($sourceStream.Position -lt $sourceStream.Length) {
                 $partNumber++
                 $partName = "qwen35-$blobName-part{0:D3}.bin" -f $partNumber
                 $partPath = Join-Path $tempRoot $partName
                 $output = [IO.File]::Create($partPath)
                 try {
                     $buffer = New-Object byte[] (8MB)
-                    $remaining = [Math]::Min([long]$ChunkBytes, $input.Length - $input.Position)
+                    $remaining = [Math]::Min([long]$ChunkBytes, $sourceStream.Length - $sourceStream.Position)
                     while ($remaining -gt 0) {
-                        $read = $input.Read($buffer, 0, [int][Math]::Min($buffer.Length, $remaining))
+                        $read = $sourceStream.Read($buffer, 0, [int][Math]::Min($buffer.Length, $remaining))
                         if ($read -le 0) { throw "Unexpected end of blob while splitting $blobName" }
                         $output.Write($buffer, 0, $read)
                         $remaining -= $read
@@ -67,7 +67,7 @@ try {
                 $assets.Add($partPath)
                 $parts += $partName
             }
-        } finally { $input.Dispose() }
+        } finally { $sourceStream.Dispose() }
         $index.blobs += [ordered]@{ digest = $digest; size = [long]$info.Length; parts = $parts }
     }
 
