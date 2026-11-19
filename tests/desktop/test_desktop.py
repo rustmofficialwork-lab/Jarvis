@@ -1523,6 +1523,36 @@ class CancellableVoiceCaptureTests(unittest.TestCase):
         self.assertEqual(recognizer.asserted_phrase_limit, 12)
         self.assertEqual(recognizer.recognized_language, "hi-IN")
 
+    def test_unclear_audio_retries_alternate_indian_language_before_offline(self):
+        import threading
+
+        class WaitTimeoutError(Exception):
+            pass
+        class UnknownValueError(Exception):
+            pass
+        class RequestError(Exception):
+            pass
+        class FakeRecognizer:
+            def __init__(self):
+                self.languages = []
+            def listen(self, source, timeout, phrase_time_limit):
+                return b"audio"
+            def recognize_google(self, audio, language):
+                self.languages.append(language)
+                if language == "en-IN":
+                    raise UnknownValueError()
+                return "calculator kholo"
+
+        recognizer = FakeRecognizer()
+        with patch.object(jarvis_desktop, "transcribe_offline_vosk") as offline:
+            result = jarvis_desktop.listen_for_voice_command(
+                recognizer, object(), threading.Event(), "en-IN",
+                WaitTimeoutError, RequestError, UnknownValueError,
+            )
+        self.assertEqual(result, "calculator kholo")
+        self.assertEqual(recognizer.languages, ["en-IN", "hi-IN"])
+        offline.assert_not_called()
+
     def test_silence_timeout_returns_to_wake_word_detection(self):
         import threading
         import time
