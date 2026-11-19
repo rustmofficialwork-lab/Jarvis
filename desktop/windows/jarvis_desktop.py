@@ -709,7 +709,7 @@ def parse_memory_command(prompt: str) -> tuple[str, str | None] | None:
 
 
 def filter_memory_history(history: list[dict]) -> list[dict]:
-    """Keep explicit memory-management exchanges out of online chat history."""
+    """Keep explicit memory-management exchanges out of general chat history."""
     filtered = []
     skip_reply = False
     for item in history[-16:]:
