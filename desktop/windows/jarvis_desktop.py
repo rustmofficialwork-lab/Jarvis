@@ -3072,7 +3072,7 @@ class JarvisDesktop:
                 "app band karo", "current app band karo", "active window band karo",
                 "close this window",
             }:
-                target = capture_foreground_window()
+                target = capture_foreground_window(current_pid=os.getpid())
                 if target is None:
                     response = "I cannot close the JARVIS window or identify another active app window."
                     self.events.put(("answer", response))
