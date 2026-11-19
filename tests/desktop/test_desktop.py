@@ -18,7 +18,7 @@ class VoiceSpeechInterruptionTests(unittest.TestCase):
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
         app.speech_stop_event = threading.Event()
         worker = Mock()
-        worker.is_alive.return_value = True
+        worker.is_alive.side_effect = [True, False]
         app.voice_answer_thread = worker
         self.assertTrue(app._interrupt_active_voice_response())
         self.assertEqual(worker.join.call_args.kwargs["timeout"], 8.0)
