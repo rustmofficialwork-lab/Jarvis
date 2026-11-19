@@ -1,11 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 # Upload the already-installed Ollama Qwen3.5 4B model directly from its model store.
-# Large blobs are streamed into temporary <=1.8 GB parts for GitHub Release's asset limit.
+# Blobs are split into small parts to reduce upload timeouts on slower connections.
 $Repo = "rustmofficialwork-lab/Jarvis"
 $Tag = "offline-ai-qwen3.5-4b"
 $Model = "qwen3.5:4b"
-$ChunkBytes = 400MB
+$ChunkBytes = 25MB
 $Store = if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } else { Join-Path $HOME ".ollama\models" }
 $ManifestRelative = "manifests\registry.ollama.ai\library\qwen3.5\4b"
 $ManifestPath = Join-Path $Store $ManifestRelative
@@ -86,9 +86,29 @@ try {
         & $ghPath release create $Tag --repo $Repo --title "JARVIS Qwen3.5 4B Offline Model" --notes "Official JARVIS offline model assets. Uploaded from the user's existing Ollama model store; SHA-256 verified."
         if ($LASTEXITCODE -ne 0) { throw "Could not create the GitHub Release." }
     }
-    $uploadArgs = @("release", "upload", $Tag, "--repo", $Repo, "--clobber") + @($assets.ToArray())
-    & $ghPath @uploadArgs
-    if ($LASTEXITCODE -ne 0) { throw "GitHub Release asset upload failed." }
+    foreach ($assetPath in $assets) {
+        $assetName = [IO.Path]::GetFileName($assetPath)
+        $uploaded = $false
+        for ($attempt = 1; $attempt -le 4 -and -not $uploaded; $attempt++) {
+            $releaseInfo = & $ghPath release view $Tag --repo $Repo --json assets
+            if ($LASTEXITCODE -ne 0) { throw "Could not inspect release assets before uploading." }
+            $existingNames = @((($releaseInfo | ConvertFrom-Json).assets) | ForEach-Object { [string]$_.name })
+            if ($existingNames -contains $assetName) {
+                Write-Host "Already uploaded, skipping: $assetName"
+                $uploaded = $true
+                break
+            }
+            Write-Host "Uploading $assetName (attempt $attempt of 4)..."
+            & $ghPath release upload $Tag $assetPath --repo $Repo
+            if ($LASTEXITCODE -eq 0) {
+                $uploaded = $true
+            } elseif ($attempt -lt 4) {
+                Write-Warning "Upload failed for $assetName. Retrying in 8 seconds..."
+                Start-Sleep -Seconds 8
+            }
+        }
+        if (-not $uploaded) { throw "Upload failed after 4 attempts: $assetName. Rerun this script to resume; completed assets will be skipped." }
+    }
     Write-Host "Qwen3.5 4B assets uploaded and source blobs SHA-256 verified." -ForegroundColor Green
     Write-Host "Release: https://github.com/$Repo/releases/tag/$Tag"
 } finally {
