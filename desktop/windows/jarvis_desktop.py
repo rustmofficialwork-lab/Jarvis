@@ -1606,8 +1606,6 @@ class JarvisDesktop:
         # Snapshot secrets as plain strings so worker threads never call Tk variables.
         self.ai_api_key = self.api_key_var.get()
         self.root.after(350, self._poll_events)
-        # Register quietly in the background; failures retry when connectivity returns.
-        threading.Thread(target=self._device_auth_worker, daemon=True).start()
         # Offline speech models can be large; prepare them only when voice is enabled.
         # This keeps ordinary app startup fast and avoids an unexpected background download.
         self.root.after(1000, self._check_reminders)
@@ -2198,20 +2196,14 @@ class JarvisDesktop:
         """Report readiness from actual configuration and installed capabilities."""
         import importlib.util
 
-        api_key_ready = bool(getattr(self, "ai_api_key", "").strip())
-        settings = getattr(self, "settings", {})
-        endpoint = settings.get("endpoint", DEFAULT_ENDPOINT) if isinstance(settings, dict) else DEFAULT_ENDPOINT
-        uses_managed_backend = str(endpoint).strip() == DEFAULT_ENDPOINT
-        device_token_ready = bool(getattr(self, "device_token", "").strip())
-        ai_ready = api_key_ready or (uses_managed_backend and device_token_ready)
-        if api_key_ready:
-            ai_detail = "CONFIGURED"
-        elif uses_managed_backend and device_token_ready:
-            ai_detail = "AUTO-CONNECTED"
-        elif uses_managed_backend:
-            ai_detail = "CONNECTING"
-        else:
-            ai_detail = "ADD API TOKEN"
+        # General AI chat is always powered by the installed local Qwen model.
+        # No cloud API key, device registration, or remote AI backend is required.
+        try:
+            local_health = check_local_brain()
+            ai_ready = local_health.ready
+        except Exception:
+            ai_ready = False
+        ai_detail = "LOCAL QWEN3.5 4B" if ai_ready else "START OLLAMA / INSTALL MODEL"
 
         voice_packages = all(
             importlib.util.find_spec(module) is not None
