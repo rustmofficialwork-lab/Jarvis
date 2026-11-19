@@ -11,6 +11,23 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class VoiceListenerControlCommandTests(unittest.TestCase):
+    def test_stop_listening_accepts_explicit_english_and_hinglish_phrases(self):
+        phrases = (
+            "stop listening", "Jarvis stop listening", "please stop voice listening",
+            "sunna band karo", "sunna band kar do", "listening band karo",
+            "Jarvis so jao",
+        )
+        for phrase in phrases:
+            with self.subTest(phrase=phrase):
+                self.assertTrue(jarvis_desktop.is_stop_listening_command(phrase))
+
+    def test_unrelated_or_ambiguous_phrases_do_not_stop_listener(self):
+        for phrase in ("start listening", "stop speaking", "stop music", "listen to me"):
+            with self.subTest(phrase=phrase):
+                self.assertFalse(jarvis_desktop.is_stop_listening_command(phrase))
+
+
 class WakewordActivationAnnouncementTests(unittest.TestCase):
     def test_verified_wake_activation_speaks_selected_confirmation(self):
         stop_event = __import__("threading").Event()
