@@ -1691,7 +1691,7 @@ class JarvisDesktop:
         ttk.Button(controls, text="Close", command=window.destroy).pack(side="right")
         refresh()
 
-    def _append(    def _append(self, who: str, text: str, tag: str | None = None):
+    def _append(self, who: str, text: str, tag: str | None = None):
         self.transcript.append((who, text, tag))
 
     def _set_status(self, text: str):
