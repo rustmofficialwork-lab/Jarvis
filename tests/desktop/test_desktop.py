@@ -1810,29 +1810,22 @@ class SharedOnlineReplyTests(unittest.TestCase):
     def test_ai_fallback_uses_shared_memory_sharing_setting(self):
         from unittest.mock import patch
 
-        class Store:
-            def __init__(self):
-                self.query = None
-
-            def context(self, query=None):
-                self.query = query
-                return ["User prefers Hindi"]
+        from types import SimpleNamespace
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
-        app.settings = {
-            "share_memory_with_ai": True,
-        }
+        app.settings = {"share_memory_with_ai": True}
         app.history = [{"role": "user", "content": "previous"}]
-        app.memory_store = Store()
-        app.brain_engine = SimpleNamespace(context_for=lambda prompt, enabled, limit: ["User prefers Hindi"])
+        app.brain_engine = SimpleNamespace(
+            context_for=lambda prompt, enabled, limit: ["User prefers Hindi"]
+        )
         app._smart_memories = lambda prompt, base: base
         app._plan_local_brain = lambda prompt, memories: None
+        app.events = __import__("queue").Queue()
         with patch.object(jarvis_desktop, "handle_online_command", return_value=None):
             with patch.object(jarvis_desktop, "local_chat_completion", return_value="Namaste") as completion:
                 self.assertEqual(app._get_online_reply("hello"), "Namaste")
         self.assertEqual(completion.call_args.args[0], "hello")
         self.assertEqual(completion.call_args.args[2], ["User prefers Hindi"])
-        self.assertEqual(app.memory_store.query, "hello")
 
 class StartupLoggingTests(unittest.TestCase):
     def test_configure_startup_logging_creates_log_and_writes_event(self):
@@ -2354,7 +2347,7 @@ class HybridAiTests(unittest.TestCase):
                 jarvis_desktop.local_chat_completion("hello", [])
 
 
-    def test_cloud_failure_falls_back_to_local_and_next_request_recovers_online(self):
+    def test_general_chat_stays_on_local_qwen_across_requests(self):
         from types import SimpleNamespace
         import queue
 
