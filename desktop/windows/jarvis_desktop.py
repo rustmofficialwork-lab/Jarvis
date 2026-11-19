@@ -531,6 +531,18 @@ VOICE_QWEN_ACTIONS = (
 )
 
 
+def should_resolve_voice_action_with_qwen(prompt: str) -> bool:
+    """Avoid an extra local-model pass for ordinary spoken questions and conversation."""
+    import re
+    text = str(prompt or "").casefold()
+    return bool(re.search(
+        r"\b(open|start|launch|run|play|stop|mute|volume|brightness|"
+        r"kholo|khol do|chalao|chala do|badhao|kam karo|batao|dikhao)\b|"
+        r"(खोलो|खोल दो|चलाओ|बढ़ाओ|कम करो)",
+        text,
+    ))
+
+
 def resolve_voice_action_with_qwen(prompt: str, chat=None) -> str | None:
     """Map a spoken request to one exact allowlisted action using local Qwen only."""
     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
@@ -3169,7 +3181,7 @@ class JarvisDesktop:
                     local_response = (
                         self._compose_briefing() if is_briefing_command(prompt) else run_local_command(prompt)
                     )
-                if local_response is None:
+                if local_response is None and should_resolve_voice_action_with_qwen(prompt):
                     qwen_action = resolve_voice_action_with_qwen(prompt)
                     if qwen_action is not None:
                         local_response = run_local_command(qwen_action)
