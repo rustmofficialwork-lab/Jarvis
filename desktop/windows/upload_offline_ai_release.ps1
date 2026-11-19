@@ -79,12 +79,16 @@ try {
     $index | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $indexPath -Encoding UTF8
     $assets.Add($indexPath)
 
-    $releaseTagsJson = & $ghPath release list --repo $Repo --limit 100 --json tagName
-    if ($LASTEXITCODE -ne 0) { throw "Could not list releases in $Repo. Check repository access." }
-    $releaseTags = @($releaseTagsJson | ConvertFrom-Json | ForEach-Object { [string]$_.tagName })
-    if ($releaseTags -notcontains $Tag) {
+    # Check the exact tag directly; parsing release-list JSON was unreliable in Windows PowerShell.
+    & $ghPath release view $Tag --repo $Repo --json tagName | Out-Null
+    $releaseViewExit = $LASTEXITCODE
+    if ($releaseViewExit -ne 0) {
         & $ghPath release create $Tag --repo $Repo --title "JARVIS Qwen3.5 4B Offline Model" --notes "Official JARVIS offline model assets. Uploaded from the user's existing Ollama model store; SHA-256 verified."
-        if ($LASTEXITCODE -ne 0) { throw "Could not create the GitHub Release." }
+        if ($LASTEXITCODE -ne 0) {
+            # A concurrent/previous run may have created it; verify before failing.
+            & $ghPath release view $Tag --repo $Repo --json tagName | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Could not create or find the GitHub Release. Check repository permissions and tag." }
+        }
     }
     foreach ($assetPath in $assets) {
         $assetName = [IO.Path]::GetFileName($assetPath)
