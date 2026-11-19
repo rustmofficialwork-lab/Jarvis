@@ -24,7 +24,6 @@ RestartApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
-Name: "offlineai"; Description: "Install offline AI now (Ollama + Qwen3.5 4B; approximately 3.3–4.0 GB download)"; GroupDescription: "Optional AI setup:"
 
 [Files]
 Source: "..\..\desktop\windows\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
