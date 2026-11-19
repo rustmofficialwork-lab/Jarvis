@@ -104,12 +104,26 @@ if (-not $hasModel) {
         } finally { Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue }
     }
 
-    # Refresh Ollama model discovery before using the network fallback.
+    # Ask Ollama to rescan the model store before using the registry fallback.
     $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 10
     if (@($tags.models | Where-Object { $_.name -eq $Model -or $_.name -eq $latestModel }).Count -eq 0) {
+        & $ollamaExe list | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw "Ollama could not inspect its local model store." }
+        $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 10
+    }
+    if (@($tags.models | Where-Object { $_.name -eq $Model -or $_.name -eq $latestModel }).Count -eq 0) {
         & $ollamaExe pull $Model
-        if ($LASTEXITCODE -ne 0) { throw "Ollama could not register the local model or download the registry fallback." }
+        if ($LASTEXITCODE -ne 0) { throw "Ollama could not register the verified local model or download the registry fallback." }
     }
 }
+
+# Verify a real local inference; file presence alone is not a successful setup.
+$body = @{ model = $Model; stream = $false; messages = @(@{ role = "user"; content = "Reply with exactly: JARVIS MODEL READY" }); options = @{ num_predict = 24; temperature = 0 } } | ConvertTo-Json -Depth 6
+try {
+    $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11434/api/chat" -ContentType "application/json" -Body $body -TimeoutSec 180
+    if (-not $reply.message.content -or -not $reply.message.content.Trim()) { throw "Ollama returned an empty response." }
+} catch {
+    throw "Qwen3.5 4B files are present, but the model did not complete a local inference test: $($_.Exception.Message)"
+}
 Write-Host ""
-Write-Host "Offline AI setup completed. JARVIS uses the local Qwen3.5 4B model." -ForegroundColor Green
+Write-Host "Offline AI setup completed. Qwen3.5 4B passed a local inference test." -ForegroundColor Green
