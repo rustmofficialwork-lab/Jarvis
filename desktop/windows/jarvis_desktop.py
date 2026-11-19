@@ -1401,28 +1401,30 @@ def _ollama_chat(messages: list[dict], options: dict) -> str:
 
 def local_chat_completion(prompt: str, history: list[dict],
                           memories: list[str] | None = None,
-                          model: str = LOCAL_AI_MODEL, *, brain_plan=None) -> str:
-    """Generate a private offline reply through the local Ollama service.
+                          model: str = LOCAL_AI_MODEL, *, brain_plan=None,
+                          online_mode: bool = False) -> str:
+    """Generate every general AI reply with JARVIS's one local Qwen model.
 
-    Tool calling is omitted because the local model must remain lightweight; instead an
-    optional ``brain_plan`` (see ``smart_brain.prepare``, built from this same ``history``)
-    supplies request-specific generation settings, a history that fits the small context
-    window, verified read-only local facts (math/clock/PC status), and - only for hard or
-    explicitly "think carefully" requests - a bounded draft/critique/revise pass.
-    Without a plan the behaviour is the original fixed-size reply.
+    Online mode changes only the context given to the same local model; live web
+    commands are handled separately by online_services before this function is called.
     """
     if model != LOCAL_AI_MODEL:
-        raise ValueError("The configured offline model is not supported.")
+        raise ValueError("The configured local model is not supported.")
     language_hint = (
         "JARVIS supports only two response languages: Hinglish (Hindi + English in Roman script) "
         "and English. Use Hinglish by default and when the user speaks/writes Hinglish or Hindi. "
         "Switch to English when the user speaks/writes English or explicitly requests English. "
         "Do not generate Hindi in Devanagari; keep Hindi words in Roman script."
     )
+    mode_hint = (
+        "You are running in ONLINE mode. You are still the same local Qwen model. "
+        "Do not claim to have searched the web or accessed live information unless JARVIS supplied it."
+        if online_mode else
+        "You are running in OFFLINE mode. Do not claim to have searched the web or accessed live internet information."
+    )
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT + " You are running in OFFLINE mode. "
-         "Do not claim to have searched the web or accessed live internet information. "
-         "Do not claim to have executed desktop tools that were not provided in this conversation."},
+        {"role": "system", "content": SYSTEM_PROMPT + " " + mode_hint
+         + " Do not claim to have executed desktop tools that were not provided in this conversation."},
         {"role": "system", "content": language_hint},
     ]
     if memories:
@@ -3031,11 +3033,9 @@ class JarvisDesktop:
             return None
 
     def _get_online_reply(self, prompt: str) -> str:
-        """Prefer cloud AI; automatically fall back to local Ollama when it is unavailable."""
+        """Use one local Qwen model for general chat in both modes; internet is for live services."""
         brain_engine = getattr(self, "brain_engine", None)
         if brain_engine is None:
-            # Lightweight test instances and partially initialized app states may
-            # not have a memory store yet. AI replies must still work without memory.
             memory_store = getattr(self, "memory_store", None)
             if memory_store is not None:
                 brain_engine = BrainEngine(memory_store)
@@ -3047,61 +3047,36 @@ class JarvisDesktop:
             if brain_engine is not None else []
         )
         memories = self._smart_memories(prompt, memories)
-        try:
-            answer = handle_online_command(prompt)
-            if answer is not None:
-                self._post_ai_status("ONLINE MODE — live internet service response.")
-                return answer
-            endpoint = self.settings.get("endpoint", DEFAULT_ENDPOINT)
-            token = self._ensure_device_token() if endpoint.strip() == DEFAULT_ENDPOINT else self.ai_api_key
+
+        # Search/weather/news are live-data tasks, not questions for the local model to guess.
+        if parse_online_command(prompt) is not None:
             try:
-                answer = chat_completion(
-                    endpoint, self.settings.get("model", DEFAULT_MODEL), token,
-                    prompt, self.history, memories,
-                    browser_open_authorizer=self._authorize_browser_open,
-                    browser_action_executor=self._run_browser_automation,
-                    sensitive_action_executor=self._run_sensitive_external_action,
-                )
-            except RuntimeError as exc:
-                if endpoint.strip() != DEFAULT_ENDPOINT or self.ai_api_key.strip() or "HTTP 401" not in str(exc):
-                    raise
-                renewed = self._ensure_device_token(force=True)
-                answer = chat_completion(
-                    endpoint, self.settings.get("model", DEFAULT_MODEL), renewed,
-                    prompt, self.history, memories,
-                    browser_open_authorizer=self._authorize_browser_open,
-                    browser_action_executor=self._run_browser_automation,
-                    sensitive_action_executor=self._run_sensitive_external_action,
-                )
-            self._post_ai_status("ONLINE MODE — cloud AI is responding.")
-            return answer
-        except Exception as online_error:
-            logging.getLogger("jarvis").info(
-                "Online AI unavailable; attempting local fallback (%s)", type(online_error).__name__
-            )
-            # Search, weather, and news require live data. Never ask a local
-            # language model to guess at current information when the network is down.
-            if parse_online_command(prompt) is not None:
+                answer = handle_online_command(prompt)
+                if answer is not None:
+                    self._post_ai_status("ONLINE MODE — live internet service response.")
+                    return answer
+                raise RuntimeError("The requested live internet service did not return a result.")
+            except Exception as online_error:
                 explanation = explain_online_failure(online_error, "live web search/weather/news")
                 self._post_ai_status("ONLINE TASK BLOCKED — live internet service failed.")
                 return (
-                    f"{explanation} General AI chat offline mode mein available hai, "
-                    "lekin main bina live internet data ke current information guess nahi karunga."
+                    f"{explanation} General AI chat ke liye wahi local Qwen model available hai, "
+                    "lekin bina live internet data ke current information guess nahi karunga."
                 )
-            try:
-                answer = local_chat_completion(
-                    prompt, self.history, memories,
-                    brain_plan=self._plan_local_brain(prompt, memories),
-                )
-                self._post_ai_status("OFFLINE MODE — local AI is responding; your data stays on this PC.")
-                return answer
-            except Exception as offline_error:
-                diagnostic = diagnose_failure(online_error)
-                raise RuntimeError(
-                    f"Online AI is unavailable ({str(online_error)[:180]}). "
-                    f"Offline AI is not ready: {str(offline_error)[:220]}. "
-                    f"Diagnosis: {diagnostic.explanation} Next step: {diagnostic.next_step}"
-                ) from offline_error
+
+        # Both online and offline general chat always use exactly the same local model.
+        online_mode = self._internet_available()
+        answer = local_chat_completion(
+            prompt, self.history, memories,
+            brain_plan=self._plan_local_brain(prompt, memories),
+            online_mode=online_mode,
+        )
+        self._post_ai_status(
+            "ONLINE MODE — local Qwen model is responding; internet features are available."
+            if online_mode else
+            "OFFLINE MODE — local Qwen model is responding; no internet or API key required."
+        )
+        return answer
 
     def _answer_worker(self, prompt: str):
         try:
