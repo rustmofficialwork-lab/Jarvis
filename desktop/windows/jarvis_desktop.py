@@ -1381,6 +1381,7 @@ class JarvisDesktop:
         self.advanced_store = AdvancedFeatureStore()
         self.stop_event = threading.Event()
         self.wake_thread: threading.Thread | None = None
+        self.voice_answer_thread: threading.Thread | None = None
         self.busy = False
         self.tray_icon = None
         self.tray_thread = None
@@ -2853,6 +2854,13 @@ class JarvisDesktop:
         self.wake_thread = threading.Thread(target=self._wake_loop, daemon=True)
         self.wake_thread.start()
 
+    def _interrupt_active_voice_response(self):
+        """Stop and join the previous spoken response before handling a new wake request."""
+        self.speech_stop_event.set()
+        worker = getattr(self, "voice_answer_thread", None)
+        if worker is not None and worker.is_alive() and worker is not threading.current_thread():
+            worker.join(timeout=2.0)
+
     def _wake_loop(self):
         """Detect the single word 'Jarvis' locally, then capture one command."""
         # Keep optional/native audio imports inside the guarded startup path.
@@ -2980,6 +2988,7 @@ class JarvisDesktop:
                     # Speaking before verification would announce an untrusted wake trigger.
                     self.events.put(("status", "Owner voice verified — JARVIS is active."))
                     try:
+                        self._interrupt_active_voice_response()
                         self.speech_stop_event.clear()
                         announce_wake_activation(self.speech_stop_event)
                     except Exception as exc:
@@ -3000,7 +3009,13 @@ class JarvisDesktop:
                             self.events.put(("status", "No command heard. Listening for “Jarvis” again."))
                             continue
                         self.events.put(("status", f"Heard: {command}"))
-                        self._answer_voice(command)
+                        self.voice_answer_thread = threading.Thread(
+                            target=self._answer_voice,
+                            args=(command,),
+                            name="JARVIS-voice-answer",
+                            daemon=True,
+                        )
+                        self.voice_answer_thread.start()
                         if not self.stop_event.is_set():
                             self.events.put(("status", "Listening locally for “Jarvis”."))
                     except sr.WaitTimeoutError:
@@ -3058,6 +3073,15 @@ class JarvisDesktop:
             normalized_voice_command = " ".join(
                 str(prompt or "").casefold().strip().rstrip(" .!?।॥").split()
             )
+            if normalized_voice_command in {
+                "stop speaking", "stop talking", "be quiet",
+                "bolna band karo", "chup ho jao", "awaaz band karo",
+            }:
+                self.speech_stop_event.set()
+                response = "Okay. I have stopped speaking."
+                self.events.put(("answer", response))
+                self.events.put(("status", "Spoken response interrupted by voice command."))
+                return
             if is_stop_listening_command(prompt):
                 self.stop_event.set()
                 response = "Voice listening stopped. Microphone is off."
