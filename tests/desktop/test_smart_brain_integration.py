@@ -143,22 +143,19 @@ class AppWiringTests(unittest.TestCase):
         with patch.object(jarvis_desktop, "prepare_brain_plan", side_effect=RuntimeError("boom")):
             self.assertIsNone(app._plan_local_brain("hello", []))
 
-    def test_general_chat_uses_one_local_model_without_cloud_api_or_backend(self):
+    def test_general_chat_uses_only_local_qwen_model_without_cloud_gateway(self):
         import queue
-        app = self.app({"endpoint": jarvis_desktop.DEFAULT_ENDPOINT, "model": jarvis_desktop.DEFAULT_MODEL},
-                       SimpleNamespace(context=lambda query: []))
-        app.ai_api_key = ""
+        app = self.app({}, None)
         app.events = queue.Queue()
         with (
             patch.object(jarvis_desktop, "handle_online_command", return_value=None),
-            patch.object(jarvis_desktop, "chat_completion") as cloud,
             patch.object(jarvis_desktop, "local_chat_completion", return_value="local") as local,
         ):
             self.assertEqual(app._get_online_reply("2 + 2 kitna hota hai"), "local")
-        cloud.assert_not_called()
         plan = local.call_args.kwargs["brain_plan"]
         self.assertEqual(plan.profile.kind, "math")
         self.assertTrue(any("= 4" in note for note in plan.grounding))
+        self.assertEqual(jarvis_desktop.LOCAL_AI_MODEL, "qwen3.5:4b")
 
 
 class BrainCheckCommandTests(unittest.TestCase):
