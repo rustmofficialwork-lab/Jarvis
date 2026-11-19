@@ -57,6 +57,12 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
             jarvis_desktop.resolve_voice_action_with_qwen("delete all files", chat=bad_chat)
         )
 
+    def test_qwen_action_resolution_is_skipped_for_normal_questions(self):
+        self.assertFalse(jarvis_desktop.should_resolve_voice_action_with_qwen("What is photosynthesis?"))
+        self.assertTrue(jarvis_desktop.should_resolve_voice_action_with_qwen("calculator chala do"))
+        self.assertTrue(jarvis_desktop.should_resolve_voice_action_with_qwen("Please open Notepad"))
+
+
     def test_qwen_action_mapping_rejects_non_json_and_chat_questions(self):
         self.assertIsNone(jarvis_desktop.resolve_voice_action_with_qwen(
             "what is the weather?", chat=lambda *_: "It may rain today."
