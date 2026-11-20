@@ -546,7 +546,7 @@ def should_resolve_voice_action_with_qwen(prompt: str) -> bool:
 
 def resolve_voice_action_with_qwen(prompt: str, chat=None) -> str | None:
     """Map a spoken request to one exact allowlisted action using local Qwen only."""
-    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 4000:
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
         return None
     chat = chat or _ollama_chat
     messages = [
@@ -637,7 +637,7 @@ def resolve_browser_action_with_qwen(prompt: str, chat=None) -> dict | None:
 
 def resolve_browser_workflow_with_qwen(prompt: str, chat=None) -> list[dict] | None:
     """Plan as many ordered browser actions as the explicit voice request requires."""
-    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 4000:
         return None
     chat = chat or _ollama_chat
     allowed = {"navigate", "read", "click", "fill", "select", "press",
