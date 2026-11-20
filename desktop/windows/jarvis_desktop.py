@@ -635,6 +635,63 @@ def resolve_browser_action_with_qwen(prompt: str, chat=None) -> dict | None:
         return None
 
 
+def resolve_browser_workflow_with_qwen(prompt: str, chat=None) -> list[dict] | None:
+    """Plan up to six ordered browser actions for one explicit voice request."""
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
+        return None
+    chat = chat or _ollama_chat
+    allowed = {"navigate", "read", "click", "fill", "select", "press",
+               "scroll", "download", "upload", "new_tab", "switch_tab"}
+    messages = [
+        {"role": "system", "content": (
+            "Turn the user's explicit website request into an ordered workflow of 1 to 6 browser actions. "
+            "Return JSON only: {\"actions\":[{\"action\":...,\"url\":...,\"selector\":...,\"value\":...}]}. "
+            "Each action must use exactly those four string fields. Allowed actions: " + ", ".join(sorted(allowed)) + ". "
+            "Never invent a URL, selector, form value, file path, or personal data. "
+            "Use only destinations and values explicitly supplied by the user. "
+            "Selectors must be grounded in visible labels or controls explicitly named by the user; "
+            "if a selector cannot be known safely, return only the preceding safe steps. "
+            "Do not include payment, checkout, purchase, account/security changes, credential entry, "
+            "or form submission. Do not use shell, scripts, arbitrary JavaScript, or hidden page data. "
+            "Keep the user's requested order. Do not add actions merely to be helpful."
+        )},
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        raw = chat(messages, {"num_ctx": 2048, "num_predict": 700, "temperature": 0.0})
+        import json as _json
+        import re as _re
+        match = _re.search(r"\{[\s\S]{1,10000}\}", str(raw))
+        if not match:
+            return None
+        payload = _json.loads(match.group(0))
+        if not isinstance(payload, dict) or set(payload) != {"actions"}:
+            return None
+        actions = payload["actions"]
+        if not isinstance(actions, list) or not 1 <= len(actions) <= 6:
+            return None
+        validated = []
+        for item in actions:
+            if not isinstance(item, dict) or set(item) != {"action", "url", "selector", "value"}:
+                return None
+            if item["action"] not in allowed:
+                return None
+            if any(not isinstance(item[key], str) for key in ("url", "selector", "value")):
+                return None
+            if len(item["url"]) > 2048 or len(item["selector"]) > 240 or len(item["value"]) > 4000:
+                return None
+            if item["action"] == "navigate" and not item["url"]:
+                return None
+            if item["action"] in {"click", "fill", "select", "press", "download", "upload"} and not item["selector"]:
+                return None
+            if item["action"] in {"fill", "select", "press", "upload", "switch_tab"} and not item["value"]:
+                return None
+            validated.append(dict(item))
+        return validated
+    except Exception:
+        return None
+
+
 def parse_hud_voice_command(prompt: str) -> tuple[str, str] | None:
     """Resolve direct voice phrases to the existing HUD bridge actions."""
     command = normalize_local_command(prompt)
@@ -1989,6 +2046,30 @@ class JarvisDesktop:
             approval_callback=approve_sensitive,
         )
 
+    def _run_browser_workflow(self, actions: list[dict], prompt: str) -> str:
+        """Execute an ordered, bounded workflow; authorize every action and verify page state."""
+        if not isinstance(actions, list) or not 1 <= len(actions) <= 6:
+            raise ValueError("A browser workflow must contain between one and six actions.")
+
+        results = []
+        for index, action in enumerate(actions, start=1):
+            if not isinstance(action, dict):
+                raise ValueError("Invalid browser workflow step.")
+            decision = self.brain_engine.authorize("browser_automation", action, prompt)
+            if not decision.allowed:
+                results.append(f"Step {index} blocked: {decision.reason}")
+                break
+            result = self._run_browser_automation(action)
+            results.append(f"Step {index}: {result}")
+            # Read the rendered page after state-changing actions so the next step
+            # cannot silently assume the previous click/navigation succeeded.
+            if action.get("action") not in {"read", "navigate", "switch_tab"} and index < len(actions):
+                snapshot = self._run_browser_automation({
+                    "action": "read", "url": "", "selector": "", "value": ""
+                })
+                results.append("Page state verified after step " + str(index) + ": " + snapshot[:1800])
+        return "\n".join(results)
+
     def _authorize_browser_open(self, url: str) -> bool:
         """Require a one-time, exact-host approval before opening a public website."""
         if not isinstance(url, str) or not 8 <= len(url) <= 2048:
@@ -3231,17 +3312,11 @@ class JarvisDesktop:
             try:
                 local_response = None
                 if should_resolve_browser_action_with_qwen(prompt):
-                    browser_action = resolve_browser_action_with_qwen(prompt)
-                    if browser_action is None:
-                        local_response = "I couldn't safely identify one clear browser action. Please say the website and the exact action."
+                    browser_actions = resolve_browser_workflow_with_qwen(prompt)
+                    if browser_actions is None:
+                        local_response = "I couldn't safely plan that browser workflow. Please specify the website and exact steps."
                     else:
-                        decision = self.brain_engine.authorize(
-                            "browser_automation", browser_action, prompt
-                        )
-                        if decision.allowed:
-                            local_response = self._run_browser_automation(browser_action)
-                        else:
-                            local_response = "Browser action blocked: " + decision.reason
+                        local_response = self._run_browser_workflow(browser_actions, prompt)
                 hud_action = parse_hud_voice_command(prompt) if local_response is None else None
                 if hud_action is not None:
                     bridge = getattr(self, "web_bridge", None)
