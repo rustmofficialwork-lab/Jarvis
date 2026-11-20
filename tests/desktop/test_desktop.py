@@ -399,15 +399,33 @@ class WakewordSetupTests(unittest.TestCase):
                 return [SimpleNamespace(shape=[1, 1])]
 
         with tempfile.TemporaryDirectory() as temporary:
-            source = Path(temporary) / "trained.onnx"
+            source = Path(temporary) / "jarvis_first_party.onnx"
             source.write_bytes(b"x" * 2048)
+            source.with_name(source.name + ".data").write_bytes(b"external-weights")
             destination = Path(temporary) / "appdata" / "jarvis_first_party.onnx"
             fake_ort = SimpleNamespace(InferenceSession=FakeSession)
             with patch.dict(sys.modules, {"onnxruntime": fake_ort}):
                 installed = jarvis_desktop.install_first_party_wakeword_model(source, destination)
             self.assertEqual(installed, destination)
             self.assertEqual(destination.read_bytes(), source.read_bytes())
+            self.assertEqual(
+                destination.with_name(destination.name + ".data").read_bytes(),
+                source.with_name(source.name + ".data").read_bytes(),
+            )
             self.assertFalse(destination.with_name(destination.name + ".part").exists())
+            self.assertFalse(destination.with_name(destination.name + ".data.part").exists())
+
+    def test_first_party_threshold_is_candidate_and_legacy_threshold_is_unchanged(self):
+        self.assertEqual(
+            jarvis_desktop.wakeword_threshold_for_model(
+                Path("jarvis_first_party.onnx")
+            ),
+            0.7,
+        )
+        self.assertEqual(
+            jarvis_desktop.wakeword_threshold_for_model(Path("Jarvis.onnx")),
+            0.5,
+        )
 
     def test_custom_model_is_preferred_when_installed(self):
         import tempfile
