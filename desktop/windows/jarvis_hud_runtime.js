@@ -207,7 +207,7 @@
     if (key === 'j') {
       event.preventDefault();
       callBridge('toggle_voice');
-    } else if (key === 'k') {    } else if (key === 'k') {
+    } else if (key === 'k') {
       event.preventDefault();
       const command = window.prompt('Enter a command for JARVIS:');
       if (command && command.trim()) callBridge('send_command', command.trim());
