@@ -2654,6 +2654,7 @@ class HybridAiTests(unittest.TestCase):
         self.assertEqual(captured["payload"]["model"], "qwen3.5:4b")
         self.assertEqual(captured["payload"]["options"]["num_ctx"], 2048)
         self.assertFalse(captured["payload"]["stream"])
+        self.assertIs(captured["payload"]["think"], False)
         self.assertEqual(captured["payload"]["messages"][-1]["content"], "hello")
 
     def test_local_ollama_missing_model_has_actionable_message(self):
