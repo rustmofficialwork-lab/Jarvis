@@ -2557,13 +2557,18 @@ class HudShortcutWiringTests(unittest.TestCase):
             "callBridge('open_system_tool', 'start_menu')",
             "callBridge('open_system_tool', 'network_settings')",
             "callBridge('open_system_tool', 'power_options')",
-            "callBridge('open_settings')",
             "callBridge('close_window')",
             "callBridge('toggle_voice')",
             "callBridge('send_command', command.trim())",
         ):
             with self.subTest(expression=expression):
                 self.assertIn(expression, runtime)
+
+    def test_settings_action_is_removed_and_command_shortcut_remains(self):
+        runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
+        self.assertNotIn("callBridge('open_settings')", runtime)
+        self.assertIn("} else if (key === 'k') {", runtime)
+        self.assertNotIn("} else if (key === 'k') {    } else if", runtime)
 
     def test_runtime_adapter_waits_for_bridge_and_refreshes_dashboard(self):
         runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
