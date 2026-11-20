@@ -636,7 +636,7 @@ def resolve_browser_action_with_qwen(prompt: str, chat=None) -> dict | None:
 
 
 def resolve_browser_workflow_with_qwen(prompt: str, chat=None) -> list[dict] | None:
-    """Plan up to six ordered browser actions for one explicit voice request."""
+    """Plan as many ordered browser actions as the explicit voice request requires."""
     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
         return None
     chat = chat or _ollama_chat
@@ -644,7 +644,7 @@ def resolve_browser_workflow_with_qwen(prompt: str, chat=None) -> list[dict] | N
                "scroll", "download", "upload", "new_tab", "switch_tab"}
     messages = [
         {"role": "system", "content": (
-            "Turn the user's explicit website request into an ordered workflow of 1 to 6 browser actions. "
+            "Turn the user's explicit website request into an ordered workflow containing every necessary safe step. "
             "Return JSON only: {\"actions\":[{\"action\":...,\"url\":...,\"selector\":...,\"value\":...}]}. "
             "Each action must use exactly those four string fields. Allowed actions: " + ", ".join(sorted(allowed)) + ". "
             "Never invent a URL, selector, form value, file path, or personal data. "
@@ -658,17 +658,17 @@ def resolve_browser_workflow_with_qwen(prompt: str, chat=None) -> list[dict] | N
         {"role": "user", "content": prompt},
     ]
     try:
-        raw = chat(messages, {"num_ctx": 2048, "num_predict": 700, "temperature": 0.0})
+        raw = chat(messages, {"num_ctx": 4096, "num_predict": 4096, "temperature": 0.0})
         import json as _json
         import re as _re
-        match = _re.search(r"\{[\s\S]{1,10000}\}", str(raw))
+        match = _re.search(r"\{[\s\S]{1,30000}\}", str(raw))
         if not match:
             return None
         payload = _json.loads(match.group(0))
         if not isinstance(payload, dict) or set(payload) != {"actions"}:
             return None
         actions = payload["actions"]
-        if not isinstance(actions, list) or not 1 <= len(actions) <= 6:
+        if not isinstance(actions, list) or not actions:
             return None
         validated = []
         for item in actions:
@@ -2049,7 +2049,7 @@ class JarvisDesktop:
     def _run_browser_workflow(self, actions: list[dict], prompt: str) -> str:
         """Execute an ordered, bounded workflow; authorize every action and verify page state."""
         if not isinstance(actions, list) or not 1 <= len(actions) <= 6:
-            raise ValueError("A browser workflow must contain between one and six actions.")
+            raise ValueError("A browser workflow must contain at least one action.")
 
         results = []
         for index, action in enumerate(actions, start=1):
