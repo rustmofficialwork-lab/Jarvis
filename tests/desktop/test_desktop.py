@@ -2473,8 +2473,8 @@ class HudShortcutWiringTests(unittest.TestCase):
         hud = hud_path.read_text(encoding="utf-8")
         self.assertGreater(len(hud_path.read_bytes()), 110_000)
         self.assertIn('id="m"', hud)
-        self.assertIn('id="v-cpu"', hud)
-        self.assertIn('id="v-ram"', hud)
+        self.assertNotIn('id="v-cpu"', hud)
+        self.assertNotIn('id="v-ram"', hud)
         self.assertIn('id="bat"', hud)
 
     def test_external_hud_assets_are_injected_in_dependency_order_after_hud_load(self):
@@ -2492,7 +2492,8 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertIn('window.JARVISGestureLogic = api', gesture_logic)
         self.assertIn("jx-gesture-toggle", extensions)
         self.assertIn("const anchorX=845,anchorY=638;", extensions)
-        self.assertIn('id="jx-gesture-toggle"', (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
+        self.assertNotIn('id="jx-gesture-toggle"', (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
+        self.assertNotIn("anchorX=845,anchorY=638", extensions)
         self.assertIn("document.getElementById('jx-gesture-toggle')||document.createElement", extensions)
         self.assertIn("ARCHITECTURE", (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
         self.assertIn("getBoundingClientRect()", extensions)
@@ -2583,9 +2584,11 @@ class HudLiveDataMappingTests(unittest.TestCase):
         self.assertNotIn("- BATTERY : LOADING...", hud)
         self.assertNotIn("put('v-sb'", runtime)
         self.assertIn('id="bat"', hud)
-        self.assertIn('x="942" y="724">- CPU', hud)
-        self.assertIn('id="v-sr" x="942" y="740">- RAM', hud)
-        self.assertIn('x="942" y="757">- DISK', hud)
+        self.assertNotIn("SYSTEM INFORMATION", hud)
+        self.assertNotIn("QUICK ACCESS", hud)
+        self.assertNotIn("NETWORK DETAILS", hud)
+        self.assertNotIn("SYSTEM STATUS", hud)
+        self.assertIn('id="bat"', hud)
 
     def test_runtime_state_updates_the_existing_svg_core_without_replacing_artwork(self):
         runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
