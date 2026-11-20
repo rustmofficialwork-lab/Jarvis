@@ -67,6 +67,10 @@ JARVIS_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "Jarvis_20260313_215039.onn
 
 JARVIS_WAKEWORD_MODEL_PAGE = "https://openwakeword.com/library/422"
 JARVIS_FIRST_PARTY_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "jarvis_first_party.onnx"
+# Provisional candidate from the initial held-out feature sweep; must be revalidated
+# on real Windows microphone recordings before production release.
+JARVIS_FIRST_PARTY_WAKEWORD_THRESHOLD = 0.7
+DEFAULT_WAKEWORD_THRESHOLD = 0.5
 OWNER_VOICE_MODEL_DIR = SETTINGS_DIR / "speaker_model"
 HISTORY_FILE = SETTINGS_DIR / "chat_history.json"
 STARTUP_LOG_FILE = SETTINGS_DIR / "startup.log"
@@ -253,7 +257,9 @@ def active_wakeword_model_path() -> Path:
 
 def install_first_party_wakeword_model(source_path: Path,
                                        model_path: Path = JARVIS_FIRST_PARTY_WAKEWORD_MODEL) -> Path:
-    """Validate and atomically install a locally trained JARVIS ONNX wake-word model."""
+    """Validate and install a trained ONNX model plus its optional external-data sidecar."""
+    import tempfile
+
     source = Path(source_path)
     destination = Path(model_path)
     if not source.is_file() or source.suffix.casefold() != ".onnx":
@@ -261,8 +267,20 @@ def install_first_party_wakeword_model(source_path: Path,
     size = source.stat().st_size
     if size < 1024 or size > 25 * 1024 * 1024:
         raise ValueError("The custom wake-word model has an unexpected file size.")
+
+    source_sidecar = source.with_name(source.name + ".data")
+    has_external_data = source_sidecar.is_file()
+    if has_external_data and source.name != destination.name:
+        raise ValueError(
+            "This ONNX model uses external data. Keep its original filename "
+            "and install it as jarvis_first_party.onnx with the matching .data file."
+        )
+    if has_external_data and not 0 < source_sidecar.stat().st_size <= 100 * 1024 * 1024:
+        raise ValueError("The custom wake-word external-data file has an unexpected size.")
+
     try:
         import onnxruntime as ort
+        # ONNX Runtime validates that any referenced external-data file is present.
         session = ort.InferenceSession(str(source), providers=["CPUExecutionProvider"])
         inputs = session.get_inputs()
         outputs = session.get_outputs()
@@ -278,20 +296,67 @@ def install_first_party_wakeword_model(source_path: Path,
             )
     except ImportError as exc:
         raise RuntimeError("ONNX Runtime is missing. Reinstall JARVIS voice dependencies.") from exc
+
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(destination.name + ".part")
-    try:
-        shutil.copyfile(source, temporary)
-        if temporary.stat().st_size != size:
-            raise OSError("The model file changed while it was being installed.")
-        # Verify the copied artifact, not just the original path.
-        session = ort.InferenceSession(str(temporary), providers=["CPUExecutionProvider"])
-        if not session.get_inputs() or not session.get_outputs():
-            raise ValueError("The installed model failed ONNX validation.")
-        os.replace(temporary, destination)
-    finally:
-        temporary.unlink(missing_ok=True)
+    destination_sidecar = destination.with_name(destination.name + ".data")
+    temporary_model = destination.with_name(destination.name + ".part")
+    temporary_sidecar = destination_sidecar.with_name(destination_sidecar.name + ".part")
+
+    # Validate a complete staged pair under the final model filename. ONNX
+    # external-data locations are stored inside the graph and are relative to
+    # the model directory, so renaming the model/sidecar independently is unsafe.
+    with tempfile.TemporaryDirectory(prefix="jarvis-wakeword-", dir=str(destination.parent)) as staging:
+        staging_dir = Path(staging)
+        staged_model = staging_dir / destination.name
+        staged_sidecar = staging_dir / destination_sidecar.name
+        shutil.copyfile(source, staged_model)
+        if staged_model.stat().st_size != size:
+            raise OSError("The model file changed while it was being staged.")
+        if has_external_data:
+            shutil.copyfile(source_sidecar, staged_sidecar)
+            if staged_sidecar.stat().st_size != source_sidecar.stat().st_size:
+                raise OSError("The external-data file changed while it was being staged.")
+
+        staged_session = ort.InferenceSession(str(staged_model), providers=["CPUExecutionProvider"])
+        staged_inputs = staged_session.get_inputs()
+        staged_outputs = staged_session.get_outputs()
+        if not staged_inputs or not staged_outputs:
+            raise ValueError("The staged model failed ONNX validation.")
+
+        backup_sidecar = staging_dir / "previous-external-data"
+        if destination_sidecar.is_file():
+            shutil.copyfile(destination_sidecar, backup_sidecar)
+        try:
+            shutil.copyfile(staged_model, temporary_model)
+            if has_external_data:
+                shutil.copyfile(staged_sidecar, temporary_sidecar)
+                os.replace(temporary_sidecar, destination_sidecar)
+            os.replace(temporary_model, destination)
+            if not has_external_data:
+                try:
+                    destination_sidecar.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        except Exception:
+            # If replacing the model fails after the sidecar swap, restore the
+            # previous sidecar so an already-installed model is not mismatched.
+            if has_external_data:
+                if backup_sidecar.is_file():
+                    shutil.copyfile(backup_sidecar, destination_sidecar)
+                else:
+                    destination_sidecar.unlink(missing_ok=True)
+            raise
+        finally:
+            temporary_model.unlink(missing_ok=True)
+            temporary_sidecar.unlink(missing_ok=True)
     return destination
+
+
+def wakeword_threshold_for_model(model_path: Path) -> float:
+    """Return the provisional threshold for the custom model or the legacy default."""
+    if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name:
+        return JARVIS_FIRST_PARTY_WAKEWORD_THRESHOLD
+    return DEFAULT_WAKEWORD_THRESHOLD
 
 def update_wakeword_activation(
     confidence: float,
@@ -1922,7 +1987,7 @@ class JarvisDesktop:
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
                     activated, streak = update_wakeword_activation(
-                        confidence, streak, threshold=0.5, required_frames=2
+                        confidence, streak, threshold=wakeword_threshold_for_model(model_path), required_frames=2
                     )
                     now = time.monotonic()
                     if activated and now - last_activation >= 2.0:
@@ -3282,7 +3347,7 @@ class JarvisDesktop:
                     scores = detector.predict(frame)
                     confidence = float(scores.get(model_path.stem, 0.0))
                     activated, activation_frames = update_wakeword_activation(
-                        confidence, activation_frames, threshold=0.5, required_frames=2
+                        confidence, activation_frames, threshold=wakeword_threshold_for_model(model_path), required_frames=2
                     )
                     now = time.monotonic()
                     if not activated or now - last_activation < 2.0:
