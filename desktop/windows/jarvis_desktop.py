@@ -574,15 +574,20 @@ def resolve_voice_action_with_qwen(prompt: str, chat=None) -> str | None:
 
 
 def should_resolve_browser_action_with_qwen(prompt: str) -> bool:
-    """Run browser intent extraction only for explicit website/browser interaction requests."""
+    """Run browser intent extraction only for explicit action requests."""
     import re
     text = str(prompt or "").casefold()
-    return bool(re.search(
-        r"\b(website|web site|browser|webpage|web page|tab|click|fill|type into|"
-        r"select option|scroll|download|upload|form|navigate)\b|"
-        r"(वेबसाइट|ब्राउज़र|टैब|क्लिक|डाउनलोड|अपलोड)",
+    action = re.search(
+        r"\\b(open|visit|go to|navigate|click|fill|type|select|scroll|download|upload|read|show|search|"
+        r"press|switch)\\b|(खोलो|खोल दो|क्लिक|भरें|डाउनलोड|अपलोड|पढ़ो|दिखाओ)",
         text,
-    ))
+    )
+    target = re.search(
+        r"\\b(website|web site|browser|webpage|web page|tab|button|link|field|textbox|search bar|form|"
+        r"page|site|option)\\b|(वेबसाइट|ब्राउज़र|टैब|बटन|लिंक|फॉर्म)",
+        text,
+    )
+    return bool(action and target)
 
 
 def resolve_browser_action_with_qwen(prompt: str, chat=None) -> dict | None:
