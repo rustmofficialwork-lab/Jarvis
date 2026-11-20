@@ -578,8 +578,8 @@ def should_resolve_browser_action_with_qwen(prompt: str) -> bool:
     import re
     text = str(prompt or "").casefold()
     return bool(re.search(
-        r"\\b(website|web site|browser|webpage|web page|tab|click|fill|type into|"
-        r"select option|scroll|download|upload|form|navigate)\\b|"
+        r"\b(website|web site|browser|webpage|web page|tab|click|fill|type into|"
+        r"select option|scroll|download|upload|form|navigate)\b|"
         r"(वेबसाइट|ब्राउज़र|टैब|क्लिक|डाउनलोड|अपलोड)",
         text,
     ))
@@ -609,7 +609,7 @@ def resolve_browser_action_with_qwen(prompt: str, chat=None) -> dict | None:
         raw = chat(messages, {"num_ctx": 1536, "num_predict": 160, "temperature": 0.0})
         import json as _json
         import re as _re
-        match = _re.search(r"\\{[^{}]{1,1000}\\}", str(raw))
+        match = _re.search(r"\{[^{}]{1,1000}\}", str(raw))
         if not match:
             return None
         payload = _json.loads(match.group(0))
