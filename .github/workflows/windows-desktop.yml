@@ -216,17 +216,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist-installer" | Out-Null
           & $compiler "/DMyAppVersion=1.1.$env:GITHUB_RUN_NUMBER" "installer/windows/JARVIS.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v6
-        with:
-          name: JARVIS-Windows-Installer-x64
-          path: |
-            dist-installer/JARVIS-Setup-x64.exe
-          if-no-files-found: error
       - name: Upload complete offline JARVIS installer
         uses: actions/upload-artifact@v6
         with:
           name: JARVIS-Full-Offline-Setup
           path: dist-installer/JARVIS-Setup-x64.exe
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
