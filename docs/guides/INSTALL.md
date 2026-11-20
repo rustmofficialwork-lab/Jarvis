@@ -7,13 +7,13 @@ Windows installer GitHub Actions automatically banata hai. App install karne ke 
 1. Repository ka **Actions** tab kholo: https://github.com/rustmofficialwork-lab/Jarvis/actions
 2. Sabse naya **JARVIS Project Checks and Windows Build** run kholo.
 3. Run ke **completed** hone aur green **Success** result aane ka wait karo. Installer build fail ya in-progress ho to download ko ready mat samjho.
-4. **Artifacts** section se `JARVIS-Windows-Installer-x64` download karo. Ya **Releases** mein **JARVIS Latest Windows Build** release se `JARVIS-Setup-x64.exe` download karo, agar release publish hui ho.
+4. **Artifacts** section se `JARVIS-Full-Offline-Setup` download karo. ZIP mein `JARVIS-Setup-x64.exe`, required `.bin` data slices aur SHA-256 file hoti hai. Setup.exe aur sabhi `.bin` files ko ek hi folder mein rakho.
 5. Agar aapne `main` branch mein code change push kiya hai, to us push ke baad bana hua latest run hi check karo. Zaroorat par Actions workflow ke **Run workflow** option se build manually start kiya ja sakta hai.
 
 ## Install
 
-1. Downloaded ZIP artifact ko extract karo (agar artifact ZIP hai), phir `JARVIS-Setup-x64.exe` chalao.
-2. JARVIS installer ke baad offline AI setup automatically chalta hai. Ye pehle official JARVIS GitHub Release se Qwen3.5 4B model assets download karke SHA-256 verify karta hai; agar release assets available na hon to Ollama registry se model download fallback use hota hai. Iske liye lagbhag 3.3–4.0 GB internet download aur disk space chahiye. General AI chat online aur offline dono mein isi ek local model se chalega; AI API key ya cloud AI backend ki zaroorat nahi. Live web search aur internet-only features ke liye internet connection chahiye.
+1. Downloaded `JARVIS-Full-Offline-Setup.zip` extract karo. `JARVIS-Setup-x64.exe` aur uske saare `.bin` slices ek hi folder mein rehne do; phir Setup.exe chalao.
+2. Installer ke andar Qwen3.5 4B model files aur Ollama runtime pehle se bundled hain. Installation ke waqt setup local bundle ko verify karke model ki local inference test karta hai; model ke liye alag se 3.3–4.0 GB download nahi karna padta. General AI chat isi ek local model se online aur offline dono mein chalega; AI API key ya cloud AI backend ki zaroorat nahi. Live web search aur internet-only features ke liye internet chahiye.
 3. App abhi code-signed nahi hai, isliye Windows SmartScreen warning dikha sakta hai. Publisher verify kiye bina kisi unexpected installer ko run mat karo.
 4. JARVIS kholo. Typing se chat use kar sakte ho. Try: `good morning jarvis`, `notepad kholo aur phir calculator kholo`, `brain check`.
 
