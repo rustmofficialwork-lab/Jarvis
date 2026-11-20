@@ -279,6 +279,51 @@ jobs:
           Write-Host "Bundled Qwen3.5 4B and Ollama runtime into the offline installer."
           $modelBytes = (Get-ChildItem -Path $modelRoot -Recurse -File | Measure-Object -Property Length -Sum).Sum
           Write-Host "Bundled model bytes: $modelBytes"
+      - name: Verify bundled Qwen model with offline Ollama inference
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = "Stop"
+          $bundle = Join-Path $PWD "desktop/windows/offline-ai-bundle"
+          $modelRoot = Join-Path $bundle "models"
+          $ollamaExe = Get-ChildItem -Path (Join-Path $bundle "ollama") -Filter "ollama.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ollamaExe) { throw "Bundled Ollama executable is missing." }
+          $env:OLLAMA_MODELS = $modelRoot
+          $env:OLLAMA_HOST = "127.0.0.1:11435"
+          $env:OLLAMA_NO_CLOUD = "1"
+          $server = Start-Process -FilePath $ollamaExe -ArgumentList "serve" -PassThru -WindowStyle Hidden
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 90; $attempt++) {
+              if ($server.HasExited) { throw "Bundled Ollama exited before its local API became ready." }
+              try {
+                Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 2 | Out-Null
+                $ready = $true
+                break
+              } catch { Start-Sleep -Seconds 2 }
+            }
+            if (-not $ready) { throw "Bundled Ollama did not start on its isolated test port." }
+            $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 10
+            if (@($tags.models | Where-Object { $_.name -eq "qwen3.5:4b" -or $_.name -eq "qwen3.5:4b:latest" }).Count -eq 0) {
+              throw "The bundled model manifest and blobs were not registered by Ollama."
+            }
+            $payload = @{
+              model = "qwen3.5:4b"
+              stream = $false
+              messages = @(@{ role = "user"; content = "Reply with one short word." })
+              options = @{ num_ctx = 1024; num_predict = 8; temperature = 0 }
+            } | ConvertTo-Json -Depth 6
+            $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11435/api/chat" -ContentType "application/json" -Body $payload -TimeoutSec 900
+            if (-not $reply.message.content -or -not $reply.message.content.Trim()) {
+              throw "Qwen3.5 4B returned an empty response from the bundled local model."
+            }
+            Write-Host "Offline bundled Qwen3.5 4B inference passed: $($reply.message.content.Trim())"
+          } finally {
+            if ($server -and -not $server.HasExited) {
+              $server.Kill($true)
+              $server.WaitForExit()
+            }
+          }
       - name: Set application build version
         shell: pwsh
         run: |
