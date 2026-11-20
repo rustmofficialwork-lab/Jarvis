@@ -7,6 +7,7 @@ $BundleRoot = Join-Path $PSScriptRoot "offline-ai-bundle"
 $BundleModels = Join-Path $BundleRoot "models"
 $DefaultModels = $BundleModels
 $env:OLLAMA_MODELS = $DefaultModels
+$env:OLLAMA_HOST = "127.0.0.1:11435"
 
 Write-Host "JARVIS Offline AI setup" -ForegroundColor Cyan
 Write-Host "Model: $Model"
@@ -24,22 +25,21 @@ if (-not $ollamaExe) {
 if (-not $ollamaExe) { throw "The offline JARVIS package is missing its bundled Ollama runtime. Re-download the complete installer." }
 
 $serverReady = $false
-# Use the bundled runtime and model store consistently, even if a separate Ollama
-# installation was already running on this machine.
-Get-Process -Name "ollama" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 700
-try { Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 2 | Out-Null; $serverReady = $true } catch {
+# Run JARVIS Ollama on its own loopback port and model store. Never terminate
+# another Ollama instance that may belong to the user or a different application.
+Start-Sleep -Milliseconds 300
+try { Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 2 | Out-Null; $serverReady = $true } catch {
     Start-Process -FilePath $ollamaExe -ArgumentList "serve" -WindowStyle Hidden | Out-Null
 }
 if (-not $serverReady) {
     for ($attempt = 0; $attempt -lt 45; $attempt++) {
         Start-Sleep -Seconds 2
-        try { Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 2 | Out-Null; $serverReady = $true; break } catch {}
+        try { Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 2 | Out-Null; $serverReady = $true; break } catch {}
     }
 }
 if (-not $serverReady) { throw "Ollama did not start. Restart Windows and rerun setup." }
 
-$installed = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 10
+$installed = Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 10
 $latestModel = $Model + ":latest"
 $hasModel = @($installed.models | Where-Object { $_.name -eq $Model -or $_.name -eq $latestModel }).Count -gt 0
 
@@ -54,11 +54,11 @@ if (-not $hasModel) {
     }
 
     # Ask Ollama to rescan the model store before using the registry fallback.
-    $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 10
+    $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 10
     if (@($tags.models | Where-Object { $_.name -eq $Model -or $_.name -eq $latestModel }).Count -eq 0) {
         & $ollamaExe list | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "Ollama could not inspect its local model store." }
-        $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 10
+        $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 10
     }
     if (@($tags.models | Where-Object { $_.name -eq $Model -or $_.name -eq $latestModel }).Count -eq 0) {
         throw "Bundled Qwen3.5 4B was not registered by Ollama. The installer package is incomplete."
@@ -68,7 +68,7 @@ if (-not $hasModel) {
 # Verify a real local inference; file presence alone is not a successful setup.
 $body = @{ model = $Model; stream = $false; messages = @(@{ role = "user"; content = "Reply with exactly: JARVIS MODEL READY" }); options = @{ num_predict = 24; temperature = 0 } } | ConvertTo-Json -Depth 6
 try {
-    $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11434/api/chat" -ContentType "application/json" -Body $body -TimeoutSec 180
+    $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11435/api/chat" -ContentType "application/json" -Body $body -TimeoutSec 180
     if (-not $reply.message.content -or -not $reply.message.content.Trim()) { throw "Ollama returned an empty response." }
 } catch {
     throw "Qwen3.5 4B files are present, but the model did not complete a local inference test: $($_.Exception.Message)"
