@@ -113,6 +113,51 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
         )
         self.assertEqual(result, expected)
 
+    def test_qwen_browser_workflow_accepts_multiple_ordered_actions(self):
+        expected = [
+            {"action": "navigate", "url": "https://example.com", "selector": "", "value": ""},
+            {"action": "fill", "url": "", "selector": "input[name='q']", "value": "weather"},
+            {"action": "press", "url": "", "selector": "input[name='q']", "value": "Enter"},
+            {"action": "read", "url": "", "selector": "", "value": ""},
+        ]
+        result = jarvis_desktop.resolve_browser_workflow_with_qwen(
+            "Open example.com, search weather, and read the results",
+            chat=lambda *_: json.dumps({"actions": expected}),
+        )
+        self.assertEqual(result, expected)
+
+    def test_qwen_browser_workflow_rejects_more_than_six_or_unsafe_steps(self):
+        valid = {"action": "read", "url": "", "selector": "", "value": ""}
+        too_many = {"actions": [valid] * 7}
+        unsafe = {"actions": [
+            {"action": "run_shell", "url": "", "selector": "", "value": ""}
+        ]}
+        for payload in (too_many, unsafe, {"actions": []}):
+            with self.subTest(payload=payload):
+                self.assertIsNone(jarvis_desktop.resolve_browser_workflow_with_qwen(
+                    "Open website and read page", chat=lambda *_args, p=payload: json.dumps(p)
+                ))
+
+    def test_browser_workflow_runs_steps_in_order_and_refreshes_page_state(self):
+        from types import SimpleNamespace
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.brain_engine = SimpleNamespace(
+            authorize=lambda *_args: SimpleNamespace(allowed=True)
+        )
+        calls = []
+        def run(action):
+            calls.append(action["action"])
+            return "page snapshot" if action["action"] == "read" else "completed"
+        app._run_browser_automation = run
+        actions = [
+            {"action": "navigate", "url": "https://example.com", "selector": "", "value": ""},
+            {"action": "click", "url": "", "selector": "text=Search", "value": ""},
+            {"action": "read", "url": "", "selector": "", "value": ""},
+        ]
+        result = app._run_browser_workflow(actions, "open and search")
+        self.assertEqual(calls, ["navigate", "click", "read", "read"])
+        self.assertIn("Page state verified after step 2", result)
+
     def test_qwen_browser_action_rejects_unknown_actions_extra_keys_and_bad_fields(self):
         invalid = (
             {"action": "run_shell", "url": "", "selector": "", "value": ""},
