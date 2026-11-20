@@ -139,6 +139,22 @@ jobs:
           ) | Set-Content -Path (Join-Path $bundle "README.txt") -Encoding utf8
           Write-Host "Bundled all three offline speech models."
 
+      - name: Bundle offline owner-voice encoder
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $revision = "4467ef1f92829ca0ff4bbdaa70d31f7d7d25c12c"
+          $bundle = Join-Path $PWD "desktop/windows/offline-voice-bundle/speaker_model"
+          New-Item -ItemType Directory -Force -Path $bundle | Out-Null
+          $base = "https://huggingface.co/kenrunio/transcriber-speaker-onnx/resolve/$revision"
+          $model = Join-Path $bundle "ecapa-any-length.onnx"
+          Invoke-WebRequest -Uri "$base/ecapa-any-length.onnx" -OutFile $model
+          $hash = (Get-FileHash -LiteralPath $model -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne "700b63064ee98981186f59f247d28e56f7f6ab265d8b50ebb450db5a8ce21dc7") { throw "The bundled owner-voice encoder failed SHA-256 verification." }
+          Invoke-WebRequest -Uri "$base/LICENSE" -OutFile (Join-Path $bundle "LICENSE")
+          if ((Get-Item -LiteralPath (Join-Path $bundle "LICENSE")).Length -lt 100) { throw "The owner-voice model license file is missing or incomplete." }
+          Write-Host "Bundled the pinned Apache-2.0 ECAPA model; the user's voice profile is still created locally during explicit enrollment."
+
       - name: Bundle pinned HUD runtime libraries
         shell: pwsh
         run: |
