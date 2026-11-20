@@ -28,7 +28,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 [Files]
 Source: "..\..\desktop\windows\dist\JARVIS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\desktop\windows\setup_offline_ai.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\desktop\windows\offline-ai-bundle\*"; DestDir: "{app}\offline-ai-bundle"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "..\..\desktop\windows\offline-ai-bundle\*"; DestDir: "{app}\offline-ai-bundle"; Flags: ignoreversion recursesubdirs createallsubdirs 
 
 [Icons]
 Name: "{group}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"
