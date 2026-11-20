@@ -2650,7 +2650,7 @@ class HybridAiTests(unittest.TestCase):
             )
 
         self.assertEqual(result, "Offline reply")
-        self.assertEqual(captured["url"], "http://127.0.0.1:11434/api/chat")
+        self.assertEqual(captured["url"], "http://127.0.0.1:11435/api/chat")
         self.assertEqual(captured["payload"]["model"], "qwen3.5:4b")
         self.assertEqual(captured["payload"]["options"]["num_ctx"], 2048)
         self.assertFalse(captured["payload"]["stream"])
@@ -2661,7 +2661,7 @@ class HybridAiTests(unittest.TestCase):
         from unittest.mock import patch
 
         error = jarvis_desktop.urllib.error.HTTPError(
-            "http://127.0.0.1:11434/api/chat", 404, "Not Found", {},
+            "http://127.0.0.1:11435/api/chat", 404, "Not Found", {},
             io.BytesIO(b"model not found"),
         )
         with patch.object(
@@ -2719,7 +2719,7 @@ class HybridAiTests(unittest.TestCase):
     def test_general_chat_source_has_one_fixed_local_model_and_no_cloud_gateway(self):
         source = Path(jarvis_desktop.__file__).read_text(encoding="utf-8")
         self.assertIn("LOCAL_AI_MODEL = \"qwen3.5:4b\"", source)
-        self.assertIn("LOCAL_AI_ENDPOINT = \"http://127.0.0.1:11434/api/chat\"", source)
+        self.assertIn("LOCAL_AI_ENDPOINT = \"http://127.0.0.1:11435/api/chat\"", source)
         self.assertIn("local_chat_completion(", source)
         for legacy in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "DEVICE_REGISTER_ENDPOINT", "register_device(", "DEFAULT_ENDPOINT", "DEFAULT_MODEL", "ai_api_key", "device_token"):
             self.assertNotIn(legacy, source)
