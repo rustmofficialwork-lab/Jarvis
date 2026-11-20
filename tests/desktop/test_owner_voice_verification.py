@@ -62,6 +62,19 @@ class OwnerVoiceVerificationTests(unittest.TestCase):
                 (np.ones(16_000 * 3, dtype="<i2") * 2000).tobytes()
             )
 
+    def test_bundled_encoder_is_used_without_network_download(self):
+        from unittest.mock import patch
+        import owner_voice_verification as module
+
+        with tempfile.TemporaryDirectory() as directory:
+            bundled = Path(directory) / "offline-voice-bundle" / "ecapa-any-length.onnx"
+            bundled.parent.mkdir(parents=True)
+            bundled.write_bytes(b"bundled-model")
+            with patch.object(module, "packaged_model_path", return_value=bundled), \
+                 patch.object(module, "_verified_model", side_effect=lambda path: path == bundled):
+                result = module.ensure_model(Path(directory) / "user-models", allow_download=False)
+        self.assertEqual(result, bundled)
+
     def test_profile_requires_five_clips_and_builds_centroid(self):
         with tempfile.TemporaryDirectory() as directory:
             paths = []
