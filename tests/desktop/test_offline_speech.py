@@ -35,6 +35,17 @@ class OfflineSpeechTests(unittest.TestCase):
             self.assertNotEqual(hindi, english)
             self.assertEqual(hindi.name, MODEL_CATALOG["hi-IN"][0])
 
+    def test_packaged_model_directory_is_preferred_for_installed_bundle(self):
+        from unittest.mock import patch
+        import offline_speech as module
+
+        with tempfile.TemporaryDirectory() as directory:
+            packaged = Path(directory) / "offline-speech-bundle"
+            model = packaged / MODEL_CATALOG["hi-IN"][0]
+            model.mkdir(parents=True)
+            with patch.object(module, "packaged_model_directory", return_value=packaged):
+                self.assertEqual(module.model_path_for_language("hi-IN"), model)
+
     def test_missing_model_is_reported_without_network_fallback(self):
         audio = Mock()
         with tempfile.TemporaryDirectory() as temp:
