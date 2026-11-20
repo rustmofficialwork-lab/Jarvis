@@ -10,7 +10,7 @@ On first launch, JARVIS shows separate foreground consent prompts for microphone
 - Python 3.11 (recommended)
 - Microphone and speakers/headphones (microphone access is optional until you enable voice setup; Windows controls the permission)
 - Internet for live web search, weather, news, and the separately licensed wake-word classifier/runtime assets; the installer bundles offline Vosk speech models and the owner-speaker encoder
-- Offline AI: the installer runs the Ollama + `qwen3.5:4b` setup after installation (approximately 3.3–4.0 GB model assets). This can also be run later with `desktop/windows/setup_offline_ai.ps1` while online
+- Offline AI: the full offline installer already includes the Ollama runtime and `qwen3.5:4b` model assets (approximately 3.3–4.0 GB). Installation verifies the bundled model and runs a local inference check; no separate model download is required.
 - A user-installed, license-compatible Jarvis ONNX wake-word classifier; the publisher model is not redistributed in the public installer ([details](docs/guides/JARVIS_WAKEWORD_SETUP.md)); custom-model training and import are documented in [WAKEWORD_FIRST_PARTY_MODEL.md](docs/guides/WAKEWORD_FIRST_PARTY_MODEL.md)
 - Internet access is not required for local Qwen chat or offline Vosk transcription after installation; the separately licensed wake-word model/runtime and live web services may require internet. No API key or cloud AI backend is used for general AI chat
 
