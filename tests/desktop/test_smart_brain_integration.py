@@ -60,6 +60,7 @@ class OfflineSmartBrainTests(unittest.TestCase):
         options = captured[0]["options"]
         self.assertEqual((options["num_ctx"], options["num_predict"]), (4096, 768))
         self.assertTrue(captured[0]["stream"] is False)
+        self.assertIs(captured[0]["think"], False)
 
     def test_long_history_is_budgeted_so_the_system_prompt_cannot_be_pushed_out(self):
         history = []
