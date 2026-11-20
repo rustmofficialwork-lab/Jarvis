@@ -2048,7 +2048,7 @@ class JarvisDesktop:
 
     def _run_browser_workflow(self, actions: list[dict], prompt: str) -> str:
         """Execute an ordered, bounded workflow; authorize every action and verify page state."""
-        if not isinstance(actions, list) or not 1 <= len(actions) <= 6:
+        if not isinstance(actions, list) or not actions:
             raise ValueError("A browser workflow must contain at least one action.")
 
         results = []
