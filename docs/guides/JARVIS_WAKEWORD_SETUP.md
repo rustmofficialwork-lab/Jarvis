@@ -45,7 +45,7 @@ Replace `2` with the index shown for the microphone you want to test. If no inde
 
 The local diagnostic runs three short phases: quiet room, five spoken "Jarvis" attempts, and ordinary background noise. It reports peak confidence and activation counts. It does not save or upload audio. Repeat it with the microphone, distance, room and speaker volume you normally use. A spot-check is not a guarantee of zero false activations or perfect recall.
 
-The live detector now requires confidence at or above 0.5 for two consecutive 80 ms audio frames, plus its existing two-second cooldown. This filters isolated confidence spikes without changing the model's published threshold.
+The live detector requires confidence above its model-specific threshold for two consecutive 80 ms audio frames, plus its existing two-second cooldown. The legacy publisher model retains 0.5; the first-party model currently uses 0.7 as a provisional candidate from its initial feature-array sweep, not as a microphone-calibrated production threshold. This filters isolated confidence spikes but does not replace real-room testing.
 
 ## Model and license
 
