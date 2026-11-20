@@ -96,6 +96,40 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
         ))
 
 
+    def test_browser_voice_intent_is_detected_without_intercepting_normal_chat(self):
+        self.assertTrue(jarvis_desktop.should_resolve_browser_action_with_qwen("open this website"))
+        self.assertTrue(jarvis_desktop.should_resolve_browser_action_with_qwen("click the search button"))
+        self.assertTrue(jarvis_desktop.should_resolve_browser_action_with_qwen("website par search karo"))
+        self.assertFalse(jarvis_desktop.should_resolve_browser_action_with_qwen("What is a web browser?"))
+
+    def test_qwen_browser_action_accepts_one_bounded_json_action(self):
+        expected = {
+            "action": "navigate", "url": "https://example.com",
+            "selector": "", "value": "",
+        }
+        result = jarvis_desktop.resolve_browser_action_with_qwen(
+            "Open https://example.com website",
+            chat=lambda *_: json.dumps(expected),
+        )
+        self.assertEqual(result, expected)
+
+    def test_qwen_browser_action_rejects_unknown_actions_extra_keys_and_bad_fields(self):
+        invalid = (
+            {"action": "run_shell", "url": "", "selector": "", "value": ""},
+            {"action": "click", "url": "", "selector": "text=Search", "value": "", "extra": True},
+            {"action": "navigate", "url": "", "selector": "", "value": ""},
+            {"action": "fill", "url": "", "selector": "", "value": "x" * 4001},
+        )
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                self.assertIsNone(jarvis_desktop.resolve_browser_action_with_qwen(
+                    "click the search button", chat=lambda *_args, p=payload: json.dumps(p)
+                ))
+        self.assertIsNone(jarvis_desktop.resolve_browser_action_with_qwen(
+            "click search", chat=lambda *_: "not JSON"
+        ))
+
+
 class VoiceListenerControlCommandTests(unittest.TestCase):
     def test_stop_listening_accepts_explicit_english_and_hinglish_phrases(self):
         phrases = (
