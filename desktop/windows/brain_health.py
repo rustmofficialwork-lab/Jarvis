@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
-OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
+OLLAMA_TAGS_URL = "http://127.0.0.1:11435/api/tags"
 DEFAULT_MODEL = "qwen3.5:4b"
 MAX_RESPONSE_BYTES = 1_000_000
 LOW_RAM_FREE_GB = 3.5      # Qwen3.5 4B needs several GB beyond Windows and other apps
