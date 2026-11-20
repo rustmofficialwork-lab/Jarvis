@@ -92,7 +92,7 @@ jobs:
     name: Build Windows desktop installer
     needs: [source-checks, web-checks]
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     permissions:
       contents: write
     steps:
@@ -145,8 +145,29 @@ jobs:
               -not (Test-Path (Join-Path $modelDir "hand_landmarker.task"))) {
             throw "One or more bundled HUD runtime or hand-landmarker model assets are missing."
           }
-      - name: Set application build version
+      - name: Bundle Qwen3.5 4B and offline Ollama runtime
         shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $bundle = Join-Path $PWD "desktop/windows/offline-ai-bundle"
+          $modelRoot = Join-Path $bundle "models"
+          $blobRoot = Join-Path $modelRoot "blobs"
+          $manifestRoot = Join-Path $modelRoot "manifests/registry.ollama.ai/library/qwen3.5"
+          New-Item -ItemType Directory -Force -Path $blobRoot, $manifestRoot | Out-Null
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rustmofficialwork-lab/Jarvis/releases/tags/offline-ai-qwen3.5-4b" -Headers @{ "User-Agent" = "JARVIS-Windows-Build"; "Accept" = "application/vnd.github+json" }
+          $assets = @{}
+          foreach ($asset in $release.assets) { $assets[$asset.name] = $asset.browser_download_url }
+          foreach ($required in @("qwen35-index.json", "qwen35-manifest.json")) { if (-not $assets.ContainsKey($required)) { throw "Offline model release is missing $required." } }
+          $temp = Join-Path $env:RUNNER_TEMP "jarvis-qwen-bundle"
+          New-Item -ItemType Directory -Force -Path $temp | Out-Null
+          $indexPath = Join-Path $temp "qwen35-index.json"
+          $manifestPath = Join-Path $temp "qwen35-manifest.json"
+          Invoke-WebRequest -Uri $assets["qwen35-index.json"] -OutFile $indexPath
+          Invoke-WebRequest -Uri $assets["qwen35-manifest.json"] -OutFile $manifestPath
+          $index = Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json
+          if ($index.model -ne "qwen3.5:4b" -or -not $index.blobs) { throw "Offline model index is invalid or names the wrong model." }
+          foreach ($blob in $index.blobs) {
+            if ($blob.digest -notmatch '^sha256:[0-9a-f]{64}        shell: pwsh
         run: |
           $version = "1.1.$env:GITHUB_RUN_NUMBER"
           Set-Content -Path "desktop/windows/build_version.py" -Value "APP_VERSION = `"$version`"" -Encoding utf8
@@ -195,10 +216,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist-installer" | Out-Null
           & $compiler "/DMyAppVersion=1.1.$env:GITHUB_RUN_NUMBER" "installer/windows/JARVIS.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Package portable release
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "desktop/windows/dist/JARVIS/*" -DestinationPath "dist-installer/JARVIS-Portable-x64.zip" -CompressionLevel Optimal
       - name: Upload Windows installer
         uses: actions/upload-artifact@v6
         with:
@@ -206,30 +223,10 @@ jobs:
           path: |
             dist-installer/JARVIS-Setup-x64.exe
           if-no-files-found: error
-      - name: Upload portable Windows build
+      - name: Upload complete offline JARVIS installer
         uses: actions/upload-artifact@v6
         with:
-          name: JARVIS-Windows-Portable-x64
-          path: |
-            dist-installer/JARVIS-Portable-x64.zip
+          name: JARVIS-Full-Offline-Setup
+          path: dist-installer/JARVIS-Setup-x64.exe
           if-no-files-found: error
-      - name: Publish rolling Windows release
-        if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: jarvis-latest
-          name: JARVIS Latest Windows Build
-          body: |
-            Latest successful Windows desktop build from the main branch.
-            Version: 1.1.${{ github.run_number }}
-            Installer: JARVIS-Setup-x64.exe
-            Portable build: JARVIS-Portable-x64.zip (extract the complete folder and run JARVIS.exe)
-          prerelease: true
-          make_latest: false
-          overwrite_files: true
-          fail_on_unmatched_files: true
-          files: |
-            dist-installer/JARVIS-Setup-x64.exe
-            dist-installer/JARVIS-Portable-x64.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          retention-days: 30
