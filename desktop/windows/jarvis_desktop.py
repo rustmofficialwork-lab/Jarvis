@@ -573,6 +573,63 @@ def resolve_voice_action_with_qwen(prompt: str, chat=None) -> str | None:
         return None
 
 
+def should_resolve_browser_action_with_qwen(prompt: str) -> bool:
+    """Run browser intent extraction only for explicit website/browser interaction requests."""
+    import re
+    text = str(prompt or "").casefold()
+    return bool(re.search(
+        r"\\b(website|web site|browser|webpage|web page|tab|click|fill|type into|"
+        r"select option|scroll|download|upload|form|navigate)\\b|"
+        r"(वेबसाइट|ब्राउज़र|टैब|क्लिक|डाउनलोड|अपलोड)",
+        text,
+    ))
+
+
+def resolve_browser_action_with_qwen(prompt: str, chat=None) -> dict | None:
+    """Extract one bounded browser action; policy authorization remains a separate step."""
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
+        return None
+    chat = chat or _ollama_chat
+    allowed = ("navigate", "read", "click", "fill", "select", "press",
+               "scroll", "download", "upload", "new_tab", "switch_tab")
+    messages = [
+        {"role": "system", "content": (
+            "Extract exactly ONE browser action explicitly requested by the user. "
+            "Return JSON only with keys action,url,selector,value. "
+            "action must be one of: " + ", ".join(allowed) + ". "
+            "Use empty strings for unused fields. Do not invent URLs, selectors, or values. "
+            "For a website destination, use the exact public HTTPS URL named by the user. "
+            "For a click/fill/select action, use a short visible-text or CSS selector grounded "
+            "in the user's words. Never submit a form unless the user explicitly asked to submit it. "
+            "If the request is unclear or does not ask for a browser action, return null."
+        )},
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        raw = chat(messages, {"num_ctx": 1536, "num_predict": 160, "temperature": 0.0})
+        import json as _json
+        import re as _re
+        match = _re.search(r"\\{[^{}]{1,1000}\\}", str(raw))
+        if not match:
+            return None
+        payload = _json.loads(match.group(0))
+        if not isinstance(payload, dict) or set(payload) != {"action", "url", "selector", "value"}:
+            return None
+        if payload.get("action") not in allowed:
+            return None
+        for key, maximum in (("url", 2048), ("selector", 240), ("value", 4000)):
+            value = payload.get(key)
+            if not isinstance(value, str) or len(value) > maximum:
+                return None
+        if payload["action"] == "navigate" and not payload["url"]:
+            return None
+        if payload["action"] in {"click", "fill", "select", "press"} and not payload["selector"]:
+            return None
+        return payload
+    except Exception:
+        return None
+
+
 def parse_hud_voice_command(prompt: str) -> tuple[str, str] | None:
     """Resolve direct voice phrases to the existing HUD bridge actions."""
     command = normalize_local_command(prompt)
@@ -3158,8 +3215,20 @@ class JarvisDesktop:
                 self.events.put(("file_search_request", prompt))
                 return
             try:
-                hud_action = parse_hud_voice_command(prompt)
                 local_response = None
+                if should_resolve_browser_action_with_qwen(prompt):
+                    browser_action = resolve_browser_action_with_qwen(prompt)
+                    if browser_action is None:
+                        local_response = "I couldn't safely identify one clear browser action. Please say the website and the exact action."
+                    else:
+                        decision = self.brain_engine.authorize(
+                            "browser_automation", browser_action, prompt
+                        )
+                        if decision.allowed:
+                            local_response = self._run_browser_automation(browser_action)
+                        else:
+                            local_response = "Browser action blocked: " + decision.reason
+                hud_action = parse_hud_voice_command(prompt) if local_response is None else None
                 if hud_action is not None:
                     bridge = getattr(self, "web_bridge", None)
                     if bridge is None:
