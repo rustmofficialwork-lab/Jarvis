@@ -70,7 +70,7 @@ JARVIS_FIRST_PARTY_WAKEWORD_MODEL = SETTINGS_DIR / "wakewords" / "jarvis_first_p
 OWNER_VOICE_MODEL_DIR = SETTINGS_DIR / "speaker_model"
 HISTORY_FILE = SETTINGS_DIR / "chat_history.json"
 STARTUP_LOG_FILE = SETTINGS_DIR / "startup.log"
-LOCAL_AI_ENDPOINT = "http://127.0.0.1:11434/api/chat"
+LOCAL_AI_ENDPOINT = "http://127.0.0.1:11435/api/chat"
 LOCAL_AI_MODEL = "qwen3.5:4b"
 LOCAL_AI_TIMEOUT_SECONDS = 120
 
@@ -1330,6 +1330,7 @@ def _find_ollama_executable() -> str | None:
         bundled_ollama = matches[0] if matches else bundled_ollama
     if bundled_ollama.is_file():
         os.environ["OLLAMA_MODELS"] = str(bundled_root / "models")
+        os.environ["OLLAMA_HOST"] = "127.0.0.1:11435"
         return str(bundled_ollama)
     candidates = (
         local_app_data / "Programs" / "Ollama" / "ollama.exe",
@@ -1354,7 +1355,7 @@ def _start_ollama_service() -> None:
         # Another JARVIS request may have started Ollama while this thread waited.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         try:
-            with opener.open("http://127.0.0.1:11434/api/tags", timeout=1):
+            with opener.open("http://127.0.0.1:11435/api/tags", timeout=1):
                 return
         except (urllib.error.URLError, TimeoutError, OSError):
             pass
@@ -1373,7 +1374,7 @@ def _start_ollama_service() -> None:
         for _ in range(30):
             time.sleep(0.5)
             try:
-                with opener.open("http://127.0.0.1:11434/api/tags", timeout=1):
+                with opener.open("http://127.0.0.1:11435/api/tags", timeout=1):
                     return
             except (urllib.error.URLError, TimeoutError, OSError):
                 if _OLLAMA_PROCESS.poll() is not None:
@@ -3801,7 +3802,7 @@ class JarvisDesktop:
         )
         tk.Label(
             ai_panel,
-            text="Qwen3.5 4B  •  Ollama local runtime  •  http://127.0.0.1:11434",
+            text="Qwen3.5 4B  •  Ollama local runtime  •  http://127.0.0.1:11435",
             bg=colors["panel"], fg=colors["bright"], font=("Consolas", 10),
         ).pack(anchor="w", pady=(8, 2))
         tk.Label(
