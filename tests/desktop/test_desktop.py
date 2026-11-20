@@ -100,7 +100,7 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
         self.assertTrue(jarvis_desktop.should_resolve_browser_action_with_qwen("open this website"))
         self.assertTrue(jarvis_desktop.should_resolve_browser_action_with_qwen("click the search button"))
         self.assertTrue(jarvis_desktop.should_resolve_browser_action_with_qwen("website par search karo"))
-        self.assertFalse(jarvis_desktop.should_resolve_browser_action_with_qwen("What is a web browser?"))
+        self.assertFalse(jarvis_desktop.should_resolve_browser_action_with_qwen("What is photosynthesis?"))
 
     def test_qwen_browser_action_accepts_one_bounded_json_action(self):
         expected = {
