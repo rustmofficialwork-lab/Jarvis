@@ -46,6 +46,20 @@ class OfflineSpeechTests(unittest.TestCase):
             with patch.object(module, "packaged_model_directory", return_value=packaged):
                 self.assertEqual(module.model_path_for_language("hi-IN"), model)
 
+    def test_install_returns_bundled_model_without_network(self):
+        from unittest.mock import patch
+        import offline_speech as module
+
+        with tempfile.TemporaryDirectory() as directory:
+            packaged = Path(directory) / "offline-speech-bundle"
+            model = packaged / MODEL_CATALOG["en-IN"][0]
+            model.mkdir(parents=True)
+            with patch.object(module, "packaged_model_directory", return_value=packaged):
+                result = install_offline_model(
+                    "en-IN", urlopen=lambda *_args, **_kwargs: self.fail("No download expected")
+                )
+        self.assertEqual(result, model)
+
     def test_missing_model_is_reported_without_network_fallback(self):
         audio = Mock()
         with tempfile.TemporaryDirectory() as temp:
