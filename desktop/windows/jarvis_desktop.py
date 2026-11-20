@@ -2890,7 +2890,9 @@ class JarvisDesktop:
         if worker is not None and worker.is_alive() and worker is not threading.current_thread():
             worker.join(timeout=8.0)
             if worker.is_alive():
-                self.events.put(("status", "Previous voice response is still stopping. Say Jarvis again in a moment."))
+                events = getattr(self, "events", None)
+                if events is not None:
+                    events.put(("status", "Previous voice response is still stopping. Say Jarvis again in a moment."))
                 return False
         self.speech_stop_event.clear()
         return True
@@ -3114,6 +3116,9 @@ class JarvisDesktop:
                 self.events.put(("answer", response))
                 self.events.put(("status", "Spoken response interrupted by voice command."))
                 return
+            # A newly accepted command starts a fresh speech response. Clear a
+            # stale interruption flag left by a previous or externally stopped turn.
+            self.speech_stop_event.clear()
             if is_stop_listening_command(prompt):
                 self.stop_event.set()
                 response = "Voice listening stopped. Microphone is off."
