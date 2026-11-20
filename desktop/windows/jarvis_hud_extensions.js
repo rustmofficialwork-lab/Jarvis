@@ -49,41 +49,7 @@
   const controls=document.createElement('div');controls.id='jx-extensions';
   controls.innerHTML='<span id="jx-ext-status" role="status">HUD ready · Camera off</span>';
   document.body.appendChild(controls);
-  // Place the hand-gesture control inside the red-marked area below ARCHITECTURE
-  // in SYSTEM INFORMATION, without changing the original HUD HTML/layout.
-  const gestureToggle=document.getElementById('jx-gesture-toggle')||document.createElement('button');
-  if(!gestureToggle.isConnected){
-    gestureToggle.id='jx-gesture-toggle';
-    gestureToggle.type='button';
-    gestureToggle.setAttribute('aria-pressed','false');
-    gestureToggle.textContent='gesture';
-    document.body.appendChild(gestureToggle);
-  }
-  gestureToggle.style.cssText='position:fixed;z-index:261;width:112px;min-height:26px;padding:3px 5px;font-size:11px;letter-spacing:.25px;transform:translate(-50%,-50%);';
-  const positionGestureToggle=()=>{
-    // The HUD switches between scene, row and stack SVG layouts by aspect
-    // ratio. Pick the visible SVG whose viewBox actually contains the anchor.
-    const anchorX=845,anchorY=638;
-    const svg=[...document.querySelectorAll('svg.scene, .row svg, .stack svg')].find(candidate=>{
-      const rect=candidate.getBoundingClientRect();
-      const viewBox=candidate.viewBox?.baseVal;
-      const matrix=candidate.getScreenCTM?.();
-      return matrix&&rect.width>0&&rect.height>0&&viewBox
-        &&anchorX>=viewBox.x&&anchorX<=viewBox.x+viewBox.width
-        &&anchorY>=viewBox.y&&anchorY<=viewBox.y+viewBox.height;
-    });
-    const matrix=svg?.getScreenCTM?.();
-    if(!svg||!matrix){gestureToggle.style.visibility='hidden';return;}
-    const point=svg.createSVGPoint();
-    point.x=anchorX; point.y=anchorY;
-    const screen=point.matrixTransform(matrix);
-    gestureToggle.style.left=screen.x+'px';
-    gestureToggle.style.top=screen.y+'px';
-    gestureToggle.style.visibility='visible';
-  };
-  positionGestureToggle();
-  window.addEventListener('resize',positionGestureToggle,{passive:true});
-  window.addEventListener('scroll',positionGestureToggle,{passive:true});
+  // Gesture activation is intentionally hidden; JARVIS is voice-first.
   const preview=document.createElement('video');preview.id='jx-camera-preview';preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Local hand gesture camera preview');document.body.appendChild(preview);
   const artwork=document.getElementById('m');
   const status=document.getElementById('jx-ext-status'),toggle=document.getElementById('jx-gesture-toggle'),hud=artwork,orb=document.querySelector('.orb-wrapper');
