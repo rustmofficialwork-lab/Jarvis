@@ -329,10 +329,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist-installer" | Out-Null
           & $compiler "/DMyAppVersion=1.1.$env:GITHUB_RUN_NUMBER" "installer/windows/JARVIS.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Generate installer SHA-256 checksum
+        shell: pwsh
+        run: |
+          $installer = Join-Path $PWD "dist-installer/JARVIS-Setup-x64.exe"
+          if (-not (Test-Path -LiteralPath $installer)) { throw "The JARVIS installer was not created." }
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path ($installer + ".sha256") -Value ($hash + "  JARVIS-Setup-x64.exe") -Encoding ascii
+          Write-Host "JARVIS installer SHA-256: $hash"
+
       - name: Upload complete offline JARVIS installer
         uses: actions/upload-artifact@v6
         with:
           name: JARVIS-Full-Offline-Setup
-          path: dist-installer/JARVIS-Setup-x64.exe
+          path: dist-installer/*
           if-no-files-found: error
           retention-days: 90
