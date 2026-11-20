@@ -1241,21 +1241,32 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
                 if is_network_error:
                     network_failure = True
                     break
-        try:
-            offline_text = transcribe_offline_vosk(audio, language)
-        except Exception as offline_error:
-            if network_failure and isinstance(offline_error, OfflineModelUnavailable):
+        offline_locales = [language]
+        for candidate in ("en-IN", "hi-IN"):
+            if candidate not in offline_locales:
+                offline_locales.append(candidate)
+        offline_error = None
+        for offline_locale in offline_locales:
+            try:
+                offline_text = transcribe_offline_vosk(audio, offline_locale)
+            except OfflineModelUnavailable as exc:
+                offline_error = exc
+                continue
+            except Exception as exc:
+                offline_error = exc
+                break
+            if offline_text:
+                return offline_text
+        if network_failure:
+            if isinstance(offline_error, OfflineModelUnavailable):
                 raise request_error(
                     f"Online speech recognition is unavailable. {offline_error}"
                 ) from offline_error
-            # Keep the last recognition error if local recovery is unavailable.
-            raise recognition_error
-        if offline_text:
-            return offline_text
-        if network_failure:
             raise request_error(
                 "Online speech recognition is unavailable and offline speech did not detect words."
-            ) from recognition_error
+            ) from (offline_error or recognition_error)
+        # Preserve the unclear-audio error when local recovery is unavailable.
+        raise recognition_error
         # Preserve the unclear-audio error so the UI can ask the user to try again.
         raise recognition_error
     return None
