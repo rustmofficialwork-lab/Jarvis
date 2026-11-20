@@ -1396,6 +1396,7 @@ def _ollama_chat(messages: list[dict], options: dict) -> str:
         "model": LOCAL_AI_MODEL,
         "messages": messages,
         "stream": False,
+        "think": False,
         "keep_alive": "5m",
         "options": {
             "num_ctx": int(options["num_ctx"]),
