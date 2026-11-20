@@ -1972,10 +1972,6 @@ class JarvisDesktop:
 
     # Legacy Tk dashboard widgets have been removed; the HTML HUD is the sole dashboard.
 
-    def _open_hud_url(self, url):
-        import webbrowser
-        webbrowser.open(url)
-
     def _open_hud_folder(self, folder, platform_name=None, popen=None):
         """Open Windows known folders through their shell aliases, including redirected folders."""
         import subprocess
@@ -2045,23 +2041,6 @@ class JarvisDesktop:
         """Delegate battery presentation to the shared system-monitor module."""
         from system_monitor import format_battery_status
         return format_battery_status(battery)
-
-    def _get_dashboard_process_summary(self):
-        """Refresh the read-only top-process summary no more than every five seconds."""
-        import time
-        now = time.monotonic()
-        cached = getattr(self, "_process_summary_cache", None)
-        if cached and now - cached[0] < 5:
-            return cached[1]
-        try:
-            from system_monitor import get_top_processes
-            summary = get_top_processes(limit=3)
-            summary = summary.replace("Top 3 processes by memory usage (read-only):",
-                                      "TOP RUNNING APPS (by RAM)")
-        except Exception:
-            summary = "TOP RUNNING APPS • N/A"
-        self._process_summary_cache = (now, summary)
-        return summary
 
     def _handle_memory_command(
         self, prompt: str, *, from_voice: bool = False, display_user: bool = True,
@@ -4260,10 +4239,6 @@ class JarvisWebBridge:
         if not self._dispatch(apply):
             return False
         return bool(completed.wait(10) and outcome["saved"])
-
-    def get_voice_state(self):
-        app = self.app_state.get("app")
-        return bool(app and app.wake_thread and app.wake_thread.is_alive())
 
     def get_runtime_state(self):
         """Expose lightweight, read-only runtime flags to animate the HUD."""
