@@ -49,7 +49,8 @@
   const controls=document.createElement('div');controls.id='jx-extensions';
   controls.innerHTML='<span id="jx-ext-status" role="status">HUD ready · Camera off</span>';
   document.body.appendChild(controls);
-  // Gesture activation is intentionally hidden; JARVIS is voice-first.
+  // Keep the gesture controller available internally, but do not show a HUD button.
+  const gestureToggle=document.createElement('button');gestureToggle.id='jx-gesture-toggle';gestureToggle.type='button';gestureToggle.hidden=true;gestureToggle.setAttribute('aria-pressed','false');gestureToggle.textContent='gesture';document.body.appendChild(gestureToggle);
   const preview=document.createElement('video');preview.id='jx-camera-preview';preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.setAttribute('aria-label','Local hand gesture camera preview');document.body.appendChild(preview);
   const artwork=document.getElementById('m');
   const status=document.getElementById('jx-ext-status'),toggle=document.getElementById('jx-gesture-toggle'),hud=artwork,orb=document.querySelector('.orb-wrapper');
