@@ -1181,9 +1181,6 @@ _OLLAMA_START_LOCK = threading.Lock()
 
 def _find_ollama_executable() -> str | None:
     """Find the per-user or machine-wide Ollama CLI without relying on a refreshed PATH."""
-    discovered = shutil.which("ollama")
-    if discovered:
-        return discovered
     local_app_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local")))
     program_files = Path(os.environ.get("ProgramFiles", "C:/Program Files"))
     app_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
@@ -1193,13 +1190,16 @@ def _find_ollama_executable() -> str | None:
         matches = list((bundled_root / "ollama").rglob("ollama.exe")) if (bundled_root / "ollama").is_dir() else []
         bundled_ollama = matches[0] if matches else bundled_ollama
     if bundled_ollama.is_file():
-        os.environ.setdefault("OLLAMA_MODELS", str(bundled_root / "models"))
+        os.environ["OLLAMA_MODELS"] = str(bundled_root / "models")
         return str(bundled_ollama)
     candidates = (
         local_app_data / "Programs" / "Ollama" / "ollama.exe",
         program_files / "Ollama" / "ollama.exe",
         Path("C:/Program Files/Ollama/ollama.exe"),
     )
+    discovered = shutil.which("ollama")
+    if discovered:
+        return discovered
     return next((str(path) for path in candidates if path.is_file()), None)
 
 
