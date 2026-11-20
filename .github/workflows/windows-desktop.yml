@@ -310,8 +310,9 @@ jobs:
             $payload = @{
               model = "qwen3.5:4b"
               stream = $false
+              think = $false
               messages = @(@{ role = "user"; content = "Reply with one short word." })
-              options = @{ num_ctx = 1024; num_predict = 8; temperature = 0 }
+              options = @{ num_ctx = 1024; num_predict = 24; temperature = 0 }
             } | ConvertTo-Json -Depth 6
             $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11435/api/chat" -ContentType "application/json" -Body $payload -TimeoutSec 900
             if (-not $reply.message.content -or -not $reply.message.content.Trim()) {
