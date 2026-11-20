@@ -5,7 +5,7 @@ $Repo = "rustmofficialwork-lab/Jarvis"
 $ReleaseTag = "offline-ai-qwen3.5-4b"
 $BundleRoot = Join-Path $PSScriptRoot "offline-ai-bundle"
 $BundleModels = Join-Path $BundleRoot "models"
-$DefaultModels = if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } else { $BundleModels }
+$DefaultModels = $BundleModels
 $env:OLLAMA_MODELS = $DefaultModels
 
 Write-Host "JARVIS Offline AI setup" -ForegroundColor Cyan
@@ -24,6 +24,10 @@ if (-not $ollamaExe) {
 if (-not $ollamaExe) { throw "The offline JARVIS package is missing its bundled Ollama runtime. Re-download the complete installer." }
 
 $serverReady = $false
+# Use the bundled runtime and model store consistently, even if a separate Ollama
+# installation was already running on this machine.
+Get-Process -Name "ollama" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 700
 try { Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 2 | Out-Null; $serverReady = $true } catch {
     Start-Process -FilePath $ollamaExe -ArgumentList "serve" -WindowStyle Hidden | Out-Null
 }
