@@ -159,10 +159,6 @@
       callBridge('close_window');
       return;
     }
-    if (x >= 402 && x <= 455 && y >= 355 && y <= 415) {
-      callBridge('open_settings');
-      return;
-    }
     if (x >= 620 && x <= 775 && y >= 710 && y <= 785) {
       if (y < 732) callBridge('open_system_tool', 'control_panel');
       else if (y < 749) callBridge('open_system_tool', 'device_manager');
@@ -211,10 +207,7 @@
     if (key === 'j') {
       event.preventDefault();
       callBridge('toggle_voice');
-    } else if (key === 's') {
-      event.preventDefault();
-      callBridge('open_settings');
-    } else if (key === 'k') {
+    } else if (key === 'k') {    } else if (key === 'k') {
       event.preventDefault();
       const command = window.prompt('Enter a command for JARVIS:');
       if (command && command.trim()) callBridge('send_command', command.trim());
