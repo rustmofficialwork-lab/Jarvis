@@ -25,7 +25,7 @@ Voice examples include “Jarvis Chrome kholo”, “Google Chrome kholo”, “
 
 ## Safe agent actions and approval boundaries
 
-The AI tool layer supports bounded, user-directed browser automation through `desktop/windows/browser_automation.py`. It opens a visible Microsoft Edge session on Windows (with Playwright Chromium fallback) using a dedicated JARVIS profile, not the user's everyday browser profile.
+The AI tool layer supports user-directed multi-step browser automation through `desktop/windows/browser_automation.py`. After each action, JARVIS reads the newly rendered page and asks local Qwen to plan the next small batch; it stops on completion, authorization denial, repeated no-progress page state, errors, or a 10-minute safety time budget. It opens a visible Microsoft Edge session on Windows (with Playwright Chromium fallback) using a dedicated JARVIS profile, not the user's everyday browser profile. Every action still passes the existing browser safety checks.
 
 - **Website interaction:** open public HTTPS sites, open/switch tabs, read pages, click one unambiguous visible element, navigate, and scroll. Ordinary navigation and non-sensitive clicks do not ask for voice permission.
 - **Form automation:** fill ordinary search and form fields, choose dropdown options, and use navigation keys. JARVIS never enters passwords, PINs, OTPs, API tokens, payment-card secrets, personal contact details, addresses, or identity data; enter those yourself in the visible browser. Pressing Enter to submit a non-search form, or clicking a control identified as sensitive, requires exact one-time spoken approval.
