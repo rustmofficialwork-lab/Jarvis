@@ -2164,16 +2164,16 @@ class JarvisDesktop:
             for action in plan["actions"]:
                 if time.monotonic() >= deadline:
                     results.append("Stopped: the browser workflow reached its 10-minute safety time budget.")
-                    return "\\n".join(results)
+                    return "\n".join(results)
                 decision = self.brain_engine.authorize("browser_automation", action, prompt)
                 if not decision.allowed:
                     results.append(f"Stopped: browser action blocked ({decision.reason}).")
-                    return "\\n".join(results)
+                    return "\n".join(results)
                 try:
                     action_result = self._run_browser_automation(action)
                 except Exception as exc:
                     results.append(f"Stopped: browser action failed ({exc}).")
-                    return "\\n".join(results)
+                    return "\n".join(results)
                 completed.append({
                     "action": action["action"],
                     "selector": action["selector"],
@@ -2191,7 +2191,7 @@ class JarvisDesktop:
                         })[:5000]
                     except Exception as exc:
                         results.append(f"Stopped: could not verify the updated page ({exc}).")
-                        return "\\n".join(results)
+                        return "\n".join(results)
 
                 current_state = hashlib.sha256(snapshot.encode("utf-8", errors="replace")).hexdigest()
                 if action["action"] not in {"read"} and current_state == previous_state:
@@ -2201,14 +2201,14 @@ class JarvisDesktop:
                 previous_state = current_state
                 if unchanged_state_count >= 3:
                     results.append("Stopped: the page did not change after three state-changing actions; avoiding a repeated loop.")
-                    return "\\n".join(results)
+                    return "\n".join(results)
 
         else:
             results.append("Stopped: the browser workflow reached its 10-minute safety time budget.")
 
         if not completed and not results:
             return "No browser action was needed."
-        return "\\n".join(results)
+        return "\n".join(results)
 
     def _run_browser_workflow(self, actions: list[dict], prompt: str) -> str:
         """Execute an ordered, bounded workflow; authorize every action and verify page state."""
