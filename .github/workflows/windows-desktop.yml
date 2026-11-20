@@ -157,7 +157,9 @@ jobs:
           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rustmofficialwork-lab/Jarvis/releases/tags/offline-ai-qwen3.5-4b" -Headers @{ "User-Agent" = "JARVIS-Windows-Build"; "Accept" = "application/vnd.github+json" }
           $assets = @{}
           foreach ($asset in $release.assets) { $assets[$asset.name] = $asset.browser_download_url }
-          foreach ($required in @("qwen35-index.json", "qwen35-manifest.json")) { if (-not $assets.ContainsKey($required)) { throw "Offline model release is missing $required." } }
+          foreach ($required in @("qwen35-index.json", "qwen35-manifest.json")) {
+            if (-not $assets.ContainsKey($required)) { throw "Offline model release is missing $required." }
+          }
           $temp = Join-Path $env:RUNNER_TEMP "jarvis-qwen-bundle"
           New-Item -ItemType Directory -Force -Path $temp | Out-Null
           $indexPath = Join-Path $temp "qwen35-index.json"
@@ -167,10 +169,43 @@ jobs:
           $index = Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json
           if ($index.model -ne "qwen3.5:4b" -or -not $index.blobs) { throw "Offline model index is invalid or names the wrong model." }
           foreach ($blob in $index.blobs) {
-            if ($blob.digest -notmatch '^sha256:[0-9a-f]{64}        shell: pwsh
+            if (-not ([string]$blob.digest).StartsWith("sha256:") -or ([string]$blob.digest).Length -ne 71 -or -not $blob.parts -or [long]$blob.size -le 0) {
+              throw "Offline model index contains an invalid blob entry."
+            }
+            $blobName = ([string]$blob.digest).Replace(":", "-")
+            $assembled = Join-Path $temp ($blobName + ".assembled")
+            $stream = [IO.File]::Create($assembled)
+            try {
+              foreach ($part in $blob.parts) {
+                if (-not $assets.ContainsKey([string]$part)) { throw "Offline model release is missing part $part." }
+                $partPath = Join-Path $temp ([string]$part)
+                Invoke-WebRequest -Uri $assets[[string]$part] -OutFile $partPath
+                $input = [IO.File]::OpenRead($partPath)
+                try { $input.CopyTo($stream) } finally { $input.Dispose(); Remove-Item -LiteralPath $partPath -Force }
+              }
+            } finally { $stream.Dispose() }
+            if ((Get-Item -LiteralPath $assembled).Length -ne [long]$blob.size) { throw "Assembled model blob has an incorrect size: $blobName." }
+            $hash = (Get-FileHash -LiteralPath $assembled -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($hash -ne ([string]$blob.digest).Substring(7)) { throw "Assembled model blob failed SHA-256 verification: $blobName." }
+            Move-Item -LiteralPath $assembled -Destination (Join-Path $blobRoot $blobName) -Force
+          }
+          Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $manifestRoot "4b") -Force
+          $ollamaZip = Join-Path $temp "ollama-windows-amd64.zip"
+          Invoke-WebRequest -Uri "https://ollama.com/download/ollama-windows-amd64.zip" -OutFile $ollamaZip
+          $ollamaDir = Join-Path $bundle "ollama"
+          New-Item -ItemType Directory -Force -Path $ollamaDir | Out-Null
+          Expand-Archive -LiteralPath $ollamaZip -DestinationPath $ollamaDir -Force
+          if (-not (Get-ChildItem -Path $ollamaDir -Filter "ollama.exe" -Recurse | Select-Object -First 1)) {
+            throw "Bundled Ollama runtime archive did not contain ollama.exe."
+          }
+          Write-Host "Bundled Qwen3.5 4B and Ollama runtime into the offline installer."
+          $modelBytes = (Get-ChildItem -Path $modelRoot -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          Write-Host "Bundled model bytes: $modelBytes"
+      - name: Set application build version
+        shell: pwsh
         run: |
           $version = "1.1.$env:GITHUB_RUN_NUMBER"
-          Set-Content -Path "desktop/windows/build_version.py" -Value "APP_VERSION = `"$version`"" -Encoding utf8
+          Set-Content -Path "desktop/windows/build_version.py" -Value ('APP_VERSION = "' + $version + '"') -Encoding utf8
           python -c "import runpy; assert runpy.run_path('desktop/windows/build_version.py')['APP_VERSION'] == '$version'"
       - name: Build standalone Windows executable
         working-directory: desktop/windows
