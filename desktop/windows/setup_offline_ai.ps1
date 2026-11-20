@@ -66,7 +66,7 @@ if (-not $hasModel) {
 }
 
 # Verify a real local inference; file presence alone is not a successful setup.
-$body = @{ model = $Model; stream = $false; messages = @(@{ role = "user"; content = "Reply with exactly: JARVIS MODEL READY" }); options = @{ num_predict = 24; temperature = 0 } } | ConvertTo-Json -Depth 6
+$body = @{ model = $Model; stream = $false; think = $false; messages = @(@{ role = "user"; content = "Reply with exactly: JARVIS MODEL READY" }); options = @{ num_predict = 48; temperature = 0 } } | ConvertTo-Json -Depth 6
 try {
     $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11435/api/chat" -ContentType "application/json" -Body $body -TimeoutSec 180
     if (-not $reply.message.content -or -not $reply.message.content.Trim()) { throw "Ollama returned an empty response." }
