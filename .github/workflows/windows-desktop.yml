@@ -155,6 +155,22 @@ jobs:
           if ((Get-Item -LiteralPath (Join-Path $bundle "LICENSE")).Length -lt 100) { throw "The owner-voice model license file is missing or incomplete." }
           Write-Host "Bundled the pinned Apache-2.0 ECAPA model; the user's voice profile is still created locally during explicit enrollment."
 
+      - name: Verify offline voice bundle contents
+        shell: pwsh
+        run: |
+          $speech = Join-Path $PWD "desktop/windows/offline-speech-bundle"
+          foreach ($name in @("vosk-model-small-hi-0.22", "vosk-model-small-en-in-0.4", "vosk-model-small-en-us-0.15")) {
+            $model = Join-Path $speech $name
+            if (-not (Test-Path (Join-Path $model "conf/model.conf")) -or -not (Test-Path (Join-Path $model "am/final.mdl"))) { throw "Offline speech model is missing or incomplete: $name." }
+          }
+          if (-not (Test-Path (Join-Path $speech "VOSK-MODELS-APACHE-2.0.txt"))) { throw "Vosk model license notice is missing." }
+          $speaker = Join-Path $PWD "desktop/windows/offline-voice-bundle/speaker_model/ecapa-any-length.onnx"
+          if (-not (Test-Path $speaker)) { throw "Offline owner-voice encoder is missing." }
+          $hash = (Get-FileHash -LiteralPath $speaker -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne "700b63064ee98981186f59f247d28e56f7f6ab265d8b50ebb450db5a8ce21dc7") { throw "Offline owner-voice encoder checksum mismatch." }
+          if (-not (Test-Path (Join-Path (Split-Path $speaker) "LICENSE"))) { throw "Offline owner-voice model license is missing." }
+          Write-Host "All offline voice assets and license notices verified."
+
       - name: Bundle pinned HUD runtime libraries
         shell: pwsh
         run: |
