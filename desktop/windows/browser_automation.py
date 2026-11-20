@@ -18,7 +18,6 @@ import urllib.parse
 from pathlib import Path
 from typing import Any
 
-MAX_STEPS_PER_SESSION = 40
 MAX_TEXT_CHARS = 5_000
 MAX_SELECTOR_CHARS = 240
 FINANCIAL_LABELS = re.compile(r"\b(pay|payment|purchase|buy now|place order|submit order|checkout|cart|add to cart)\b", re.IGNORECASE)
@@ -178,8 +177,8 @@ class BrowserAutomation:
                 self._playwright = None
 
     def _check_step(self):
-        if self._steps >= MAX_STEPS_PER_SESSION:
-            raise BrowserAutomationError("Browser task step limit reached; start a new task.")
+        # No fixed action-count cap: long user-requested tasks continue until
+        # completion, an execution error, or a safety/approval boundary.
         self._steps += 1
 
     def _require_page(self):
@@ -518,7 +517,7 @@ class BrowserAutomation:
                 "running": self._context is not None,
                 "domain": self._host,
                 "steps_used": self._steps,
-                "step_limit": MAX_STEPS_PER_SESSION,
+                "step_limit": None,
                 "profile": "dedicated_jarvis_profile",
                 "checkout_and_payments": "disabled",
             }
