@@ -156,7 +156,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $blobRoot, $manifestRoot | Out-Null
           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rustmofficialwork-lab/Jarvis/releases/tags/offline-ai-qwen3.5-4b" -Headers @{ "User-Agent" = "JARVIS-Windows-Build"; "Accept" = "application/vnd.github+json" }
           $assets = @{}
-          foreach ($asset in $release.assets) { $assets[$asset.name] = $asset.browser_download_url }
+          foreach ($asset in $release.assets) { $assets[$asset.name] = $asset }
           foreach ($required in @("qwen35-index.json", "qwen35-manifest.json")) {
             if (-not $assets.ContainsKey($required)) { throw "Offline model release is missing $required." }
           }
@@ -164,8 +164,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $temp | Out-Null
           $indexPath = Join-Path $temp "qwen35-index.json"
           $manifestPath = Join-Path $temp "qwen35-manifest.json"
-          Invoke-WebRequest -Uri $assets["qwen35-index.json"] -OutFile $indexPath
-          Invoke-WebRequest -Uri $assets["qwen35-manifest.json"] -OutFile $manifestPath
+          Invoke-WebRequest -Uri $assets["qwen35-index.json"].browser_download_url -OutFile $indexPath
+          Invoke-WebRequest -Uri $assets["qwen35-manifest.json"].browser_download_url -OutFile $manifestPath
           $index = Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json
           if ($index.model -ne "qwen3.5:4b" -or -not $index.blobs) { throw "Offline model index is invalid or names the wrong model." }
           foreach ($blob in $index.blobs) {
@@ -179,12 +179,20 @@ jobs:
               foreach ($part in $blob.parts) {
                 if (-not $assets.ContainsKey([string]$part)) { throw "Offline model release is missing part $part." }
                 $partPath = Join-Path $temp ([string]$part)
-                Invoke-WebRequest -Uri $assets[[string]$part] -OutFile $partPath
-                $input = [IO.File]::OpenRead($partPath)
-                try { $input.CopyTo($stream) } finally { $input.Dispose(); Remove-Item -LiteralPath $partPath -Force }
+                $partAsset = $assets[[string]$part]
+                Invoke-WebRequest -Uri $partAsset.browser_download_url -OutFile $partPath
+                $actualPartBytes = (Get-Item -LiteralPath $partPath).Length
+                if ($actualPartBytes -ne [long]$partAsset.size) {
+                  throw "Downloaded model part has an incorrect size: $part (expected $($partAsset.size), got $actualPartBytes)."
+                }
+                $partStream = [IO.File]::OpenRead($partPath)
+                try { $partStream.CopyTo($stream) } finally { $partStream.Dispose(); Remove-Item -LiteralPath $partPath -Force }
               }
             } finally { $stream.Dispose() }
-            if ((Get-Item -LiteralPath $assembled).Length -ne [long]$blob.size) { throw "Assembled model blob has an incorrect size: $blobName." }
+            $assembledBytes = (Get-Item -LiteralPath $assembled).Length
+            if ($assembledBytes -ne [long]$blob.size) {
+              throw "Assembled model blob has an incorrect size: $blobName (expected $($blob.size), got $assembledBytes)."
+            }
             $hash = (Get-FileHash -LiteralPath $assembled -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($hash -ne ([string]$blob.digest).Substring(7)) { throw "Assembled model blob failed SHA-256 verification: $blobName." }
             Move-Item -LiteralPath $assembled -Destination (Join-Path $blobRoot $blobName) -Force
