@@ -20,9 +20,10 @@ import openwakeword
 from openwakeword.model import Model
 
 from jarvis_desktop import (
-    JARVIS_WAKEWORD_MODEL,
+    active_wakeword_model_path,
     prepare_openwakeword_assets,
     update_wakeword_activation,
+    wakeword_threshold_for_model,
 )
 
 
@@ -108,12 +109,16 @@ def capture_phase(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Test JARVIS wake-word detection on this PC.")
-    parser.add_argument("--model", type=Path, default=JARVIS_WAKEWORD_MODEL)
+    parser.add_argument("--model", type=Path, default=None,
+                        help="ONNX model path; defaults to the installed first-party model when present.")
     parser.add_argument("--device-index", type=int, default=None, help="PyAudio input device index; default input is used when omitted.")
     parser.add_argument("--list-devices", action="store_true", help="List Windows audio input devices and exit.")
-    parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument("--threshold", type=float, default=None,
+                        help="Override the model-specific candidate threshold.")
     args = parser.parse_args()
-    if not math.isfinite(args.threshold) or not 0.0 <= args.threshold <= 1.0:
+    model_path = args.model or active_wakeword_model_path()
+    threshold = args.threshold if args.threshold is not None else wakeword_threshold_for_model(model_path)
+    if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
         parser.error("--threshold must be a finite number between 0 and 1")
 
     audio = None
@@ -138,16 +143,17 @@ def main() -> int:
         else:
             print("Using the Windows/PyAudio default input device.")
 
-        if not args.model.is_file():
-            print(f"Wake-word model not found: {args.model}")
+        if not model_path.is_file():
+            print(f"Wake-word model not found: {model_path}")
             print("Complete the in-app Set up wake word step first.")
             return 2
 
-        print("Loading the local Jarvis wake-word model…")
+        print(f"Loading the local Jarvis wake-word model: {model_path}")
+        print(f"Using candidate threshold: {threshold:.2f}")
         # Store shared runtime files in the current user's writable AppData.
-        runtime_paths = prepare_openwakeword_assets(openwakeword, args.model)
+        runtime_paths = prepare_openwakeword_assets(openwakeword, model_path)
         detector = Model(
-            wakeword_models=[str(args.model)],
+            wakeword_models=[str(model_path)],
             inference_framework="onnx",
             **runtime_paths,
         )
@@ -156,9 +162,9 @@ def main() -> int:
         print("- Quiet phase: stay quiet; this measures false activations.")
         print("- Speech phase: say 'Jarvis' clearly five times, with a short pause.")
         print("- Background phase: keep ordinary room/TV/fan noise at your normal level; do not say the wake word.")
-        results.append(capture_phase(audio, detector, args.model.stem, "QUIET ROOM — 12 seconds; stay silent.", 12, args.threshold, args.device_index))
-        results.append(capture_phase(audio, detector, args.model.stem, "WAKE WORD — 18 seconds; say Jarvis five times.", 18, args.threshold, args.device_index))
-        results.append(capture_phase(audio, detector, args.model.stem, "BACKGROUND NOISE — 15 seconds; do not say Jarvis.", 15, args.threshold, args.device_index))
+        results.append(capture_phase(audio, detector, model_path.stem, "QUIET ROOM — 12 seconds; stay silent.", 12, threshold, args.device_index))
+        results.append(capture_phase(audio, detector, model_path.stem, "WAKE WORD — 18 seconds; say Jarvis five times.", 18, threshold, args.device_index))
+        results.append(capture_phase(audio, detector, model_path.stem, "BACKGROUND NOISE — 15 seconds; do not say Jarvis.", 15, threshold, args.device_index))
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"Microphone/model test failed: {exc}")
         return 1
