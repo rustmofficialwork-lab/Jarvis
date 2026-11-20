@@ -579,7 +579,7 @@ def should_resolve_browser_action_with_qwen(prompt: str) -> bool:
     text = str(prompt or "").casefold()
     action = re.search(
         r"\b(open|visit|go to|navigate|click|fill|type|select|scroll|download|upload|read|show|search|"
-        r"press|switch)\b|(खोलो|खोल दो|क्लिक|भरें|डाउनलोड|अपलोड|पढ़ो|दिखाओ)",
+        r"press|switch)\b|(kholo|khol do|kholna|click karo|dabao|bhar do|download karo|upload karo|padho|dikhao|खोलो|खोल दो|क्लिक|भरें|डाउनलोड|अपलोड|पढ़ो|दिखाओ)",
         text,
     )
     target = re.search(
