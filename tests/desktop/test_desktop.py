@@ -2028,8 +2028,8 @@ class OfflineVoiceFallbackTests(unittest.TestCase):
             )
         self.assertEqual(result, "calculator kholo")
         self.assertEqual(
-            offline.call_args_list,
-            [call("captured-audio", "en-IN"), call("captured-audio", "hi-IN")],
+            [item.args for item in offline.call_args_list],
+            [("captured-audio", "en-IN"), ("captured-audio", "hi-IN")],
         )
 
     def test_missing_offline_model_reports_setup_instructions(self):
