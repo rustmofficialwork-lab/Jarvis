@@ -4,7 +4,7 @@
 
 The voice setup wizard has an explicit **Enroll owner voice (local)** action. It records eight prompted 3-second clips after microphone consent and explicit confirmation. The raw WAV clips are temporary and are deleted after the profile is created.
 
-JARVIS downloads the pinned ECAPA-TDNN ONNX speaker-embedding model during that explicit enrollment step. The model runs on the PC through ONNX Runtime. The derived voice embedding is stored in Windows Credential Manager through the existing keyring integration; raw recordings are not uploaded and are not retained by the enrollment flow.
+The Windows installer bundles the pinned ECAPA-TDNN ONNX speaker-embedding model and its Apache-2.0 license. Enrollment uses this local model through ONNX Runtime and does not need a model download. In a source/developer setup without the bundle, the explicit enrollment flow can still download the pinned model. The derived voice embedding is stored in Windows Credential Manager through the existing keyring integration; raw recordings are not uploaded and are not retained by the enrollment flow.
 
 At runtime, the wake listener first detects “Jarvis”, then asks the speaker to say a separate short phrase. It captures 3.2 seconds in memory and compares that sample with the locally enrolled profile before opening command capture. A non-match, short sample, or missing profile is rejected. The verification phrase is not saved.
 
