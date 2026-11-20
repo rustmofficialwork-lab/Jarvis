@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import wave
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -37,18 +38,35 @@ def _normalise(vector):
     return value / norm
 
 
+def packaged_model_path() -> Path:
+    """Return the model shipped with JARVIS, outside the writable user profile."""
+    root = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+    return root / "offline-voice-bundle" / "speaker_model" / MODEL_FILENAME
+
+
+def _verified_model(path: Path) -> bool:
+    if not path.is_file() or path.stat().st_size <= 10_000_000:
+        return False
+    with path.open("rb") as model_file:
+        digest = hashlib.file_digest(model_file, "sha256").hexdigest()
+    return digest == MODEL_SHA256
+
+
 def ensure_model(model_dir: Path, allow_download: bool = False) -> Path:
     """Return the pinned local model file; download only after explicit opt-in."""
     target = Path(model_dir)
     model_path = target / MODEL_FILENAME
-    if model_path.is_file() and model_path.stat().st_size > 10_000_000:
-        with model_path.open("rb") as model_file:
-            digest = hashlib.file_digest(model_file, "sha256").hexdigest()
-        if digest == MODEL_SHA256:
+    if model_path.is_file():
+        if _verified_model(model_path):
             return model_path
         if not allow_download:
             raise RuntimeError("The local owner voice model failed its SHA-256 integrity check.")
         model_path.unlink()
+    bundled = packaged_model_path()
+    if bundled.is_file():
+        if _verified_model(bundled):
+            return bundled
+        raise RuntimeError("The bundled owner voice model failed its SHA-256 integrity check.")
     if not allow_download:
         raise FileNotFoundError("Owner voice model is not installed. Run the explicit owner-voice enrollment setup.")
     try:
