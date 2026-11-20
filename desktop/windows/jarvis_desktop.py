@@ -1734,7 +1734,7 @@ class JarvisDesktop:
         self.voice_setup_test_passed = False
         self.voice_setup_mic_var = tk.StringVar(value="1. Check Windows microphone access.")
         self.voice_setup_model_var = tk.StringVar(
-            value=("2. Wake-word model is installed." if JARVIS_WAKEWORD_MODEL.is_file()
+            value=("2. Wake-word model is installed." if active_wakeword_model_path().is_file()
                    else "2. Install the licensed Jarvis wake-word model.")
         )
         self.voice_setup_test_var = tk.StringVar(
