@@ -546,7 +546,7 @@ def should_resolve_voice_action_with_qwen(prompt: str) -> bool:
 
 def resolve_voice_action_with_qwen(prompt: str, chat=None) -> str | None:
     """Map a spoken request to one exact allowlisted action using local Qwen only."""
-    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000:
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 4000:
         return None
     chat = chat or _ollama_chat
     messages = [
@@ -661,7 +661,7 @@ def resolve_browser_workflow_with_qwen(prompt: str, chat=None) -> list[dict] | N
         raw = chat(messages, {"num_ctx": 4096, "num_predict": 4096, "temperature": 0.0})
         import json as _json
         import re as _re
-        match = _re.search(r"\{[\s\S]{1,30000}\}", str(raw))
+        match = _re.search(r"\{[\s\S]{1,100000}\}", str(raw))
         if not match:
             return None
         payload = _json.loads(match.group(0))
