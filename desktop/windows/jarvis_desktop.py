@@ -1255,6 +1255,7 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
             except Exception as exc:
                 offline_error = exc
                 break
+            offline_error = None
             if offline_text:
                 return offline_text
         if network_failure:
