@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import stat
+import sys
 import tempfile
 import threading
 import urllib.request
@@ -73,15 +74,24 @@ def _get_cached_vosk_model(model_path: Path, vosk_module):
         return model
 
 
-def model_path_for_language(language: str, model_dir: Path = DEFAULT_MODEL_DIR) -> Path:
+def packaged_model_directory() -> Path:
+    """Return the read-only speech bundle shipped beside the installed executable."""
+    root = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+    return root / "offline-speech-bundle"
+
+
+def model_path_for_language(language: str, model_dir: Path | None = None) -> Path:
     try:
         model_name, _url = MODEL_CATALOG[language]
     except KeyError as exc:
         raise ValueError("Unsupported offline speech language.") from exc
+    if model_dir is None:
+        packaged = packaged_model_directory() / model_name
+        model_dir = packaged_model_directory() if packaged.is_dir() else DEFAULT_MODEL_DIR
     return Path(model_dir) / model_name
 
 
-def transcribe_offline_vosk(audio, language: str, model_dir: Path = DEFAULT_MODEL_DIR,
+def transcribe_offline_vosk(audio, language: str, model_dir: Path | None = None,
                             vosk_module=None) -> str:
     """Transcribe SpeechRecognition AudioData locally; no network access is used."""
     model_path = model_path_for_language(language, model_dir)
@@ -103,13 +113,18 @@ def transcribe_offline_vosk(audio, language: str, model_dir: Path = DEFAULT_MODE
     return text.strip()
 
 
-def install_offline_model(language: str, model_dir: Path = DEFAULT_MODEL_DIR,
+def install_offline_model(language: str, model_dir: Path | None = None,
                           urlopen=None) -> Path:
     """Download and safely extract one official, small Vosk model for later offline use."""
     try:
         model_name, url = MODEL_CATALOG[language]
     except KeyError as exc:
         raise ValueError("Unsupported offline speech language.") from exc
+    if model_dir is None:
+        packaged = packaged_model_directory() / model_name
+        if packaged.is_dir():
+            return packaged
+        model_dir = DEFAULT_MODEL_DIR
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     destination = model_dir / model_name
