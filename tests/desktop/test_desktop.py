@@ -11,6 +11,73 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class AdaptiveBrowserPlanningTests(unittest.TestCase):
+    def test_next_batch_uses_latest_page_and_completed_actions(self):
+        response = json.dumps({
+            "done": False,
+            "reason": "Continue from the results page.",
+            "actions": [{
+                "action": "click", "url": "", "selector": "text=Next", "value": ""
+            }],
+        })
+        captured = {}
+        def fake_chat(messages, _options):
+            captured["messages"] = messages
+            return response
+
+        plan = jarvis_desktop.resolve_next_browser_workflow_batch_with_qwen(
+            "Find the next result", [{"action": "read", "result": "first page"}],
+            "Second page is visible", chat=fake_chat,
+        )
+        self.assertFalse(plan["done"])
+        self.assertEqual(plan["actions"][0]["selector"], "text=Next")
+        prompt = captured["messages"][1]["content"]
+        self.assertIn("Second page is visible", prompt)
+        self.assertIn("first page", prompt)
+
+    def test_next_batch_rejects_more_than_six_actions_and_invalid_actions(self):
+        action = {"action": "read", "url": "", "selector": "", "value": ""}
+        too_many = json.dumps({"done": False, "reason": "", "actions": [action] * 7})
+        invalid = json.dumps({"done": False, "reason": "", "actions": [
+            {"action": "execute_script", "url": "", "selector": "", "value": ""}
+        ]})
+        self.assertIsNone(jarvis_desktop.resolve_next_browser_workflow_batch_with_qwen(
+            "Read a page", [], "Page", chat=lambda *_: too_many
+        ))
+        self.assertIsNone(jarvis_desktop.resolve_next_browser_workflow_batch_with_qwen(
+            "Read a page", [], "Page", chat=lambda *_: invalid
+        ))
+
+    def test_adaptive_executor_replans_from_refreshed_page_snapshot(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app._browser_automation = object()
+        app._run_browser_automation = Mock(side_effect=[
+            "initial page", "clicked next", "updated results page"
+        ])
+        app.brain_engine = Mock()
+        app.brain_engine.authorize.return_value = SimpleNamespace(allowed=True, reason="")
+        plans = [
+            {"done": False, "reason": "", "actions": [
+                {"action": "click", "url": "", "selector": "text=Next", "value": ""}
+            ]},
+            {"done": True, "reason": "Goal complete.", "actions": []},
+        ]
+        seen_snapshots = []
+        def planner(_goal, _completed, snapshot):
+            seen_snapshots.append(snapshot)
+            return plans.pop(0)
+
+        with patch.object(jarvis_desktop, "resolve_next_browser_workflow_batch_with_qwen", side_effect=planner):
+            result = app._run_adaptive_browser_workflow("Read the next result")
+        self.assertIn("clicked next", result)
+        self.assertIn("Goal complete", result)
+        self.assertEqual(seen_snapshots, ["initial page", "updated results page"])
+        app.brain_engine.authorize.assert_called_once()
+
+
 class VoiceSpeechInterruptionTests(unittest.TestCase):
     def test_new_verified_wake_interrupts_and_joins_previous_response(self):
         import threading
