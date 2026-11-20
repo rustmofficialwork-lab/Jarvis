@@ -2004,6 +2004,34 @@ class OfflineVoiceFallbackTests(unittest.TestCase):
         self.assertEqual(result, "notepad kholo")
         offline.assert_called_once_with("captured-audio", "hi-IN")
 
+    def test_offline_fallback_tries_other_bundled_language_when_selected_model_misses(self):
+        import threading
+        from unittest.mock import patch
+
+        class RequestError(Exception):
+            pass
+
+        class Recognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                return "captured-audio"
+
+            def recognize_google(self, audio, language):
+                raise RequestError("network unavailable")
+
+        def transcribe(_audio, language):
+            return "" if language == "en-IN" else "calculator kholo"
+
+        with patch.object(jarvis_desktop, "transcribe_offline_vosk", side_effect=transcribe) as offline:
+            result = jarvis_desktop.listen_for_voice_command(
+                Recognizer(), object(), threading.Event(), "en-IN",
+                TimeoutError, RequestError,
+            )
+        self.assertEqual(result, "calculator kholo")
+        self.assertEqual(
+            offline.call_args_list,
+            [call("captured-audio", "en-IN"), call("captured-audio", "hi-IN")],
+        )
+
     def test_missing_offline_model_reports_setup_instructions(self):
         from unittest.mock import patch
         import threading
