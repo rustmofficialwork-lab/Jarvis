@@ -375,19 +375,35 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist-installer" | Out-Null
           & $compiler "/DMyAppVersion=1.1.$env:GITHUB_RUN_NUMBER" "installer/windows/JARVIS.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Generate installer SHA-256 checksum
+      - name: Package complete offline JARVIS installer
         shell: pwsh
         run: |
-          $installer = Join-Path $PWD "dist-installer/JARVIS-Setup-x64.exe"
-          if (-not (Test-Path -LiteralPath $installer)) { throw "The JARVIS installer was not created." }
-          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -Path ($installer + ".sha256") -Value ($hash + "  JARVIS-Setup-x64.exe") -Encoding ascii
-          Write-Host "JARVIS installer SHA-256: $hash"
+          $setup = Join-Path $PWD "dist-installer/JARVIS-Setup-x64.exe"
+          if (-not (Test-Path -LiteralPath $setup)) { throw "The JARVIS Setup.exe was not created." }
+          $slices = @(Get-ChildItem -LiteralPath (Join-Path $PWD "dist-installer") -Filter "JARVIS-Setup-x64-*.bin" -File)
+          if ($slices.Count -lt 1) { throw "Inno Setup disk spanning was enabled but no installer data slices were generated." }
+
+          $packageRoot = Join-Path $env:RUNNER_TEMP "JARVIS-Full-Offline-Installer"
+          if (Test-Path -LiteralPath $packageRoot) { Remove-Item -LiteralPath $packageRoot -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
+          Copy-Item -LiteralPath $setup -Destination $packageRoot
+          foreach ($slice in $slices) { Copy-Item -LiteralPath $slice.FullName -Destination $packageRoot }
+
+          $archive = Join-Path $PWD "dist-installer/JARVIS-Full-Offline-Installer.zip"
+          if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }
+          Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $archive -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath $archive)) { throw "The complete offline installer ZIP was not created." }
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path ($archive + ".sha256") -Value ($hash + "  JARVIS-Full-Offline-Installer.zip") -Encoding ascii
+          Write-Host "Complete offline JARVIS installer SHA-256: $hash"
+          Write-Host "Installer package includes Setup.exe and $($slices.Count) required data slice(s)."
 
       - name: Upload complete offline JARVIS installer
         uses: actions/upload-artifact@v6
         with:
           name: JARVIS-Full-Offline-Setup
-          path: dist-installer/*
+          path: |
+            dist-installer/JARVIS-Full-Offline-Installer.zip
+            dist-installer/JARVIS-Full-Offline-Installer.zip.sha256
           if-no-files-found: error
           retention-days: 90

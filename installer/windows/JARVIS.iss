@@ -18,6 +18,10 @@ PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\JARVIS.exe
 Compression=lzma2/fast
 SolidCompression=no
+; The bundled offline model makes the compressed installer larger than Windows' single-EXE limit.
+; Keep every slice beside Setup.exe; the release packages them together in one ZIP.
+DiskSpanning=yes
+DiskSliceSize=1900000000
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
