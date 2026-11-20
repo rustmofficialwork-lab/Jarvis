@@ -1324,13 +1324,14 @@ def _find_ollama_executable() -> str | None:
     program_files = Path(os.environ.get("ProgramFiles", "C:/Program Files"))
     app_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
     bundled_root = app_dir / "offline-ai-bundle"
+    os.environ["OLLAMA_HOST"] = "127.0.0.1:11435"
+    if (bundled_root / "models").is_dir():
+        os.environ["OLLAMA_MODELS"] = str(bundled_root / "models")
     bundled_ollama = bundled_root / "ollama" / "ollama.exe"
     if not bundled_ollama.is_file():
         matches = list((bundled_root / "ollama").rglob("ollama.exe")) if (bundled_root / "ollama").is_dir() else []
         bundled_ollama = matches[0] if matches else bundled_ollama
     if bundled_ollama.is_file():
-        os.environ["OLLAMA_MODELS"] = str(bundled_root / "models")
-        os.environ["OLLAMA_HOST"] = "127.0.0.1:11435"
         return str(bundled_ollama)
     candidates = (
         local_app_data / "Programs" / "Ollama" / "ollama.exe",
