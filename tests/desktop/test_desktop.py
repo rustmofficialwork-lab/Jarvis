@@ -128,13 +128,18 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
         )
         self.assertEqual(result, expected)
 
-    def test_qwen_browser_workflow_rejects_more_than_six_or_unsafe_steps(self):
+    def test_qwen_browser_workflow_accepts_more_than_six_steps_and_rejects_unsafe_steps(self):
         valid = {"action": "read", "url": "", "selector": "", "value": ""}
-        too_many = {"actions": [valid] * 7}
+        many_steps = {"actions": [valid] * 12}
         unsafe = {"actions": [
             {"action": "run_shell", "url": "", "selector": "", "value": ""}
         ]}
-        for payload in (too_many, unsafe, {"actions": []}):
+        result = jarvis_desktop.resolve_browser_workflow_with_qwen(
+            "Open website and complete the requested steps",
+            chat=lambda *_args: json.dumps(many_steps),
+        )
+        self.assertEqual(result, [valid] * 12)
+        for payload in (unsafe, {"actions": []}):
             with self.subTest(payload=payload):
                 self.assertIsNone(jarvis_desktop.resolve_browser_workflow_with_qwen(
                     "Open website and read page", chat=lambda *_args, p=payload: json.dumps(p)
