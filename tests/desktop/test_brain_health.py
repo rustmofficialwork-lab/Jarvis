@@ -49,7 +49,7 @@ class CheckTests(unittest.TestCase):
         health = bh.check_local_brain(opener=opener, psutil_module=ram(8, 3.2))
         self.assertTrue(health.ready and not health.deep_think_ok and health.low_ram)
         self.assertEqual((health.ram_total_gb, health.ram_free_gb), (8.0, 3.2))
-        self.assertEqual(opener.urls[0][0], "http://127.0.0.1:11434/api/tags")
+        self.assertEqual(opener.urls[0][0], "http://127.0.0.1:11435/api/tags")
         self.assertIn("deep think", bh.format_brain_report(health))
 
     def test_ollama_down_gives_start_hint_without_raising(self):
