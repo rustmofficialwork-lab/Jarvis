@@ -2495,7 +2495,7 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertNotIn('id="jx-gesture-toggle"', (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
         self.assertNotIn("anchorX=845,anchorY=638", extensions)
         self.assertIn("document.getElementById('jx-gesture-toggle')||document.createElement", extensions)
-        self.assertIn("ARCHITECTURE", (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
+        self.assertNotIn("ARCHITECTURE", (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8"))
         self.assertIn("getBoundingClientRect()", extensions)
         self.assertIn("candidate.viewBox?.baseVal", extensions)
         self.assertIn("anchorX>=viewBox.x", extensions)
