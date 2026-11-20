@@ -130,7 +130,7 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
 
     def test_qwen_browser_workflow_accepts_more_than_six_steps_and_rejects_unsafe_steps(self):
         valid = {"action": "read", "url": "", "selector": "", "value": ""}
-        many_steps = {"actions": [valid] * 12}
+        many_steps = {"actions": [valid] * 64}
         unsafe = {"actions": [
             {"action": "run_shell", "url": "", "selector": "", "value": ""}
         ]}
@@ -138,12 +138,28 @@ class VoiceHudAndQwenActionTests(unittest.TestCase):
             "Open website and complete the requested steps",
             chat=lambda *_args: json.dumps(many_steps),
         )
-        self.assertEqual(result, [valid] * 12)
+        self.assertEqual(result, [valid] * 64)
         for payload in (unsafe, {"actions": []}):
             with self.subTest(payload=payload):
                 self.assertIsNone(jarvis_desktop.resolve_browser_workflow_with_qwen(
                     "Open website and read page", chat=lambda *_args, p=payload: json.dumps(p)
                 ))
+
+    def test_browser_workflow_executor_has_no_fixed_action_count_cap(self):
+        from types import SimpleNamespace
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.brain_engine = SimpleNamespace(
+            authorize=lambda *_args: SimpleNamespace(allowed=True)
+        )
+        calls = []
+        app._run_browser_automation = lambda action: calls.append(action["action"]) or "completed"
+        actions = [
+            {"action": "read", "url": "", "selector": "", "value": ""}
+            for _ in range(64)
+        ]
+        result = app._run_browser_workflow(actions, "read the requested pages")
+        self.assertEqual(calls, ["read"] * 64)
+        self.assertEqual(result.count("Step "), 64)
 
     def test_browser_workflow_runs_steps_in_order_and_refreshes_page_state(self):
         from types import SimpleNamespace
