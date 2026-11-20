@@ -175,7 +175,15 @@ jobs:
             $blobName = ([string]$blob.digest).Replace(":", "-")
             # Older index exports may list only part001. Discover all chunks from
             # release assets and sort by their numeric suffix before concatenating.
-            $partPattern = '^' + [regex]::Escape("qwen35-$blobName") + '-part(\d+)\.bin
+            $partPrefix = "qwen35-$blobName-part"
+            $partNames = @($assets.Keys | Where-Object { $_.StartsWith($partPrefix) -and $_.EndsWith(".bin") } | Sort-Object { [int]($_.Substring($partPrefix.Length, $_.Length - $partPrefix.Length - 4)) })
+            if ($partNames.Count -eq 0) { throw "Offline model release has no chunks for $blobName." }
+            $partBytes = [long](($partNames | ForEach-Object { [long]$assets[$_].size } | Measure-Object -Sum).Sum)
+            if ($partBytes -ne [long]$blob.size) { throw "Model chunk sizes do not match $blobName (expected $($blob.size), got $partBytes across $($partNames.Count) chunks)." }
+            $assembled = Join-Path $temp ($blobName + ".assembled")
+            $stream = [IO.File]::Create($assembled)
+            try {
+              foreach ($part in $partNames) {
                 if (-not $assets.ContainsKey([string]$part)) { throw "Offline model release is missing part $part." }
                 $partPath = Join-Path $temp ([string]$part)
                 $partAsset = $assets[[string]$part]
