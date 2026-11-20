@@ -692,6 +692,86 @@ def resolve_browser_workflow_with_qwen(prompt: str, chat=None) -> list[dict] | N
         return None
 
 
+
+def resolve_next_browser_workflow_batch_with_qwen(
+    prompt: str, completed_actions: list[dict], page_snapshot: str, chat=None,
+) -> dict | None:
+    """Re-plan the next small browser batch from the latest rendered page state."""
+    if (not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 4000
+            or not isinstance(completed_actions, list)
+            or not isinstance(page_snapshot, str)):
+        return None
+    chat = chat or _ollama_chat
+    allowed = {"navigate", "read", "click", "fill", "select", "press",
+               "scroll", "download", "upload", "new_tab", "switch_tab"}
+    context = {
+        "goal": prompt,
+        "completed": completed_actions[-30:],
+        "current_page": page_snapshot[:5000],
+    }
+    messages = [
+        {"role": "system", "content": (
+            "You are planning the NEXT browser workflow batch for a local desktop assistant. "
+            "Use the current rendered page snapshot and completed actions; never assume an earlier page is still open. "
+            "Return JSON only: {\"done\":true|false,\"reason\":\"short status\","
+            "\"actions\":[{\"action\":\"read\",\"url\":\"\",\"selector\":\"\",\"value\":\"\"}]}. "
+            "Return at most 6 actions in this batch. If the user's goal is complete, set done=true and actions=[]. "
+            "If the next safe step cannot be grounded in the current page or user's explicit instructions, "
+            "set done=true, actions=[], and explain briefly in reason. "
+            "Allowed actions: " + ", ".join(sorted(allowed)) + ". "
+            "Each action must contain exactly action,url,selector,value as strings. "
+            "Never invent a URL, selector, file path, form value, or personal data. "
+            "Only use public HTTPS destinations explicitly provided by the user. "
+            "Do not enter credentials, passwords, PINs, OTPs, payment data, personal contact details, "
+            "or perform checkout, purchases, payments, account/security changes, or deletion. "
+            "Do not submit forms unless the user explicitly asked for that exact submission. "
+            "No shell, scripts, arbitrary JavaScript, or hidden page data. "
+            "Do not repeat completed actions unless the current page state proves they are still required."
+        )},
+        {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
+    ]
+    try:
+        raw = chat(messages, {"num_ctx": 4096, "num_predict": 2048, "temperature": 0.0})
+        import re as _re
+        match = _re.search(r"\{[\s\S]{1,20000}\}", str(raw))
+        if not match:
+            return None
+        payload = json.loads(match.group(0))
+        if (not isinstance(payload, dict)
+                or set(payload) != {"done", "reason", "actions"}
+                or not isinstance(payload["done"], bool)
+                or not isinstance(payload["reason"], str)
+                or len(payload["reason"]) > 400
+                or not isinstance(payload["actions"], list)
+                or len(payload["actions"]) > 6):
+            return None
+        validated = []
+        for item in payload["actions"]:
+            if not isinstance(item, dict) or set(item) != {"action", "url", "selector", "value"}:
+                return None
+            if item["action"] not in allowed:
+                return None
+            if any(not isinstance(item[key], str) for key in ("url", "selector", "value")):
+                return None
+            if (len(item["url"]) > 2048 or len(item["selector"]) > 240
+                    or len(item["value"]) > 4000):
+                return None
+            if item["action"] == "navigate" and not item["url"]:
+                return None
+            if item["action"] in {"click", "fill", "select", "press", "download", "upload"} and not item["selector"]:
+                return None
+            if item["action"] in {"fill", "select", "press", "upload", "switch_tab"} and not item["value"]:
+                return None
+            validated.append(dict(item))
+        if payload["done"] and validated:
+            return None
+        if not payload["done"] and not validated:
+            return None
+        return {"done": payload["done"], "reason": payload["reason"], "actions": validated}
+    except Exception:
+        return None
+
+
 def parse_hud_voice_command(prompt: str) -> tuple[str, str] | None:
     """Resolve direct voice phrases to the existing HUD bridge actions."""
     command = normalize_local_command(prompt)
@@ -2046,6 +2126,86 @@ class JarvisDesktop:
             approval_callback=approve_sensitive,
         )
 
+    def _run_adaptive_browser_workflow(self, prompt: str) -> str:
+        """Execute and re-plan browser work from fresh page snapshots until done or safely stopped."""
+        import hashlib
+
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError("A browser workflow needs a clear user goal.")
+        if not hasattr(self, "_browser_automation"):
+            from browser_automation import BrowserAutomation
+            self._browser_automation = BrowserAutomation(SETTINGS_DIR / "browser-profile")
+
+        snapshot = self._run_browser_automation({
+            "action": "read", "url": "", "selector": "", "value": ""
+        })
+        completed = []
+        results = []
+        previous_state = hashlib.sha256(snapshot.encode("utf-8", errors="replace")).hexdigest()
+        unchanged_state_count = 0
+        deadline = time.monotonic() + 600
+
+        while time.monotonic() < deadline:
+            plan = resolve_next_browser_workflow_batch_with_qwen(
+                prompt, completed, snapshot
+            )
+            if plan is None:
+                results.append("Stopped: Qwen could not produce a valid safe next-step plan.")
+                break
+            if plan["done"]:
+                if plan["reason"]:
+                    results.append(plan["reason"])
+                break
+
+            for action in plan["actions"]:
+                if time.monotonic() >= deadline:
+                    results.append("Stopped: the browser workflow reached its 10-minute safety time budget.")
+                    return "\\n".join(results)
+                decision = self.brain_engine.authorize("browser_automation", action, prompt)
+                if not decision.allowed:
+                    results.append(f"Stopped: browser action blocked ({decision.reason}).")
+                    return "\\n".join(results)
+                try:
+                    action_result = self._run_browser_automation(action)
+                except Exception as exc:
+                    results.append(f"Stopped: browser action failed ({exc}).")
+                    return "\\n".join(results)
+                completed.append({
+                    "action": action["action"],
+                    "selector": action["selector"],
+                    "value": action["value"][:500],
+                    "result": str(action_result)[:1200],
+                })
+                results.append(f"{len(completed)}. {action_result}")
+
+                if action["action"] == "read":
+                    snapshot = str(action_result)[:5000]
+                else:
+                    try:
+                        snapshot = self._run_browser_automation({
+                            "action": "read", "url": "", "selector": "", "value": ""
+                        })[:5000]
+                    except Exception as exc:
+                        results.append(f"Stopped: could not verify the updated page ({exc}).")
+                        return "\\n".join(results)
+
+                current_state = hashlib.sha256(snapshot.encode("utf-8", errors="replace")).hexdigest()
+                if action["action"] not in {"read"} and current_state == previous_state:
+                    unchanged_state_count += 1
+                else:
+                    unchanged_state_count = 0
+                previous_state = current_state
+                if unchanged_state_count >= 3:
+                    results.append("Stopped: the page did not change after three state-changing actions; avoiding a repeated loop.")
+                    return "\\n".join(results)
+
+        else:
+            results.append("Stopped: the browser workflow reached its 10-minute safety time budget.")
+
+        if not completed and not results:
+            return "No browser action was needed."
+        return "\\n".join(results)
+
     def _run_browser_workflow(self, actions: list[dict], prompt: str) -> str:
         """Execute an ordered, bounded workflow; authorize every action and verify page state."""
         if not isinstance(actions, list) or not actions:
@@ -3312,11 +3472,7 @@ class JarvisDesktop:
             try:
                 local_response = None
                 if should_resolve_browser_action_with_qwen(prompt):
-                    browser_actions = resolve_browser_workflow_with_qwen(prompt)
-                    if browser_actions is None:
-                        local_response = "I couldn't safely plan that browser workflow. Please specify the website and exact steps."
-                    else:
-                        local_response = self._run_browser_workflow(browser_actions, prompt)
+                    local_response = self._run_adaptive_browser_workflow(prompt)
                 hud_action = parse_hud_voice_command(prompt) if local_response is None else None
                 if hud_action is not None:
                     bridge = getattr(self, "web_bridge", None)
