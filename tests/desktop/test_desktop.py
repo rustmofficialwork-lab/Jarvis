@@ -48,6 +48,48 @@ class AdaptiveBrowserPlanningTests(unittest.TestCase):
             "Read a page", [], "Page", chat=lambda *_: invalid
         ))
 
+    def test_adaptive_executor_stops_when_page_state_repeats(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app._browser_automation = object()
+        app._run_browser_automation = Mock(side_effect=[
+            "same page",
+            "click one", "same page",
+            "click two", "same page",
+            "click three", "same page",
+        ])
+        app.brain_engine = Mock()
+        app.brain_engine.authorize.return_value = SimpleNamespace(allowed=True, reason="")
+        repeated_clicks = [
+            {"action": "click", "url": "", "selector": "text=Next", "value": ""}
+        ] * 3
+        plan = {"done": False, "reason": "", "actions": repeated_clicks}
+        with patch.object(jarvis_desktop, "resolve_next_browser_workflow_batch_with_qwen", return_value=plan):
+            result = app._run_adaptive_browser_workflow("Continue")
+        self.assertIn("did not change", result)
+        self.assertEqual(app.brain_engine.authorize.call_count, 3)
+
+    def test_adaptive_executor_stops_before_a_denied_action(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app._browser_automation = object()
+        app._run_browser_automation = Mock(return_value="initial page")
+        app.brain_engine = Mock()
+        app.brain_engine.authorize.return_value = SimpleNamespace(allowed=False, reason="approval required")
+        plan = {"done": False, "reason": "", "actions": [
+            {"action": "click", "url": "", "selector": "text=Continue", "value": ""}
+        ]}
+        with patch.object(jarvis_desktop, "resolve_next_browser_workflow_batch_with_qwen", return_value=plan):
+            result = app._run_adaptive_browser_workflow("Continue")
+        self.assertIn("blocked", result)
+        app._run_browser_automation.assert_called_once_with({
+            "action": "read", "url": "", "selector": "", "value": ""
+        })
+
     def test_adaptive_executor_replans_from_refreshed_page_snapshot(self):
         from types import SimpleNamespace
         from unittest.mock import Mock, patch
