@@ -43,7 +43,7 @@ The existing native file-removal flow only moves explicitly selected files from 
 
 ## Hybrid online and offline AI
 
-General AI chat always uses the same local Ollama model, `qwen3.5:4b`, whether the PC is online or offline. Local requests go only to `127.0.0.1:11434`; they do not require an API key, cloud AI gateway, or JARVIS backend. Internet is used separately for live web search, weather, and news. Local requests use a bounded context and reply length to reduce memory pressure on 8 GB laptops. Live internet features are unavailable while offline.
+General AI chat always uses the same local Ollama model, `qwen3.5:4b`, whether the PC is online or offline. Local requests go only to `127.0.0.1:11435`; they do not require an API key, cloud AI gateway, or JARVIS backend. Internet is used separately for live web search, weather, and news. Local requests use a bounded context and reply length to reduce memory pressure on 8 GB laptops. Live internet features are unavailable while offline.
 
 **One-time setup (while connected to the internet):**
 
