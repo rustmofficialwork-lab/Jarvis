@@ -115,6 +115,18 @@ class DesktopChainTests(unittest.TestCase):
         self.assertEqual((launched, opened), ([["notepad.exe"]], ["https://www.youtube.com"]))
         self.assertTrue(out.startswith("Completed - 2 steps confirmed."))
 
+    def test_browser_failure_is_not_reported_as_success(self):
+        launched = []
+        with self.assertRaises(RuntimeError) as ctx:
+            jarvis_desktop.run_local_command(
+                "open notepad and then open youtube",
+                popen=lambda target, shell=False: launched.append(target),
+                open_url=lambda url: False,
+            )
+        self.assertEqual(launched, [["notepad.exe"]])
+        self.assertIn("could not confirm", str(ctx.exception))
+        self.assertIn("Step 2", str(ctx.exception))
+
     def test_unknown_step_launches_nothing(self):
         launched = []
         out = jarvis_desktop.run_local_command(
