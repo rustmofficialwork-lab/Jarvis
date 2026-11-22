@@ -8,7 +8,7 @@ JARVIS now prefers a locally installed custom model at:
 
 If that file is absent, the app falls back to the legacy community-published Jarvis model. The custom model is loaded through the same local openWakeWord runtime. The first-party model is a JARVIS-specific classifier trained for the phrase "Jarvis"; it uses openWakeWord's shared frozen feature extractor, so it is not a newly trained speech backbone.
 
-The installer validates the ONNX file and installs it with its optional external-data sidecar. If the export produced both `jarvis_first_party.onnx` and `jarvis_first_party.onnx.data`, keep both files together and do not rename either one. Close JARVIS before importing the model. The installer stages and validates the complete pair before replacing the installed files. It does not claim that an arbitrary ONNX file is an accurate wake-word classifier; the model must come from the training pipeline below and must pass real microphone evaluation.
+The installer requires, validates, and installs the complete pair: `jarvis_first_party.onnx` and `jarvis_first_party.onnx.data`. Both files must be present, non-empty, and kept together; a missing sidecar is an installation failure, not a usable model. Close JARVIS before importing the model. The installer stages and validates the complete pair before replacing the installed files. It does not claim that an arbitrary ONNX file is an accurate wake-word classifier; the model must come from the training pipeline below and must pass real microphone evaluation.
 
 ## Training pipeline
 
@@ -35,7 +35,7 @@ Install the exported model from PowerShell, run from `desktop/windows`:
 py install_first_party_wakeword.py --model "$HOME\Downloads\jarvis_first_party.onnx" --confirm
 ```
 
-The installer places the model (and any `.onnx.data` companion) in the JARVIS AppData wake-word directory. Restart Voice Listening; the custom model is preferred automatically. The model runs locally after installation.
+The installer places both required files (`jarvis_first_party.onnx` and `jarvis_first_party.onnx.data`) in the JARVIS AppData wake-word directory. Detection remains disabled unless both files are present and non-empty. Restart Voice Listening; the custom model is preferred automatically. The model runs locally after installation.
 
 For the initial Colab export evaluated during this project, `0.7` is wired as a **provisional candidate threshold** for the first-party model; the legacy publisher model keeps its existing `0.5` threshold. The reported 1,000-positive/1,000-negative feature-array sweep showed 72.3% positive detection and 99.4% negative rejection at 0.7. Those are not real-microphone results and do not measure false activations per hour. Recalibrate with independent Windows microphone recordings before treating 0.7 as a production setting.
 
