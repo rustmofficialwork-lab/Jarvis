@@ -1712,7 +1712,7 @@ class JarvisDesktop:
 
 
     def _begin_first_launch_voice_setup(self):
-        """Request device consents on upgrade even when voice onboarding was completed earlier."""
+        """Request microphone consent on upgrade even when voice setup was completed earlier."""
         if self.voice_setup_window is not None:
             return
         if microphone_consent_required(self.settings):
