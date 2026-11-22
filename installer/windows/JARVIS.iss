@@ -41,7 +41,7 @@ Name: "{group}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"
 Name: "{autodesktop}\JARVIS Desktop"; Filename: "{app}\JARVIS.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_offline_ai.ps1"""; Description: "Install JARVIS offline AI model"; Flags: postinstall waituntilterminated skipifsilent
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_offline_ai.ps1"""; StatusMsg: "Setting up bundled JARVIS offline AI model..."; Flags: waituntilterminated
 Filename: "{app}\JARVIS.exe"; Description: "Launch JARVIS Desktop"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
