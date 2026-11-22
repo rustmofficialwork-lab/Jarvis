@@ -1,6 +1,6 @@
 # Single-word "Jarvis" wake-word model
 
-JARVIS prefers the custom-trained first-party ONNX classifier at `%APPDATA%\\JARVISDesktop\\wakewords\\jarvis_first_party.onnx` when installed. If it is absent, JARVIS uses the community-published openWakeWord model named **Jarvis** as a fallback.
+JARVIS prefers the custom-trained first-party ONNX classifier at `%APPDATA%\\JARVISDesktop\\wakewords\\jarvis_first_party.onnx`. The first-party model is valid only when both `jarvis_first_party.onnx` and `jarvis_first_party.onnx.data` are present and non-empty. If either first-party file exists but the pair is incomplete, JARVIS blocks wake-word detection and reports the missing file instead of silently falling back.
 
 ## One-time setup
 
