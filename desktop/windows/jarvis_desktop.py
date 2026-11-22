@@ -386,15 +386,6 @@ def install_first_party_wakeword_model(source_path: Path,
     return destination
 
 
-def wakeword_audio_error_types(pyaudio_module) -> tuple[type[BaseException], ...]:
-    """Include PyAudio device/stream exceptions so unplug events can reconnect."""
-    errors = [OSError, RuntimeError]
-    native_error = getattr(pyaudio_module, "PyAudioError", None)
-    if isinstance(native_error, type) and issubclass(native_error, Exception):
-        if native_error not in errors:
-            errors.append(native_error)
-    return tuple(errors)
-
 def wakeword_threshold_for_model(model_path: Path) -> float:
     """Return the provisional threshold for the custom model or the legacy default."""
     if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name:
@@ -3339,7 +3330,6 @@ class JarvisDesktop:
         try:
             import numpy as np
             import pyaudio
-            audio_errors = wakeword_audio_error_types(pyaudio)
             import openwakeword
             from openwakeword.model import Model
             import speech_recognition as sr
@@ -3497,7 +3487,7 @@ class JarvisDesktop:
                         self.events.put(("status", "Sorry, I couldn't understand that. Listening again."))
                     except sr.RequestError as exc:
                         self.events.put(("status", f"Speech recognition request failed: {exc}"))
-                    except audio_errors as exc:
+                    except (OSError, RuntimeError) as exc:
                         self.events.put(("status", f"Microphone unavailable ({exc}). Retrying…"))
                         self.stop_event.wait(2)
                 except audio_errors as exc:
