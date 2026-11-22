@@ -191,12 +191,32 @@ def prepare_openwakeword_assets(
         ["__jarvis_custom__"] if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name
         else [Path(model_path).stem]
     )
-    openwakeword_module.utils.download_models(
-        model_names=model_names,
-        target_directory=str(models_dir),
-    )
+    download_assets = openwakeword_module.utils.download_models
+    download_assets(model_names=model_names, target_directory=str(models_dir))
     melspec_path = models_dir / "melspectrogram.onnx"
     embedding_path = models_dir / "embedding_model.onnx"
+
+    # openWakeWord's downloader checks the TFLite file before downloading both
+    # formats. If a previous install left TFLite but lost its ONNX partner, a
+    # normal retry skips the pair forever. Remove only that incomplete shared
+    # feature pair and let the official downloader restore it.
+    incomplete_pair = False
+    for onnx_path in (melspec_path, embedding_path):
+        tflite_path = onnx_path.with_suffix(".tflite")
+        if (
+            not onnx_path.is_file() or onnx_path.stat().st_size <= 0
+        ):
+            incomplete_pair = True
+            for artifact in (onnx_path, tflite_path):
+                try:
+                    artifact.unlink(missing_ok=True)
+                except OSError as exc:
+                    raise RuntimeError(
+                        f"Could not repair incomplete wake-word runtime asset {artifact.name}: {exc}"
+                    ) from exc
+    if incomplete_pair:
+        download_assets(model_names=model_names, target_directory=str(models_dir))
+
     missing = [
         path.name for path in (melspec_path, embedding_path)
         if not path.is_file() or path.stat().st_size <= 0
