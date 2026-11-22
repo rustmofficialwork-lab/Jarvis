@@ -1021,7 +1021,9 @@ class MicrophoneConsentDialogTests(unittest.TestCase):
         )
         self.assertTrue(accepted)
         self.assertIsNone(user32.args[0])
-        self.assertIn("Allow JARVIS to check microphone access?", user32.args[1])
+        self.assertIn("Allow JARVIS to use the microphone?", user32.args[1])
+        self.assertIn("optional “Jarvis” wake word", user32.args[1])
+        self.assertIn("stop Voice Listening from the HUD", user32.args[1])
         self.assertEqual(user32.args[2], "JARVIS microphone permission")
         self.assertEqual(user32.args[3] & 0x00040000, 0x00040000)  # MB_TOPMOST
         self.assertEqual(user32.args[3] & 0x00010000, 0x00010000)  # MB_SETFOREGROUND
