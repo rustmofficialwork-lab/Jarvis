@@ -177,37 +177,49 @@ class BrainEngine:
         return authorize_tool_call(tool_name, arguments, user_request)
 
     def context_for(self, query: str, *, enabled: bool, limit: int = 5) -> list[str]:
-        """Return bounded local memory context only when the caller's privacy setting allows it."""
+        """Return bounded, relevant local memory only when the privacy switch allows it.
+
+        Memory providers are optional adapters. A broken context() implementation must
+        not break chat: fall back to the provider's list() and BM25 ranking when possible.
+        """
         if not enabled:
             return []
         limit = max(1, min(int(limit), 10))
-        context_method = self.memory.context
-        parameters = inspect.signature(context_method).parameters
-        accepts_extra = any(
-            parameter.kind is inspect.Parameter.VAR_KEYWORD
-            for parameter in parameters.values()
-        )
-        if "limit" in parameters or accepts_extra:
-            items = context_method(query=query, limit=limit)
-        else:
-            # Keep lightweight adapters and older memory providers compatible.
-            items = context_method(query=query)
-        base = [
-            str(item)[:MAX_FEEDBACK_LENGTH]
-            for item in items
-            if isinstance(item, str) and item.strip()
-        ]
-        # Keep relevance ranking inside the coordinator rather than in the HUD layer.
+        items: list[str] = []
+        context_method = getattr(self.memory, "context", None)
+        if callable(context_method):
+            try:
+                parameters = inspect.signature(context_method).parameters
+                accepts_extra = any(
+                    parameter.kind is inspect.Parameter.VAR_KEYWORD
+                    for parameter in parameters.values()
+                )
+                kwargs = {}
+                if "query" in parameters or accepts_extra:
+                    kwargs["query"] = query
+                if "limit" in parameters or accepts_extra:
+                    kwargs["limit"] = limit
+                raw_items = context_method(**kwargs)
+                if isinstance(raw_items, (list, tuple)):
+                    items = [
+                        str(item).strip()[:MAX_FEEDBACK_LENGTH]
+                        for item in raw_items
+                        if isinstance(item, str) and item.strip()
+                    ]
+            except (TypeError, ValueError, OSError, RuntimeError):
+                # Continue to the deterministic list/ranker fallback below.
+                items = []
+
         try:
             list_method = getattr(self.memory, "list", None)
             if callable(list_method):
                 from smart_brain import rank_memories
 
                 ranked = rank_memories(query, list_method(), limit=limit)
-                return list(dict.fromkeys([*ranked, *base]))[:limit]
-        except Exception:
+                return list(dict.fromkeys([*ranked, *items]))[:limit]
+        except (TypeError, ValueError, OSError, RuntimeError):
             pass
-        return base
+        return items[:limit]
 
     def prepare_model_plan(
         self,
