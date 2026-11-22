@@ -181,7 +181,9 @@ class BrainCheckCommandTests(unittest.TestCase):
         ):
             self.assertTrue(app._try_local_command("brain check karo"))
         self.assertEqual(app.shown[0], ("YOU", "brain check karo"))
-        self.assertIn("ollama pull qwen3.5:4b", app.shown[1][1])
+        self.assertIn("setup_offline_ai.ps1", app.shown[1][1])
+        self.assertIn("Full Offline Setup", app.shown[1][1])
+        self.assertNotIn("ollama pull qwen3.5:4b", app.shown[1][1])
         self.assertEqual(app.history[-1]["role"], "assistant")
 
     def test_ordinary_prompts_are_not_intercepted(self):
