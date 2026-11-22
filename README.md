@@ -45,11 +45,13 @@ The existing native file-removal flow only moves explicitly selected files from 
 
 General AI chat always uses the same local Ollama model, `qwen3.5:4b`, whether the PC is online or offline. Local requests go only to `127.0.0.1:11435`; they do not require an API key, cloud AI gateway, or JARVIS backend. Internet is used separately for live web search, weather, and news. Local requests use a bounded context and reply length to reduce memory pressure on 8 GB laptops. Live internet features are unavailable while offline.
 
-**Automatic model setup:**
+**One-time setup (while connected to the internet):**
 
-The full offline installer already contains the Ollama runtime and Qwen3.5 4B model files. During installation, JARVIS automatically verifies the bundled files, starts its private local Ollama service, and runs a real inference check. There is no optional or deferred model-download step, and no separate model download is needed. If the bundled model is missing or fails verification, setup stops with an error instead of silently downloading a replacement.
+1. The installer runs `setup_offline_ai.ps1` after installation. It installs Ollama with WinGet if needed, starts the local service, and installs `qwen3.5:4b` from the verified JARVIS GitHub Release assets (or uses the official Ollama registry as a fallback if the release assets are unavailable).
+2. If setup was skipped or failed, run `powershell -ExecutionPolicy Bypass -File .\\setup_offline_ai.ps1` from the installed JARVIS folder while connected to the internet.
+3. After setup, general AI chat uses local Qwen3.5 4B in both online and offline modes. Live web search, weather, and news separately require internet. If Windows restarts and Ollama is not running, JARVIS attempts to start its local service when needed.
 
-After setup, general AI chat uses local Qwen3.5 4B in both online and offline modes. Live web search, weather, and news separately require internet. If Windows restarts and Ollama is not running, JARVIS attempts to start its local service when needed. Response quality and speed depend on available RAM/CPU; close other memory-heavy apps if an 8 GB PC struggles.
+The setup script first downloads the split Qwen3.5 4B assets from the JARVIS GitHub Release, reassembles each Ollama blob, and verifies its SHA-256 and size before installing it into the local Ollama model store. If the release assets are unavailable, it can fall back to the official Ollama registry. The model weights are not stored in Git source history. If setup has not completed, JARVIS reports that offline setup is required rather than pretending offline AI is ready. Response quality and speed depend on available RAM/CPU; close other memory-heavy apps if an 8 GB PC struggles.
 
 ## Offline reminders
 
