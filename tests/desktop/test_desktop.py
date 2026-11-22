@@ -460,6 +460,52 @@ class WakewordSetupTests(unittest.TestCase):
             jarvis_desktop.prepare_openwakeword_assets(module, custom_path, Path(temporary) / "appdata")
         self.assertEqual(calls, [["__jarvis_custom__"]])
 
+    def test_first_party_model_requires_nonempty_onnx_and_data_pair(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            model = Path(temporary) / "jarvis_first_party.onnx"
+            sidecar = model.with_name(model.name + ".data")
+            self.assertFalse(jarvis_desktop.wakeword_model_files_ready(model))
+            model.write_bytes(b"onnx")
+            self.assertFalse(jarvis_desktop.wakeword_model_files_ready(model))
+            sidecar.write_bytes(b"")
+            self.assertFalse(jarvis_desktop.wakeword_model_files_ready(model))
+            sidecar.write_bytes(b"external-weights")
+            self.assertTrue(jarvis_desktop.wakeword_model_files_ready(model))
+
+    def test_partial_first_party_pair_does_not_silently_fall_back_to_legacy_model(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            legacy = Path(temporary) / "legacy.onnx"
+            custom = Path(temporary) / "jarvis_first_party.onnx"
+            legacy.write_bytes(b"legacy")
+            custom.write_bytes(b"custom")
+            with patch.object(jarvis_desktop, "JARVIS_WAKEWORD_MODEL", legacy), patch.object(
+                jarvis_desktop, "JARVIS_FIRST_PARTY_WAKEWORD_MODEL", custom
+            ):
+                self.assertEqual(jarvis_desktop.active_wakeword_model_path(), custom)
+                self.assertFalse(jarvis_desktop.wakeword_model_files_ready(
+                    jarvis_desktop.active_wakeword_model_path()
+                ))
+
+    def test_first_party_installer_rejects_missing_external_data_sidecar(self):
+        import sys
+        import tempfile
+        from types import SimpleNamespace
+        class FakeSession:
+            def __init__(self, path, providers=None): pass
+            def get_inputs(self): return [SimpleNamespace(shape=[1, 16, 96])]
+            def get_outputs(self): return [SimpleNamespace(shape=[1, 1])]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "jarvis_first_party.onnx"
+            source.write_bytes(b"x" * 2048)
+            fake_ort = SimpleNamespace(InferenceSession=FakeSession)
+            with patch.dict(sys.modules, {"onnxruntime": fake_ort}):
+                with self.assertRaisesRegex(ValueError, "requires both"):
+                    jarvis_desktop.install_first_party_wakeword_model(
+                        source, Path(temporary) / "appdata" / source.name
+                    )
+
     def test_first_party_wakeword_model_is_validated_and_installed_atomically(self):
         import sys
         import tempfile
