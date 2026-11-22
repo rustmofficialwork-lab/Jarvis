@@ -1069,33 +1069,6 @@ class MicrophoneConsentTests(unittest.TestCase):
         self.assertFalse(jarvis_desktop.microphone_consent_required(settings))
         self.assertFalse(settings["microphone_consent_granted"])
 
-    def test_camera_consent_is_versioned_and_decline_does_not_grant_access(self):
-        settings = {}
-        self.assertTrue(jarvis_desktop.camera_consent_required(settings))
-        jarvis_desktop.record_camera_consent(settings, False)
-        self.assertFalse(jarvis_desktop.camera_consent_required(settings))
-        self.assertFalse(settings["camera_consent_granted"])
-
-    def test_camera_consent_acceptance_is_persisted(self):
-        settings = {}
-        jarvis_desktop.record_camera_consent(settings, True)
-        self.assertFalse(jarvis_desktop.camera_consent_required(settings))
-        self.assertTrue(settings["camera_consent_granted"])
-
-    def test_camera_consent_dialog_is_foreground_and_camera_is_opt_in(self):
-        class FakeUser32:
-            def __init__(self):
-                self.args = None
-            def MessageBoxW(self, hwnd, message, title, flags):
-                self.args = (hwnd, message, title, flags)
-                return 6
-        user32 = FakeUser32()
-        self.assertTrue(jarvis_desktop.ask_camera_consent(
-            platform_name="nt", user32=user32,
-        ))
-        self.assertIn("camera will remain OFF during startup", user32.args[1])
-        self.assertIn("ENABLE GESTURES", user32.args[1])
-        self.assertEqual(user32.args[3] & 0x00040000, 0x00040000)
 
 
 class SettingsPersistenceTests(unittest.TestCase):
@@ -1108,8 +1081,6 @@ class SettingsPersistenceTests(unittest.TestCase):
             "share_memory_with_ai": False,
             "microphone_consent_version": 1,
             "microphone_consent_granted": False,
-            "camera_consent_version": 1,
-            "camera_consent_granted": False,
             "voice_setup_completed": False,
         }
         jarvis_desktop.save_settings(settings, path)
@@ -2523,32 +2494,27 @@ class HudShortcutWiringTests(unittest.TestCase):
         self.assertNotIn('id="v-ram"', hud)
         self.assertIn('id="bat"', hud)
 
-    def test_external_hud_assets_are_injected_in_dependency_order_after_hud_load(self):
+    def test_external_hud_assets_load_without_webcam_or_gesture_code(self):
         desktop = MODULE_PATH.read_text(encoding="utf-8")
-        gesture_logic = (DESKTOP_DIR / "jarvis_gesture_logic.js").read_text(encoding="utf-8")
         extensions = (DESKTOP_DIR / "jarvis_hud_extensions.js").read_text(encoding="utf-8")
         runtime = (DESKTOP_DIR / "jarvis_hud_runtime.js").read_text(encoding="utf-8")
         hud = (DESKTOP_DIR / "jarvis_hud.html").read_text(encoding="utf-8")
         self.assertIn('window.events.loaded += inject_hud_assets', desktop)
         self.assertIn('window.evaluate_js(source)', desktop)
-        self.assertIn('jarvis_gesture_logic.js', desktop)
+        self.assertNotIn('jarvis_gesture_logic.js', desktop)
+        self.assertNotIn('camera_access_allowed', desktop)
+        self.assertNotIn('ask_camera_consent', desktop)
+        self.assertNotIn('camera_consent', desktop)
         self.assertIn('jarvis_hud_extensions.js', desktop)
         self.assertIn('jarvis_hud_runtime.js', desktop)
-        self.assertLess(desktop.index('("gesture logic", gesture_logic_source)'), desktop.index('("HUD extensions", extensions_source)'))
         self.assertLess(desktop.index('("HUD extensions", extensions_source)'), desktop.index('("runtime adapter", runtime_source)'))
-        self.assertIn('window.JARVISGestureLogic = api', gesture_logic)
-        self.assertIn("jx-gesture-toggle", extensions)
-        self.assertIn("gestureToggle.hidden=true", extensions)
-        self.assertNotIn("jx-gesture-toggle", hud)
-        self.assertNotIn("SYSTEM INFORMATION", hud)
-        self.assertNotIn("ARCHITECTURE", hud)
-        self.assertNotIn("anchorX=845,anchorY=638", extensions)
-        self.assertIn("getBoundingClientRect()", extensions)
-        self.assertIn("const svg=[...document.querySelectorAll('svg.scene, .row svg, .stack svg')]", extensions)
-        self.assertIn("svg.dispatchEvent(new MouseEvent('click'", extensions)
-        self.assertIn("#m.jx-gesture-active .core", extensions)
-        self.assertIn("const artwork=document.getElementById('m')", extensions)
-        self.assertNotIn("\\n    @keyframes jx-gesture-pulse", extensions)
+        self.assertIn("three.module.js", extensions)
+        self.assertIn("TorusKnotGeometry", extensions)
+        self.assertNotIn("getUserMedia", extensions)
+        self.assertNotIn("mediapipe", extensions.lower())
+        self.assertNotIn("hand_landmarker", extensions.lower())
+        self.assertNotIn("jx-gesture-toggle", extensions)
+        self.assertNotIn("ENABLE GESTURES", hud)
         self.assertIn('window.__jarvisHudRuntimeAdapterLoaded', runtime)
 
     def test_runtime_adapter_resolves_visible_svg_from_use_event_composed_path(self):
