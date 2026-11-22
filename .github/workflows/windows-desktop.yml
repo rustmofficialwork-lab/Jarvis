@@ -353,6 +353,51 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist-installer" | Out-Null
           & $compiler "/DMyAppVersion=1.1.$env:GITHUB_RUN_NUMBER" "installer/windows/JARVIS.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install and smoke-test the complete offline installer
+        shell: pwsh
+        timeout-minutes: 30
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = Join-Path $PWD "dist-installer/JARVIS-Setup-x64.exe"
+          if (-not (Test-Path -LiteralPath $setup)) { throw "The built JARVIS installer is missing." }
+          $installRoot = Join-Path $env:RUNNER_TEMP "JARVIS-Install-Smoke"
+          if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
+          $arguments = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", ('/DIR="' + $installRoot + '"'))
+          $installer = Start-Process -FilePath $setup -ArgumentList $arguments -PassThru
+          if (-not $installer.WaitForExit(1500000)) {
+            $installer.Kill()
+            $installer.WaitForExit()
+            throw "The full offline JARVIS installer did not finish within 25 minutes."
+          }
+          if ($installer.ExitCode -ne 0) {
+            throw "The full offline JARVIS installer failed with exit code $($installer.ExitCode)."
+          }
+          $app = Join-Path $installRoot "JARVIS.exe"
+          $setupScript = Join-Path $installRoot "setup_offline_ai.ps1"
+          $modelManifest = Join-Path $installRoot "offline-ai-bundle/models/manifests/registry.ollama.ai/library/qwen3.5/4b"
+          $ollama = Join-Path $installRoot "offline-ai-bundle/ollama/ollama.exe"
+          foreach ($required in @($app, $setupScript, $modelManifest, $ollama)) {
+            if (-not (Test-Path -LiteralPath $required)) { throw "Installed offline package is missing: $required" }
+          }
+          $stdout = Join-Path $env:RUNNER_TEMP "jarvis-installed-version.stdout.txt"
+          $stderr = Join-Path $env:RUNNER_TEMP "jarvis-installed-version.stderr.txt"
+          $versionProcess = Start-Process -FilePath $app -ArgumentList "--version" -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (-not $versionProcess.WaitForExit(90000)) {
+            $versionProcess.Kill()
+            $versionProcess.WaitForExit()
+            throw "Installed JARVIS executable did not exit within 90 seconds."
+          }
+          $reportedVersion = if (Test-Path $stdout) { (Get-Content $stdout -Raw).Trim() } else { "" }
+          if ($versionProcess.ExitCode -ne 0 -or $reportedVersion -ne "1.1.$env:GITHUB_RUN_NUMBER") {
+            $errorOutput = if (Test-Path $stderr) { Get-Content $stderr -Raw } else { "No stderr output." }
+            throw "Installed JARVIS executable smoke test failed. Version='$reportedVersion'; stderr=$errorOutput"
+          }
+          $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11435/api/tags" -TimeoutSec 10
+          if (@($tags.models | Where-Object { $_.name -eq "qwen3.5:4b" }).Count -eq 0) {
+            throw "Installed Ollama service does not expose the bundled Qwen3.5 4B model."
+          }
+          Write-Host "Full offline installer passed: files installed, setup/inference succeeded, and packaged JARVIS launched."
+
       - name: Package complete offline JARVIS installer
         shell: pwsh
         run: |
