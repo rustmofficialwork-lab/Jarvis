@@ -2913,6 +2913,46 @@ class HybridAiTests(unittest.TestCase):
         self.assertIs(captured["payload"]["think"], False)
         self.assertEqual(captured["payload"]["messages"][-1]["content"], "hello")
 
+    def test_local_ollama_reply_uses_memories_from_brain_plan(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self, size=-1):
+                return json.dumps({"message": {"content": "Plan memory reply"}}).encode("utf-8")
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                captured["payload"] = json.loads(request.data.decode("utf-8"))
+                return FakeResponse()
+
+        plan = SimpleNamespace(
+            memories=["Memory stored in BrainPlan"],
+            grounding=[],
+            options={"num_ctx": 4096, "num_predict": 384, "temperature": 0.3},
+            history=SimpleNamespace(summary=None, messages=[]),
+            profile=SimpleNamespace(deliberate=False),
+        )
+        with patch.object(
+            jarvis_desktop.urllib.request, "build_opener", return_value=FakeOpener()
+        ):
+            result = jarvis_desktop.local_chat_completion(
+                "hello", [], ["legacy separate memory"], brain_plan=plan
+            )
+
+        self.assertEqual(result, "Plan memory reply")
+        system_context = "\\n".join(
+            message["content"] for message in captured["payload"]["messages"]
+            if message["role"] == "system"
+        )
+        self.assertIn("Memory stored in BrainPlan", system_context)
+        self.assertNotIn("legacy separate memory", system_context)
+        self.assertEqual(captured["payload"]["options"]["num_ctx"], 4096)
+
     def test_local_ollama_missing_model_has_actionable_message(self):
         import io
         from unittest.mock import patch
