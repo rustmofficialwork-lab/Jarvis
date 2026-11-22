@@ -2963,7 +2963,7 @@ class HybridAiTests(unittest.TestCase):
         plan = SimpleNamespace(memories=["JARVIS project memory"], grounding=[], options={"num_ctx": 4096}, history=SimpleNamespace(summary="", messages=[]), profile=SimpleNamespace(deliberate=False))
         brain = SimpleNamespace(
             context_for=lambda prompt, enabled, limit: ["JARVIS project memory"],
-            prepare_model_plan=lambda prompt, history, fixed_chars: plan,
+            prepare_model_plan=lambda prompt, history, fixed_chars, memory_items=None: plan,
         )
         app.brain_engine = brain
 
