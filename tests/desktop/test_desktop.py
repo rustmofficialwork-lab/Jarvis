@@ -3003,7 +3003,7 @@ class OllamaRuntimeIntegrationTests(unittest.TestCase):
                 self.assertTrue(
                     os.path.samefile(os.environ["OLLAMA_MODELS"], models)
                 )
-            self.assertEqual(found, str(ollama))
+            self.assertTrue(os.path.samefile(found, ollama))
 
 
 class HybridAiTests(unittest.TestCase):
