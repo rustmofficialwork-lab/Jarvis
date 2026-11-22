@@ -7,6 +7,18 @@ context, and memory-selection layer around that model.
 It is plain Python (no extra packages), runs on the PC, and sits *under* the safety policy in
 `brain_core.py` - it can never run a tool the policy would not already allow.
 
+## Architecture and ownership
+
+- Qwen3.5 4B (Ollama) is the one local language model that generates general-chat answers.
+- BrainEngine is JARVIS's application-facing coordinator. It owns memory access, safety/tool authorization, approval state, browser-session policy, and the hand-off to request planning.
+- smart_brain.py is the deterministic planning subsystem used by BrainEngine: query classification, bounded generation options, memory ranking, history compaction, verified read-only grounding, and optional draft/critique/revise.
+- jarvis_desktop.py connects voice/HUD input and output to BrainEngine, then sends the prepared request to the Qwen runtime. It should not maintain a second independent model planner.
+- Qwen does not execute desktop actions. Any action remains behind JARVIS's allowlisted tool executor and the existing approval/consent checks.
+
+Request flow: USER -> JARVIS CORE -> BRAIN ENGINE -> smart_brain request plan (memory/context/grounding/budget) -> Qwen3.5 4B -> JARVIS response -> HUD/voice.
+
+BrainEngine delegates deterministic preparation to smart_brain.py; it does not duplicate the classifier or inference engine. local_chat_completion() remains the single Qwen inference entry point.
+
 ## What it does today (offline / local model path)
 
 | Part | What it fixes |
