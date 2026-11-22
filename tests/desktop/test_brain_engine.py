@@ -88,9 +88,9 @@ class BrainEngineTests(unittest.TestCase):
 
     def test_engine_prepares_a_bounded_qwen_request_plan(self):
         plan = self.engine.prepare_model_plan(
-            "python code likho", [], memory_items=["JARVIS project context"]
+            "python code likho", [], memory_items=["Python code project context"]
         )
-        self.assertEqual(plan.memories, ["JARVIS project context"])
+        self.assertEqual(plan.memories, ["Python code project context"])
         self.assertEqual(plan.profile.kind, "code")
         self.assertEqual(plan.options["num_ctx"], 4096)
         self.assertEqual(plan.options["num_predict"], 768)
