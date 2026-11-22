@@ -2819,7 +2819,7 @@ class HybridAiTests(unittest.TestCase):
                 "open": lambda self, request, timeout: (_ for _ in ()).throw(error)
             })(),
         ):
-            with self.assertRaisesRegex(RuntimeError, "ollama pull qwen3.5:4b"):
+            with self.assertRaisesRegex(RuntimeError, "setup_offline_ai.ps1"):
                 jarvis_desktop.local_chat_completion("hello", [])
 
 
