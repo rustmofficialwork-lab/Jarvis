@@ -44,15 +44,26 @@ def run_chain(
     clauses = split_chain(prompt)
     if len(clauses) < 2 or len(clauses) > max_steps:
         return None
+    # A failed/ambiguous dry run must never fall through into partial execution.
     for clause in clauses:
-        if run_single(clause, dry_run=True) is None:
+        try:
+            preview = run_single(clause, dry_run=True)
+        except Exception:
             return None
+        if not isinstance(preview, str) or not preview.strip():
+            return None
+
     results: list[str] = []
     for index, clause in enumerate(clauses, start=1):
         try:
             result = run_single(clause, dry_run=False)
         except Exception as exc:
-            done = f"{len(results)} step(s) completed" if results else "nothing was run yet"
+            done = f"{len(results)} step(s) confirmed" if results else "no steps confirmed"
             raise RuntimeError(f"Step {index} ('{clause}') failed ({done}): {exc}") from exc
-        results.append(str(result).strip())
-    return f"Done - {len(clauses)} steps. " + " ".join(results)
+        if not isinstance(result, str) or not result.strip():
+            done = f"{len(results)} step(s) confirmed" if results else "no steps confirmed"
+            raise RuntimeError(
+                f"Step {index} ('{clause}') returned no completion confirmation ({done})."
+            )
+        results.append(result.strip())
+    return f"Completed - {len(clauses)} steps confirmed. " + " ".join(results)
