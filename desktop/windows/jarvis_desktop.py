@@ -3515,7 +3515,7 @@ class JarvisDesktop:
                     except (OSError, RuntimeError) as exc:
                         self.events.put(("status", f"Microphone unavailable ({exc}). Retrying…"))
                         self.stop_event.wait(2)
-                except audio_errors as exc:
+                except (OSError, RuntimeError) as exc:
                     self.events.put(("status", f"Wake microphone disconnected ({exc}). Reconnecting…"))
                     if stream is not None:
                         try:
