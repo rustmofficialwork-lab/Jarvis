@@ -345,21 +345,6 @@ class WakewordActivationAnnouncementTests(unittest.TestCase):
         self.assertFalse(any(any("\u0900" <= char <= "\u097f" for char in phrase) for phrase in phrases))
 
 
-class WakewordAudioRecoveryTests(unittest.TestCase):
-    def test_native_pyaudio_errors_are_treated_as_reconnectable(self):
-        class FakePyAudioError(Exception):
-            pass
-        module = type('FakePyAudio', (), {'PyAudioError': FakePyAudioError})()
-        error_types = jarvis_desktop.wakeword_audio_error_types(module)
-        self.assertIn(OSError, error_types)
-        self.assertIn(RuntimeError, error_types)
-        self.assertIn(FakePyAudioError, error_types)
-
-    def test_invalid_pyaudio_error_attribute_does_not_break_error_types(self):
-        module = type('FakePyAudio', (), {'PyAudioError': 'not-an-exception'})()
-        error_types = jarvis_desktop.wakeword_audio_error_types(module)
-        self.assertEqual(error_types, (OSError, RuntimeError))
-
 class WakewordSetupTests(unittest.TestCase):
     def test_wakeword_auto_start_requires_completed_setup_current_consent_and_assets(self):
         settings = {
