@@ -3481,6 +3481,10 @@ class JarvisDesktop:
                         announce_wake_activation(self.speech_stop_event)
                     except Exception as exc:
                         self.events.put(("status", f"JARVIS is active; voice confirmation unavailable: {exc}"))
+                    # If listening was stopped during the spoken confirmation,
+                    # do not reopen the microphone for command capture.
+                    if self.stop_event.is_set():
+                        break
                     recognizer = configure_voice_recognizer(sr.Recognizer())
                     try:
                         with sr.Microphone() as source:
