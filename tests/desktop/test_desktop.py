@@ -1902,6 +1902,25 @@ class ApplicationShutdownTests(unittest.TestCase):
         self.assertTrue(app.root.destroyed)
 
 
+    def test_wake_loop_audio_recovery_uses_defined_exception_types(self):
+        import ast
+        import inspect
+        import textwrap
+
+        source = textwrap.dedent(inspect.getsource(jarvis_desktop.JarvisDesktop._wake_loop))
+        tree = ast.parse(source)
+        handlers = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.ExceptHandler)
+            and isinstance(node.type, ast.Tuple)
+            and len(node.type.elts) == 2
+            and all(
+                isinstance(item, ast.Name) and item.id in {"OSError", "RuntimeError"}
+                for item in node.type.elts
+            )
+        ]
+        self.assertTrue(handlers, "Wake stream recovery must catch defined audio I/O exceptions.")
+
 class WakeRecorderCleanupTests(unittest.TestCase):
     def test_missing_wake_dependency_reports_error_and_stops_listener_cleanly(self):
         import builtins
