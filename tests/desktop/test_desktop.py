@@ -373,6 +373,54 @@ class WakewordSetupTests(unittest.TestCase):
             model_ready=True, owner_voice_ready=True, consent_required=False,
         ))
 
+    def test_auto_start_starts_listener_after_all_voice_setup_gates_pass(self):
+        import tempfile
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {
+            "voice_setup_completed": True,
+            "microphone_consent_granted": True,
+            "microphone_consent_version": jarvis_desktop.MICROPHONE_CONSENT_VERSION,
+        }
+        app.wake_thread = None
+        statuses = []
+        starts = []
+        app._set_status = statuses.append
+        app._owner_voice_profile_ready = lambda: True
+        app.toggle_listening = lambda: starts.append("started")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            model = Path(temporary) / "jarvis_first_party.onnx"
+            model.write_bytes(b"validated-model-placeholder")
+            with (
+                patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=model),
+                patch.object(jarvis_desktop, "microphone_consent_required", return_value=False),
+            ):
+                app._auto_start_wakeword_if_ready()
+
+        self.assertEqual(starts, ["started"])
+        self.assertIn("Starting hands-free Jarvis listening", statuses[-1])
+
+    def test_auto_start_does_not_toggle_an_already_running_listener(self):
+        from types import SimpleNamespace
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {
+            "voice_setup_completed": True,
+            "microphone_consent_granted": True,
+        }
+        app.wake_thread = SimpleNamespace(is_alive=lambda: True)
+        app._set_status = lambda _message: None
+        app._owner_voice_profile_ready = lambda: True
+        app.toggle_listening = lambda: self.fail("must not toggle an already-running listener")
+
+        with (
+            patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=Path("existing-model.onnx")),
+            patch.object(jarvis_desktop.Path, "is_file", return_value=True),
+            patch.object(jarvis_desktop, "microphone_consent_required", return_value=False),
+        ):
+            app._auto_start_wakeword_if_ready()
+
     def test_openwakeword_assets_use_user_writable_directory_and_selective_download(self):
         import tempfile
         from types import SimpleNamespace
