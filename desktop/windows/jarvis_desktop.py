@@ -1324,8 +1324,6 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
             raise request_error(
                 "Online speech recognition is unavailable and offline speech did not detect words."
             ) from (offline_error or recognition_error)
-        # Preserve the unclear-audio error when local recovery is unavailable.
-        raise recognition_error
         # Preserve the unclear-audio error so the UI can ask the user to try again.
         raise recognition_error
     return None
