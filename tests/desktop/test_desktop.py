@@ -1921,6 +1921,29 @@ class ApplicationShutdownTests(unittest.TestCase):
         ]
         self.assertTrue(handlers, "Wake stream recovery must catch defined audio I/O exceptions.")
 
+    def test_wake_loop_checks_stop_before_opening_command_capture_microphone(self):
+        import ast
+        import inspect
+        import textwrap
+
+        source = textwrap.dedent(inspect.getsource(jarvis_desktop.JarvisDesktop._wake_loop))
+        tree = ast.parse(source)
+        statements = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.If)
+            and isinstance(node.test, ast.Call)
+            and isinstance(node.test.func, ast.Attribute)
+            and node.test.func.attr == "is_set"
+            and isinstance(node.test.func.value, ast.Attribute)
+            and node.test.func.value.attr == "stop_event"
+            and any(isinstance(child, ast.Break) for child in ast.walk(node))
+        ]
+        command_capture = source.index("recognizer = configure_voice_recognizer(sr.Recognizer())")
+        wake_confirmation = source.index("announce_wake_activation(self.speech_stop_event)")
+        self.assertTrue(statements)
+        self.assertLess(wake_confirmation, command_capture)
+        self.assertIn("if self.stop_event.is_set():\\n                        break\\n                    recognizer =", source)
+
 class WakeRecorderCleanupTests(unittest.TestCase):
     def test_missing_wake_dependency_reports_error_and_stops_listener_cleanly(self):
         import builtins
