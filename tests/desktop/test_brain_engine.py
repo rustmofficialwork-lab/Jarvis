@@ -51,6 +51,13 @@ class BrainEngineTests(unittest.TestCase):
         self.assertEqual(self.engine.context_for("Hinglish", enabled=False), [])
         self.assertTrue(self.engine.context_for("Hinglish", enabled=True))
 
+    def test_engine_prepares_a_bounded_qwen_request_plan(self):
+        plan = self.engine.prepare_model_plan("python code likho", [])
+        self.assertEqual(plan.profile.kind, "code")
+        self.assertEqual(plan.options["num_ctx"], 4096)
+        self.assertEqual(plan.options["num_predict"], 768)
+        self.assertEqual(plan.history.messages, [])
+
     def test_learning_requires_explicit_user_feedback(self):
         with self.assertRaises(PermissionError):
             self.engine.learn_preference("Prefers short answers", explicit=False)
