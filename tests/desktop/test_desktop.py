@@ -347,7 +347,7 @@ class WakewordActivationAnnouncementTests(unittest.TestCase):
 
     def test_wake_activation_has_only_hinglish_and_english_phrases(self):
         phrases = jarvis_desktop.WAKE_ACTIVATION_PHRASES
-        self.assertGreaterEqual(len(phrases), 8)
+        self.assertGreaterEqual(len(phrases), 16)
         self.assertEqual(len(phrases), len(set(phrases)))
         self.assertTrue(any("Boliye" in phrase for phrase in phrases))
         self.assertTrue(any("listening" in phrase for phrase in phrases))
