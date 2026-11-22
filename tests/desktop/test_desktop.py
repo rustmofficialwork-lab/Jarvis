@@ -2120,6 +2120,32 @@ class CancellableVoiceCaptureTests(unittest.TestCase):
         self.assertIsNone(command)
 
 
+    def test_stop_during_online_recognition_skips_alternate_locale_and_offline_fallback(self):
+        import threading
+
+        class WaitTimeoutError(Exception):
+            pass
+        class UnknownValueError(Exception):
+            pass
+        class RequestError(Exception):
+            pass
+
+        stop_event = threading.Event()
+        class FakeRecognizer:
+            def listen(self, source, timeout, phrase_time_limit):
+                return b"captured-audio"
+            def recognize_google(self, audio, language):
+                stop_event.set()
+                raise UnknownValueError("cancelled while recognition was running")
+
+        with patch.object(jarvis_desktop, "transcribe_offline_vosk") as offline:
+            result = jarvis_desktop.listen_for_voice_command(
+                FakeRecognizer(), object(), stop_event, "en-IN",
+                WaitTimeoutError, RequestError, UnknownValueError,
+            )
+        self.assertIsNone(result)
+        offline.assert_not_called()
+
     def test_preexisting_stop_does_not_open_or_read_microphone(self):
         import threading
 
