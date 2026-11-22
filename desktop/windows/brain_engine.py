@@ -198,6 +198,29 @@ class BrainEngine:
             if isinstance(item, str) and item.strip()
         ]
 
+    def prepare_model_plan(
+        self,
+        prompt: str,
+        history: list[dict],
+        *,
+        fixed_chars: int = 2400,
+    ):
+        """Prepare the single local-model request through JARVIS's brain coordinator.
+
+        The smart-brain module remains the deterministic planning implementation;
+        BrainEngine owns the application-facing orchestration boundary. The import
+        is local to avoid a module cycle and keeps non-chat brain features lightweight.
+        """
+        from smart_brain import prepare
+
+        return prepare(
+            prompt,
+            history,
+            None,
+            fixed_chars=fixed_chars,
+            authorize=self.authorize,
+        )
+
     def learn_preference(self, feedback: str, *, explicit: bool) -> dict:
         """Persist only explicitly offered feedback; memory_store rejects secret-like data."""
         if not explicit:
