@@ -142,8 +142,6 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         "language": "en-IN",
         "microphone_consent_version": 0,
         "microphone_consent_granted": False,
-        "camera_consent_version": 0,
-        "camera_consent_granted": False,
         "voice_setup_completed": False,
     }
     try:
@@ -161,12 +159,6 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
                 and not isinstance(data.get("microphone_consent_version"), bool) else 0
             ),
             "microphone_consent_granted": data.get("microphone_consent_granted") is True,
-            "camera_consent_version": (
-                data.get("camera_consent_version")
-                if isinstance(data.get("camera_consent_version"), int)
-                and not isinstance(data.get("camera_consent_version"), bool) else 0
-            ),
-            "camera_consent_granted": data.get("camera_consent_granted") is True,
             "voice_setup_completed": data.get("voice_setup_completed") is True,
         }
         # Remove obsolete cloud model, endpoint, and device-registration values
@@ -397,8 +389,6 @@ def wakeword_setup_test_passed(activations: int, required: int = WAKEWORD_SETUP_
 
 
 MICROPHONE_CONSENT_VERSION = 2
-CAMERA_CONSENT_VERSION = 1
-
 def microphone_consent_required(settings: dict) -> bool:
     """Ask once for each consent version; legacy completion flags are not consent."""
     return settings.get("microphone_consent_version") != MICROPHONE_CONSENT_VERSION
@@ -407,39 +397,6 @@ def record_microphone_consent(settings: dict, accepted: bool) -> None:
     """Persist the user's explicit choice without implying Windows granted access."""
     settings["microphone_consent_version"] = MICROPHONE_CONSENT_VERSION
     settings["microphone_consent_granted"] = bool(accepted)
-
-def camera_consent_required(settings: dict) -> bool:
-    """Ask once for the optional webcam capability for each consent version."""
-    return settings.get("camera_consent_version") != CAMERA_CONSENT_VERSION
-
-def record_camera_consent(settings: dict, accepted: bool) -> None:
-    """Persist webcam consent without opening the camera automatically."""
-    settings["camera_consent_version"] = CAMERA_CONSENT_VERSION
-    settings["camera_consent_granted"] = bool(accepted)
-
-def ask_camera_consent(parent=None, platform_name=None, user32=None,
-                       messagebox_module=messagebox) -> bool:
-    """Show a foreground native consent prompt for optional hand-gesture camera use."""
-    platform_name = os.name if platform_name is None else platform_name
-    title = "JARVIS camera permission"
-    message = (
-        "JARVIS would like permission to request webcam access for optional hand gestures.\n\n"
-        "The camera will remain OFF during startup and will start only when you press ENABLE GESTURES. "
-        "Camera frames are processed locally and are not uploaded.\n\n"
-        "Allow JARVIS to request camera access for gestures?"
-    )
-    if platform_name == "nt":
-        import ctypes
-        from ctypes import wintypes
-        if user32 is None:
-            user32 = ctypes.WinDLL("user32", use_last_error=True)
-        message_box = user32.MessageBoxW
-        if hasattr(message_box, "argtypes"):
-            message_box.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
-            message_box.restype = wintypes.INT
-        flags = 0x00000004 | 0x00000020 | 0x00040000 | 0x00010000
-        return message_box(None, message, title, flags) == 6
-    return bool(messagebox_module.askyesno(title, message, parent=parent))
 
 def ask_microphone_consent(parent=None, platform_name=None, user32=None,
                            messagebox_module=messagebox) -> bool:
@@ -1762,19 +1719,6 @@ class JarvisDesktop:
             self._first_launch_permission_setup()
             if self.settings.get("microphone_consent_granted"):
                 self._request_microphone_access()
-        if camera_consent_required(self.settings):
-            accepted = ask_camera_consent(parent=self.root)
-            record_camera_consent(self.settings, accepted)
-            try:
-                save_settings(self.settings)
-            except OSError as exc:
-                logging.getLogger("jarvis").warning(
-                    "Could not save camera consent choice: %s", exc
-                )
-            if accepted:
-                self._set_status("Camera consent saved. Webcam remains off until ENABLE GESTURES is pressed.")
-            else:
-                self._set_status("Camera permission declined. Webcam remains off; other HUD features remain available.")
         if self.settings.get("voice_setup_completed"):
             return
         if not self.settings.get("microphone_consent_granted"):
@@ -4702,11 +4646,6 @@ class JarvisWebBridge:
             return False
         return self._dispatch(app.open_settings)
 
-    def camera_access_allowed(self):
-        """Return the user's saved opt-in; never grant camera access implicitly."""
-        app = self.app_state.get("app")
-        return bool(app and app.settings.get("camera_consent_granted") is True)
-
     def get_settings(self):
         app = self.app_state.get("app")
         if app is None:
@@ -5008,15 +4947,13 @@ def run_web_hud():
             raise FileNotFoundError(f"JARVIS HUD asset not found: {asset_path}")
         return asset_path.read_text(encoding="utf-8")
 
-    # Load the gesture API before the extension that consumes it. Keep each
-    # asset external so the original HUD HTML remains byte-for-byte unchanged.
-    gesture_logic_source = read_hud_asset("jarvis_gesture_logic.js")
+    # Keep the original HUD HTML external and unchanged; add only the
+    # animated hologram and runtime bindings after the WebView document loads.
     extensions_source = read_hud_asset("jarvis_hud_extensions.js")
     runtime_source = read_hud_asset("jarvis_hud_runtime.js")
 
     def inject_hud_assets(*_args):
         for label, source in (
-            ("gesture logic", gesture_logic_source),
             ("HUD extensions", extensions_source),
             ("runtime adapter", runtime_source),
         ):
@@ -5026,9 +4963,8 @@ def run_web_hud():
             except Exception:
                 logger.exception("Could not inject external HUD %s", label)
 
-    # Keep the uploaded 116 KB HTML artwork byte-for-byte unchanged. Gesture
-    # controls, hologram, runtime bindings and click actions are layered on
-    # after the WebView document loads.
+    # Keep the uploaded HUD artwork byte-for-byte unchanged. The animated
+    # hologram, runtime bindings and click actions are layered on after load.
     window.events.loaded += inject_hud_assets
     logger.info("HUD window created; entering webview event loop")
     webview.start(debug=False)
