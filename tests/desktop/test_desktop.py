@@ -2814,6 +2814,67 @@ class HudBridgeActionTests(unittest.TestCase):
         self.assertEqual(calls, [("queued", 0), ("opened",)])
 
 
+class OllamaRuntimeIntegrationTests(unittest.TestCase):
+    def test_ollama_chat_restarts_service_and_retries_once(self):
+        from unittest.mock import patch
+
+        calls = []
+
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, size=-1):
+                return json.dumps({"message": {"content": "Qwen is ready"}}).encode("utf-8")
+
+        class Opener:
+            def open(self, request, timeout):
+                calls.append((request.full_url, timeout))
+                if len(calls) == 1:
+                    raise jarvis_desktop.urllib.error.URLError("connection refused")
+                return Response()
+
+        with (
+            patch.object(jarvis_desktop.urllib.request, "build_opener", return_value=Opener()),
+            patch.object(jarvis_desktop, "_start_ollama_service") as start_service,
+        ):
+            result = jarvis_desktop._ollama_chat(
+                [{"role": "user", "content": "Say ready"}],
+                {"num_ctx": 1024, "num_predict": 24, "temperature": 0.0},
+            )
+
+        self.assertEqual(result, "Qwen is ready")
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(url == jarvis_desktop.LOCAL_AI_ENDPOINT for url, _ in calls))
+        start_service.assert_called_once_with()
+
+    def test_bundled_ollama_configuration_uses_app_local_model_store(self):
+        import os
+        import sys
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporary:
+            app_dir = Path(temporary)
+            executable = app_dir / "JARVIS.exe"
+            bundled = app_dir / "offline-ai-bundle"
+            ollama = bundled / "ollama" / "ollama.exe"
+            models = bundled / "models"
+            ollama.parent.mkdir(parents=True)
+            models.mkdir(parents=True)
+            ollama.write_bytes(b"test executable")
+            with (
+                patch.object(sys, "frozen", True, create=True),
+                patch.object(sys, "executable", str(executable)),
+                patch.dict(os.environ, {"OLLAMA_HOST": "127.0.0.1:11434"}, clear=False),
+            ):
+                found = jarvis_desktop._find_ollama_executable()
+                self.assertEqual(os.environ["OLLAMA_HOST"], "127.0.0.1:11435")
+                self.assertEqual(os.environ["OLLAMA_MODELS"], str(models))
+            self.assertEqual(found, str(ollama))
+
+
 class HybridAiTests(unittest.TestCase):
     def test_local_ollama_reply_uses_bounded_context_and_returns_content(self):
         from unittest.mock import patch
