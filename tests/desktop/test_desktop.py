@@ -710,6 +710,7 @@ class WakewordSetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             model = Path(temporary) / "jarvis_first_party.onnx"
             model.write_bytes(b"model")
+            model.with_name(model.name + ".data").write_bytes(b"external-weights")
             with (
                 patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=model),
                 patch("importlib.util.find_spec", return_value=object()),
