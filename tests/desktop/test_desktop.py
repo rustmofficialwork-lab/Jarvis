@@ -346,6 +346,33 @@ class WakewordActivationAnnouncementTests(unittest.TestCase):
 
 
 class WakewordSetupTests(unittest.TestCase):
+    def test_wakeword_auto_start_requires_completed_setup_current_consent_and_assets(self):
+        settings = {
+            "voice_setup_completed": True,
+            "microphone_consent_granted": True,
+        }
+        ready = jarvis_desktop.wakeword_auto_start_ready
+        self.assertTrue(ready(
+            settings, model_ready=True, owner_voice_ready=True, consent_required=False
+        ))
+        self.assertFalse(ready(
+            settings, model_ready=True, owner_voice_ready=True, consent_required=True
+        ))
+        self.assertFalse(ready(
+            settings, model_ready=False, owner_voice_ready=True, consent_required=False
+        ))
+        self.assertFalse(ready(
+            settings, model_ready=True, owner_voice_ready=False, consent_required=False
+        ))
+        self.assertFalse(ready(
+            {"voice_setup_completed": False, "microphone_consent_granted": True},
+            model_ready=True, owner_voice_ready=True, consent_required=False,
+        ))
+        self.assertFalse(ready(
+            {"voice_setup_completed": True, "microphone_consent_granted": False},
+            model_ready=True, owner_voice_ready=True, consent_required=False,
+        ))
+
     def test_openwakeword_assets_use_user_writable_directory_and_selective_download(self):
         import tempfile
         from types import SimpleNamespace
