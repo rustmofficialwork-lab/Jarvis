@@ -226,6 +226,7 @@ class BrainEngine:
         prompt: str,
         history: list[dict],
         *,
+        memory_items: Iterable[str] | None = None,
         fixed_chars: int = 2400,
     ):
         """Prepare the single local-model request through JARVIS's brain coordinator.
@@ -239,7 +240,7 @@ class BrainEngine:
         return prepare(
             prompt,
             history,
-            None,
+            memory_items,
             fixed_chars=fixed_chars,
             authorize=self.authorize,
         )
