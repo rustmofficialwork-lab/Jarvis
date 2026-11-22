@@ -3197,7 +3197,7 @@ class JarvisDesktop:
             )
             if brain_engine is not None else []
         )
-        memories = self._smart_memories(prompt, memories)
+        # BrainEngine owns privacy-aware memory retrieval and relevance ranking.
 
         # Search/weather/news are live-data tasks, not questions for the local model to guess.
         if parse_online_command(prompt) is not None:
