@@ -613,6 +613,18 @@ class WakewordSetupTests(unittest.TestCase):
             self.assertFalse(destination.with_name(destination.name + ".part").exists())
             self.assertFalse(destination.with_name(destination.name + ".data.part").exists())
 
+    def test_wakeword_score_requires_the_exact_model_key(self):
+        score = jarvis_desktop.wakeword_score_for_model({"jarvis_first_party": 0.82}, "jarvis_first_party")
+        self.assertAlmostEqual(score, 0.82)
+        with self.assertRaisesRegex(RuntimeError, "did not return a score"):
+            jarvis_desktop.wakeword_score_for_model({"Jarvis": 0.9}, "jarvis_first_party")
+
+    def test_wakeword_score_rejects_invalid_and_non_probability_values(self):
+        for value in (None, "not-a-number", float("nan"), float("inf"), -0.1, 1.1):
+            with self.subTest(value=value):
+                with self.assertRaises(RuntimeError):
+                    jarvis_desktop.wakeword_score_for_model({"Jarvis": value}, "Jarvis")
+
     def test_first_party_threshold_is_candidate_and_legacy_threshold_is_unchanged(self):
         self.assertEqual(
             jarvis_desktop.wakeword_threshold_for_model(
