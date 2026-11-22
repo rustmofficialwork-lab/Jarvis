@@ -58,6 +58,34 @@ class BrainEngineTests(unittest.TestCase):
         self.assertTrue(any("JARVIS desktop assistant" in item for item in result))
         self.assertFalse(any("cricket" in item for item in result))
 
+    def test_memory_context_falls_back_to_ranked_store_when_context_fails(self):
+        class BrokenContextStore:
+            def context(self, query=None, limit=5):
+                raise RuntimeError("temporary memory read failure")
+
+            def list(self, limit=100):
+                return [
+                    {"content": "JARVIS desktop project notes", "updated_at": "2026-11-22T00:00:00+00:00"},
+                    {"content": "Cricket match notes", "updated_at": "2026-11-22T00:00:00+00:00"},
+                ]
+
+        engine = BrainEngine(BrokenContextStore())
+        result = engine.context_for("JARVIS desktop", enabled=True, limit=3)
+        self.assertTrue(result)
+        self.assertTrue(any("JARVIS desktop" in item for item in result))
+        self.assertFalse(any("Cricket" in item for item in result))
+
+    def test_memory_context_does_not_read_store_when_privacy_is_disabled(self):
+        class ForbiddenStore:
+            def context(self, **kwargs):
+                raise AssertionError("memory access must be disabled")
+
+            def list(self, *args, **kwargs):
+                raise AssertionError("memory access must be disabled")
+
+        engine = BrainEngine(ForbiddenStore())
+        self.assertEqual(engine.context_for("JARVIS", enabled=False), [])
+
     def test_engine_prepares_a_bounded_qwen_request_plan(self):
         plan = self.engine.prepare_model_plan("python code likho", [])
         self.assertEqual(plan.profile.kind, "code")
