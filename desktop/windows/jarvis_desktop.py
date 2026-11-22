@@ -56,9 +56,6 @@ from owner_voice_verification import load_owner_profile, load_encoder, verify_pc
 from voice_permission import request_voice_permission
 
 APP_NAME = "JARVIS"
-# TEMPORARY DIAGNOSTIC: capture one short, local-only utterance 2 seconds after launch.
-# Set False after the microphone/speech pipeline has been verified.
-TEMPORARY_STARTUP_MIC_TEST = True
 try:
     from build_version import APP_VERSION
 except ImportError:
@@ -1721,9 +1718,6 @@ class JarvisDesktop:
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
         self.voice_setup_window = None
         self.root.after(1400, self._begin_first_launch_voice_setup)
-        if TEMPORARY_STARTUP_MIC_TEST:
-            self.root.after(2000, self._run_temporary_startup_microphone_test)
-
     def _first_launch_permission_setup(self):
         if not microphone_consent_required(self.settings):
             return
@@ -2069,81 +2063,6 @@ class JarvisDesktop:
                 self.events.put(("permission_result", {"ok": False, "error": str(exc)}))
 
         threading.Thread(target=worker, name="JARVIS-microphone-check", daemon=True).start()
-
-    def _run_temporary_startup_microphone_test(self):
-        """Capture and transcribe one short utterance locally, without the wake word."""
-        if not TEMPORARY_STARTUP_MIC_TEST:
-            return
-        if (
-            microphone_consent_required(self.settings)
-            or self.settings.get("microphone_consent_granted") is not True
-        ):
-            self._set_status("Temporary microphone test skipped: microphone consent is not granted.")
-            return
-        if getattr(self, "startup_mic_test_running", False):
-            return
-
-        self.startup_mic_test_running = True
-        self._set_status("TEMPORARY MIC TEST: listening once. Say a short sentence now.")
-        if self.voice_setup_window is not None:
-            try:
-                self.voice_setup_status_var.set("TEMPORARY MIC TEST — SPEAK A SHORT SENTENCE")
-            except tk.TclError:
-                self.voice_setup_window = None
-
-        def worker():
-            result = {"ok": False}
-            audio_data = None
-            try:
-                import speech_recognition as sr
-
-                recognizer = sr.Recognizer()
-                with sr.Microphone() as source:
-                    recognizer.adjust_for_ambient_noise(source, duration=0.4)
-                    audio_data = recognizer.listen(
-                        source, timeout=8, phrase_time_limit=8
-                    )
-
-                language = self.settings.get("language", "en-IN")
-                locales = list(dict.fromkeys((language, "en-IN", "hi-IN")))
-                errors = []
-                transcript = ""
-                for locale in locales:
-                    try:
-                        transcript = transcribe_offline_vosk(audio_data, locale)
-                    except OfflineModelUnavailable as exc:
-                        errors.append(str(exc))
-                        continue
-                    except Exception as exc:
-                        errors.append(str(exc))
-                        break
-                    if transcript:
-                        break
-
-                if transcript:
-                    result = {"ok": True, "text": transcript[:500]}
-                else:
-                    result = {
-                        "ok": False,
-                        "error": "; ".join(errors) if errors
-                        else "The offline speech model did not recognize any words.",
-                    }
-            except Exception as exc:
-                if exc.__class__.__name__ == "WaitTimeoutError":
-                    result = {
-                        "ok": False,
-                        "error": "No speech was heard within 8 seconds. Try again and speak after the listening message.",
-                    }
-                else:
-                    result = {"ok": False, "error": str(exc)}
-            finally:
-                # The captured audio is used only in memory for this one test.
-                audio_data = None
-                self.events.put(("startup_mic_test_result", result))
-
-        threading.Thread(
-            target=worker, name="JARVIS-temporary-startup-mic-test", daemon=True
-        ).start()
 
     @staticmethod
     def _open_microphone_privacy_settings():
@@ -4498,31 +4417,6 @@ class JarvisDesktop:
                                 )
                         except tk.TclError:
                             self.voice_setup_window = None
-                elif kind == "startup_mic_test_result":
-                    self.startup_mic_test_running = False
-                    if value.get("ok"):
-                        transcript = str(value.get("text", ""))[:500]
-                        self._append("MIC TEST", transcript)
-                        self._set_status(
-                            f"Temporary microphone + offline speech test passed. Heard: {transcript}"
-                        )
-                        if self.voice_setup_window is not None:
-                            try:
-                                self.voice_setup_status_var.set("MICROPHONE + OFFLINE SPEECH TEST PASSED")
-                                self.voice_setup_mic_var.set(
-                                    "1. Microphone and offline speech recognition passed."
-                                )
-                            except tk.TclError:
-                                self.voice_setup_window = None
-                    else:
-                        detail = str(value.get("error", "Unknown microphone test error."))[:300]
-                        self._set_status(f"Temporary microphone test failed: {detail}")
-                        if self.voice_setup_window is not None:
-                            try:
-                                self.voice_setup_status_var.set("TEMPORARY MICROPHONE TEST FAILED")
-                                self.voice_setup_mic_var.set(f"1. Microphone test failed: {detail}")
-                            except tk.TclError:
-                                self.voice_setup_window = None
                 elif kind == "permission_result":
                     if value.get("ok"):
                         self._set_status("Microphone access is available. Voice listening still starts only when you activate it.")
