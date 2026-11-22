@@ -23,7 +23,8 @@ def main() -> int:
     except (OSError, RuntimeError, ValueError) as exc:
         parser.exit(1, f"Model installation failed: {exc}\n")
     print(f"First-party JARVIS wake-word model installed: {destination}")
-    print("Restart JARVIS voice listening to use it. The app prefers this model over the legacy publisher model.")
+    print(f"Required external-data companion installed: {destination.with_name(destination.name + ".data")}")
+    print("Both files were validated. Restart JARVIS to use the first-party wake-word model.")
     return 0
 
 
