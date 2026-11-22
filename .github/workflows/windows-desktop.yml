@@ -65,9 +65,6 @@ jobs:
         env:
           PYTHONPATH: desktop/windows
         run: python -m unittest discover -s tests/desktop -p "test_*.py" -v
-      - name: Test HUD gesture logic
-        run: node --test tests/desktop/test_jarvis_gesture_logic.cjs
-
 
   web-checks:
     name: Web dashboard checks
@@ -176,8 +173,7 @@ jobs:
         run: |
           $vendor = Join-Path $PWD "desktop/windows/vendor"
           $threeTemp = Join-Path $env:RUNNER_TEMP "jarvis-three"
-          $visionTemp = Join-Path $env:RUNNER_TEMP "jarvis-vision"
-          New-Item -ItemType Directory -Force -Path $vendor, $threeTemp, $visionTemp | Out-Null
+          New-Item -ItemType Directory -Force -Path $vendor, $threeTemp | Out-Null
 
           $threeArchive = npm pack three@0.160.0 --pack-destination $env:RUNNER_TEMP --silent | Select-Object -Last 1
           if ($LASTEXITCODE -ne 0 -or -not $threeArchive) { throw "Could not download the pinned Three.js package." }
@@ -188,26 +184,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $licenseDir | Out-Null
           Copy-Item (Join-Path $threeTemp "package/LICENSE") (Join-Path $licenseDir "THREE-MIT.txt") -Force
 
-          $visionArchive = npm pack @mediapipe/tasks-vision@0.10.14 --pack-destination $env:RUNNER_TEMP --silent | Select-Object -Last 1
-          if ($LASTEXITCODE -ne 0 -or -not $visionArchive) { throw "Could not download the pinned MediaPipe package." }
-          tar -xf (Join-Path $env:RUNNER_TEMP $visionArchive) -C $visionTemp
-          $visionVendor = Join-Path $vendor "mediapipe"
-          New-Item -ItemType Directory -Force -Path $visionVendor | Out-Null
-          Copy-Item (Join-Path $visionTemp "package/vision_bundle.mjs") (Join-Path $visionVendor "vision_bundle.mjs") -Force
-          Copy-Item (Join-Path $visionTemp "package/wasm") (Join-Path $visionVendor "wasm") -Recurse -Force
-          $modelDir = Join-Path $visionVendor "models"
-          New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
-          Invoke-WebRequest -Uri "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" -OutFile (Join-Path $modelDir "hand_landmarker.task")
-          if ((Get-Item (Join-Path $modelDir "hand_landmarker.task")).Length -lt 1000000) { throw "The MediaPipe hand-landmarker model download is missing or incomplete." }
-          Invoke-WebRequest -Uri "https://www.apache.org/licenses/LICENSE-2.0.txt" -OutFile (Join-Path $licenseDir "APACHE-2.0.txt")
           Copy-Item "docs/legal/THIRD_PARTY_NOTICES.md" (Join-Path $vendor "THIRD_PARTY_NOTICES.md") -Force
 
-          if (-not (Test-Path (Join-Path $vendor "three.module.js")) -or
-              -not (Test-Path (Join-Path $visionVendor "vision_bundle.mjs")) -or
-              -not (Test-Path (Join-Path $visionVendor "wasm")) -or
-              -not (Test-Path (Join-Path $modelDir "hand_landmarker.task"))) {
-            throw "One or more bundled HUD runtime or hand-landmarker model assets are missing."
-          }
       - name: Bundle Qwen3.5 4B and offline Ollama runtime
         shell: pwsh
         run: |
@@ -333,7 +311,7 @@ jobs:
           python -c "import runpy; assert runpy.run_path('desktop/windows/build_version.py')['APP_VERSION'] == '$version'"
       - name: Build standalone Windows executable
         working-directory: desktop/windows
-        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_hud_runtime.js;." --add-data "jarvis_gesture_logic.js;." --add-data "vendor;vendor" --collect-all webview --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --exclude-module android --exclude-module onnxruntime.quantization --collect-all huggingface_hub --collect-all playwright --collect-all greenlet --paths . --hidden-import browser_automation --hidden-import build_version --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
+        run: pyinstaller --noconfirm --onedir --windowed --add-data "jarvis_hud.html;." --add-data "jarvis_hud_extensions.js;." --add-data "jarvis_hud_runtime.js;." --add-data "vendor;vendor" --collect-all webview --collect-all proxy_tools --collect-all pystray --collect-all PIL --collect-all vosk --collect-all openwakeword --collect-all onnxruntime --exclude-module android --exclude-module onnxruntime.quantization --collect-all huggingface_hub --collect-all playwright --collect-all greenlet --paths . --hidden-import browser_automation --hidden-import build_version --hidden-import owner_voice_setup --hidden-import owner_voice_verification --name JARVIS jarvis_desktop.py
       - name: Smoke-test packaged Windows executable
         shell: pwsh
         run: |
