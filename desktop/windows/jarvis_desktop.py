@@ -388,6 +388,7 @@ def install_first_party_wakeword_model(source_path: Path,
 
 def wakeword_score_for_model(scores, model_name: str) -> float:
     """Read the requested detector score explicitly; never hide a model-key mismatch as zero."""
+    import math
     if not isinstance(scores, dict) or model_name not in scores:
         available = ', '.join(sorted(str(key) for key in scores)) if isinstance(scores, dict) else 'no score mapping'
         raise RuntimeError(
