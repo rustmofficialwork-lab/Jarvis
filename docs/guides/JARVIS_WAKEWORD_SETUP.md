@@ -9,7 +9,7 @@ JARVIS prefers the custom-trained first-party ONNX classifier at `%APPDATA%\\JAR
 3. If the wake-word model is not installed, choose **Set up wake word**. JARVIS opens the model publisher's page. Sign in there if the publisher requests it, review the license, and download the ONNX model.
 4. Leave the downloaded filename unchanged. JARVIS watches the Windows **Downloads** folder, validates the ONNX file, and copies it to the app's wake-word folder automatically.
 5. Choose **Test wake word — say Jarvis** and say **"Jarvis"** clearly three times when prompted. The short test runs locally, saves no audio, and setup only finishes after all three detections register (the counter shows `1/3`, `2/3`, then `3/3`).
-6. After setup, activate Voice Listening when you want JARVIS to listen for the wake word. Owner voice enrollment is a separate required gate; see [OWNER_VOICE_SETUP.md](OWNER_VOICE_SETUP.md).
+6. After setup is completed, JARVIS automatically starts local wake-word listening on the next launch (and immediately after the setup wizard). You can stop Voice Listening from the HUD at any time. Owner voice enrollment is required before wake activation; see [OWNER_VOICE_SETUP.md](OWNER_VOICE_SETUP.md).
 
 Expected model filename:
 
@@ -45,7 +45,7 @@ Replace `2` with the index shown for the microphone you want to test. If no inde
 
 The local diagnostic runs three short phases: quiet room, five spoken "Jarvis" attempts, and ordinary background noise. It reports peak confidence and activation counts. It does not save or upload audio. Repeat it with the microphone, distance, room and speaker volume you normally use. A spot-check is not a guarantee of zero false activations or perfect recall.
 
-The live detector requires confidence above its model-specific threshold for two consecutive 80 ms audio frames, plus its existing two-second cooldown. The legacy publisher model retains 0.5; the first-party model currently uses 0.7 as a provisional candidate from its initial feature-array sweep, not as a microphone-calibrated production threshold. This filters isolated confidence spikes but does not replace real-room testing.
+The live detector requires confidence above its model-specific threshold for two consecutive 80 ms audio frames, plus its existing two-second cooldown. Automatic listening starts only after the user completes the voice wizard, grants the current microphone-consent prompt, installs a wake-word model, and enrolls the local owner voice. A new consent prompt is shown because wake listening can now start automatically on app launch. The legacy publisher model retains 0.5; the first-party model currently uses 0.7 as a provisional candidate from its initial feature-array sweep, not as a microphone-calibrated production threshold. This filters isolated confidence spikes but does not replace real-room testing.
 
 ## Model and license
 
