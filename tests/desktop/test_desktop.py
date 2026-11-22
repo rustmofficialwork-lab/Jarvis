@@ -2991,9 +2991,8 @@ class OllamaRuntimeIntegrationTests(unittest.TestCase):
             ):
                 found = jarvis_desktop._find_ollama_executable()
                 self.assertEqual(os.environ["OLLAMA_HOST"], "127.0.0.1:11435")
-                self.assertEqual(
-                    Path(os.environ["OLLAMA_MODELS"]).resolve(),
-                    models.resolve(),
+                self.assertTrue(
+                    os.path.samefile(os.environ["OLLAMA_MODELS"], models)
                 )
             self.assertEqual(found, str(ollama))
 
