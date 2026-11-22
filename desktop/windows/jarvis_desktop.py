@@ -1000,8 +1000,8 @@ def _run_single_local_command(command: str, popen=None, open_url=None, dry_run: 
     if kind == "app":
         launch(target, shell=False)
     else:
-        if browse(target) is False:
-            raise RuntimeError("Windows could not open the requested website.")
+        if not browse(target):
+            raise RuntimeError("Windows could not confirm that the requested website was opened.")
     return response
 
 
