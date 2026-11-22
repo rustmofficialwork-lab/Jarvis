@@ -1493,7 +1493,7 @@ def _ollama_chat(messages: list[dict], options: dict) -> str:
     def raise_for_http(exc: urllib.error.HTTPError):
         if exc.code == 404:
             raise RuntimeError(
-                "Offline AI model is not installed yet. Run the JARVIS Offline AI setup once, or open PowerShell and run: ollama pull qwen3.5:4b."
+                "Qwen3.5 4B is missing from JARVIS local model storage. Rerun setup_offline_ai.ps1 from the JARVIS installation folder; if the bundled model is missing, reinstall the complete Full Offline Setup."
             ) from exc
         detail = exc.read(1024).decode("utf-8", errors="replace")
         raise RuntimeError(f"Local Ollama returned HTTP {exc.code}: {detail}") from exc
