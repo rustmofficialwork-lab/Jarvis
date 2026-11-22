@@ -63,7 +63,7 @@ class CheckTests(unittest.TestCase):
     def test_missing_model_gives_exact_pull_command(self):
         health = bh.check_local_brain(opener=opener_returning(["phi3:mini"]), psutil_module=ram(8, 3))
         self.assertTrue(health.ollama_running and not health.model_installed)
-        self.assertIn("ollama pull qwen3.5:4b", bh.format_brain_report(health))
+        self.assertIn("setup_offline_ai.ps1", bh.format_brain_report(health))
 
     def test_low_ram_warns_and_disables_deep_think(self):
         health = bh.check_local_brain(opener=opener_returning(["qwen3.5:4b"]), psutil_module=ram(8, 1.0))
