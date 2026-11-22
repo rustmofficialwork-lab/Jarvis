@@ -2960,7 +2960,7 @@ class HybridAiTests(unittest.TestCase):
         app.settings = {"share_memory_with_ai": True}
         app.history = [{"role": "user", "content": "previous turn"}]
         app.events = queue.Queue()
-        plan = SimpleNamespace(grounding=[], options={"num_ctx": 4096}, history=SimpleNamespace(summary="", messages=[]), profile=SimpleNamespace(deliberate=False))
+        plan = SimpleNamespace(memories=["JARVIS project memory"], grounding=[], options={"num_ctx": 4096}, history=SimpleNamespace(summary="", messages=[]), profile=SimpleNamespace(deliberate=False))
         brain = SimpleNamespace(
             context_for=lambda prompt, enabled, limit: ["JARVIS project memory"],
             prepare_model_plan=lambda prompt, history, fixed_chars: plan,
@@ -2975,6 +2975,7 @@ class HybridAiTests(unittest.TestCase):
 
         self.assertEqual(answer, "Qwen response")
         self.assertEqual(local.call_args.args[2], ["JARVIS project memory"])
+        self.assertEqual(local.call_args.kwargs["brain_plan"].memories, ["JARVIS project memory"])
         self.assertIs(local.call_args.kwargs["brain_plan"], plan)
 
     def test_disabled_memory_sharing_never_passes_memory_to_qwen(self):
