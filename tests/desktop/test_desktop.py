@@ -11,6 +11,15 @@ jarvis_desktop = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(jarvis_desktop)
 
 
+class InstallerConfigurationTests(unittest.TestCase):
+    def test_offline_setup_run_entry_uses_supported_inno_flags(self):
+        installer = (DESKTOP_DIR.parents[1] / "installer" / "windows" / "JARVIS.iss").read_text(encoding="utf-8")
+        run_section = installer.split("[Run]", 1)[1].split("[UninstallRun]", 1)[0]
+        setup_entry = next(line for line in run_section.splitlines() if "setup_offline_ai.ps1" in line)
+        self.assertIn("Flags: waituntilterminated", setup_entry)
+        self.assertNotIn("Flags: waituntilterminated check", setup_entry)
+
+
 class AdaptiveBrowserPlanningTests(unittest.TestCase):
     def test_next_batch_uses_latest_page_and_completed_actions(self):
         response = json.dumps({
