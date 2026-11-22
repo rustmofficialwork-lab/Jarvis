@@ -3169,8 +3169,15 @@ class JarvisDesktop:
         """Build the smart-brain plan for the offline model; any failure falls back to the plain reply."""
         try:
             fixed = len(SYSTEM_PROMPT) + 700 + sum(len(item) for item in memories)
+            history = filter_memory_history(self.history)
+            brain_engine = getattr(self, "brain_engine", None)
+            if brain_engine is not None:
+                return brain_engine.prepare_model_plan(
+                    prompt, history, fixed_chars=fixed
+                )
+            # Compatibility fallback for lightweight tests and legacy app adapters.
             return prepare_brain_plan(
-                prompt, filter_memory_history(self.history), None, fixed_chars=fixed
+                prompt, history, None, fixed_chars=fixed
             )
         except Exception:
             logging.getLogger("jarvis").info("Smart brain planning failed; using the plain offline reply.")
