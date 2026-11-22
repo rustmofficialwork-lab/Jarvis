@@ -124,7 +124,7 @@ def format_brain_report(health: BrainHealth) -> str:
             "kar leta hai, par pehli baar 10-20 second lag sakte hain."
         )
     elif not health.model_installed:
-        lines.append(f"Agla kadam: PowerShell me ye chalao: ollama pull {health.model}")
+        lines.append("Agla kadam: JARVIS installation folder se setup_offline_ai.ps1 dobara chalao. Agar bundled model missing bataye, complete Full Offline Setup reinstall karo.")
     elif health.low_ram:
         lines.append(
             "RAM kam bachi hai. Browser tabs aur baaki apps band karo, warna offline jawab bahut dheere aayenge. "
