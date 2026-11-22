@@ -206,7 +206,7 @@ class BrainEngine:
                         for item in raw_items
                         if isinstance(item, str) and item.strip()
                     ]
-            except (TypeError, ValueError, OSError, RuntimeError):
+            except Exception:
                 # Continue to the deterministic list/ranker fallback below.
                 items = []
 
@@ -217,7 +217,7 @@ class BrainEngine:
 
                 ranked = rank_memories(query, list_method(), limit=limit)
                 return list(dict.fromkeys([*ranked, *items]))[:limit]
-        except (TypeError, ValueError, OSError, RuntimeError):
+        except Exception:
             pass
         return items[:limit]
 
