@@ -386,6 +386,21 @@ def install_first_party_wakeword_model(source_path: Path,
     return destination
 
 
+def wakeword_score_for_model(scores, model_name: str) -> float:
+    """Read the requested detector score explicitly; never hide a model-key mismatch as zero."""
+    if not isinstance(scores, dict) or model_name not in scores:
+        available = ', '.join(sorted(str(key) for key in scores)) if isinstance(scores, dict) else 'no score mapping'
+        raise RuntimeError(
+            f"Wake-word detector did not return a score for {model_name!r} (available: {available})."
+        )
+    try:
+        score = float(scores[model_name])
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RuntimeError(f"Wake-word detector returned an invalid score for {model_name!r}.") from exc
+    if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+        raise RuntimeError(f"Wake-word detector returned an out-of-range score for {model_name!r}.")
+    return score
+
 def wakeword_threshold_for_model(model_path: Path) -> float:
     """Return the provisional threshold for the custom model or the legacy default."""
     if Path(model_path).name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name:
@@ -1989,7 +2004,7 @@ class JarvisDesktop:
                         )
                     frame = np.frombuffer(raw, dtype=np.int16)
                     scores = detector.predict(frame)
-                    confidence = float(scores.get(model_path.stem, 0.0))
+                    confidence = wakeword_score_for_model(scores, model_path.stem)
                     activated, streak = update_wakeword_activation(
                         confidence, streak, threshold=wakeword_threshold_for_model(model_path), required_frames=2
                     )
@@ -3399,7 +3414,7 @@ class JarvisDesktop:
                         self.stop_event.wait(1)
                         continue
                     scores = detector.predict(frame)
-                    confidence = float(scores.get(model_path.stem, 0.0))
+                    confidence = wakeword_score_for_model(scores, model_path.stem)
                     activated, activation_frames = update_wakeword_activation(
                         confidence, activation_frames, threshold=wakeword_threshold_for_model(model_path), required_frames=2
                     )
