@@ -24,6 +24,7 @@ from jarvis_desktop import (
     prepare_openwakeword_assets,
     update_wakeword_activation,
     wakeword_threshold_for_model,
+    wakeword_model_files_ready,
 )
 
 
@@ -143,8 +144,10 @@ def main() -> int:
         else:
             print("Using the Windows/PyAudio default input device.")
 
-        if not model_path.is_file():
-            print(f"Wake-word model not found: {model_path}")
+        if not wakeword_model_files_ready(model_path):
+            print(f"Wake-word model files are missing or incomplete: {model_path}")
+            if model_path.name == "jarvis_first_party.onnx":
+                print("Both jarvis_first_party.onnx and jarvis_first_party.onnx.data must exist and be non-empty.")
             print("Complete the in-app Set up wake word step first.")
             return 2
 
