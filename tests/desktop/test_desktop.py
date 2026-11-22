@@ -465,6 +465,53 @@ class WakewordSetupTests(unittest.TestCase):
             jarvis_desktop.prepare_openwakeword_assets(module, custom_path, Path(temporary) / "appdata")
         self.assertEqual(calls, [["__jarvis_custom__"]])
 
+    def test_zero_byte_openwakeword_runtime_asset_is_rejected(self):
+        import tempfile
+        from types import SimpleNamespace
+
+        with tempfile.TemporaryDirectory() as temporary:
+            def fake_download_models(model_names, target_directory):
+                root = Path(target_directory)
+                (root / "melspectrogram.onnx").write_bytes(b"")
+                (root / "embedding_model.onnx").write_bytes(b"embedding")
+
+            module = SimpleNamespace(utils=SimpleNamespace(download_models=fake_download_models))
+            with self.assertRaisesRegex(RuntimeError, "melspectrogram.onnx"):
+                jarvis_desktop.prepare_openwakeword_assets(
+                    module, Path(temporary) / "jarvis_first_party.onnx",
+                    Path(temporary) / "appdata",
+                )
+
+    def test_manual_listener_refuses_incomplete_first_party_model_pair(self):
+        import tempfile
+        import threading
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {
+            "microphone_consent_granted": True,
+            "microphone_consent_version": jarvis_desktop.MICROPHONE_CONSENT_VERSION,
+        }
+        app.wake_thread = None
+        app.stop_event = threading.Event()
+        statuses = []
+        app._set_status = statuses.append
+        app._ensure_offline_model = lambda _language: self.fail(
+            "Speech model setup must not start when wake-word files are incomplete"
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            model = Path(temporary) / "jarvis_first_party.onnx"
+            model.write_bytes(b"onnx")
+            with (
+                patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=model),
+                patch.object(jarvis_desktop, "microphone_consent_required", return_value=False),
+            ):
+                app.toggle_listening()
+
+        self.assertTrue(statuses)
+        self.assertIn("jarvis_first_party.onnx.data", statuses[-1])
+        self.assertFalse(app.stop_event.is_set())
+
     def test_first_party_model_requires_nonempty_onnx_and_data_pair(self):
         import tempfile
         with tempfile.TemporaryDirectory() as temporary:
