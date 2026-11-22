@@ -392,6 +392,7 @@ class WakewordSetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             model = Path(temporary) / "jarvis_first_party.onnx"
             model.write_bytes(b"validated-model-placeholder")
+            model.with_name(model.name + ".data").write_bytes(b"external-weights")
             with (
                 patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=model),
                 patch.object(jarvis_desktop, "microphone_consent_required", return_value=False),
@@ -414,12 +415,15 @@ class WakewordSetupTests(unittest.TestCase):
         app._owner_voice_profile_ready = lambda: True
         app.toggle_listening = lambda: self.fail("must not toggle an already-running listener")
 
-        with (
-            patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=Path("existing-model.onnx")),
-            patch.object(jarvis_desktop.Path, "is_file", return_value=True),
-            patch.object(jarvis_desktop, "microphone_consent_required", return_value=False),
-        ):
-            app._auto_start_wakeword_if_ready()
+        with tempfile.TemporaryDirectory() as temporary:
+            model = Path(temporary) / "jarvis_first_party.onnx"
+            model.write_bytes(b"model")
+            model.with_name(model.name + ".data").write_bytes(b"external-data")
+            with (
+                patch.object(jarvis_desktop, "active_wakeword_model_path", return_value=model),
+                patch.object(jarvis_desktop, "microphone_consent_required", return_value=False),
+            ):
+                app._auto_start_wakeword_if_ready()
 
     def test_openwakeword_assets_use_user_writable_directory_and_selective_download(self):
         import tempfile
