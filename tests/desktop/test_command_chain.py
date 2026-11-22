@@ -42,7 +42,7 @@ class RunChainTests(unittest.TestCase):
         log = []
         out = cc.run_chain("a then b", self.runner({"a": "A done.", "b": "B done."}, log))
         self.assertEqual(log, ["a", "b"])
-        self.assertEqual(out, "Done - 2 steps. A done. B done.")
+        self.assertEqual(out, "Completed - 2 steps confirmed. A done. B done.")
 
     def test_one_unknown_step_runs_nothing(self):
         log = []
@@ -53,6 +53,39 @@ class RunChainTests(unittest.TestCase):
         known = {c: "ok" for c in "abcde"}
         self.assertIsNone(cc.run_chain("a then b then c then d then e", self.runner(known, [])))
 
+    def test_dry_run_exception_executes_nothing(self):
+        executed = []
+        def single(clause, dry_run=False):
+            if dry_run and clause == "b":
+                raise RuntimeError("preview failed")
+            if not dry_run:
+                executed.append(clause)
+            return "ok"
+        self.assertIsNone(cc.run_chain("a then b", single))
+        self.assertEqual(executed, [])
+
+    def test_empty_dry_run_result_rejects_entire_chain(self):
+        executed = []
+        def single(clause, dry_run=False):
+            if dry_run and clause == "b":
+                return "   "
+            if not dry_run:
+                executed.append(clause)
+            return "ok"
+        self.assertIsNone(cc.run_chain("a then b", single))
+        self.assertEqual(executed, [])
+
+    def test_missing_execution_confirmation_never_reports_done(self):
+        def single(clause, dry_run=False):
+            if dry_run:
+                return "recognized"
+            return "done" if clause == "a" else None
+        with self.assertRaises(RuntimeError) as ctx:
+            cc.run_chain("a then b", single)
+        self.assertIn("Step 2", str(ctx.exception))
+        self.assertIn("no completion confirmation", str(ctx.exception))
+        self.assertNotIn("Completed - 2 steps", str(ctx.exception))
+
     def test_failure_reports_the_step(self):
         def single(clause, dry_run=False):
             if clause == "b" and not dry_run:
@@ -61,7 +94,7 @@ class RunChainTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             cc.run_chain("a then b", single)
         self.assertIn("Step 2", str(ctx.exception))
-        self.assertIn("1 step(s) completed", str(ctx.exception))
+        self.assertIn("1 step(s) confirmed", str(ctx.exception))
 
 
 class DesktopChainTests(unittest.TestCase):
@@ -80,7 +113,7 @@ class DesktopChainTests(unittest.TestCase):
             "open notepad and then open youtube",
             popen=lambda target, shell=False: launched.append(target), open_url=lambda url: opened.append(url) or True)
         self.assertEqual((launched, opened), ([["notepad.exe"]], ["https://www.youtube.com"]))
-        self.assertTrue(out.startswith("Done - 2 steps."))
+        self.assertTrue(out.startswith("Completed - 2 steps confirmed."))
 
     def test_unknown_step_launches_nothing(self):
         launched = []
