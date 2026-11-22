@@ -1238,6 +1238,14 @@ WAKE_ACTIVATION_PHRASES = (
     "Aapka JARVIS active hai. Boliye.",
     "Ji, main taiyaar hoon. Bataiye.",
     "Yes, I'm listening. Go ahead.",
+    "JARVIS ready hai. Aapka command?",
+    "Ji, sun raha hoon. Kya karna hai?",
+    "At your service. Boliye.",
+    "Wake word detected. Main sun raha hoon.",
+    "System active hai. Aap bol sakte hain.",
+    "Haan, JARVIS taiyaar hai.",
+    "I'm here. What can I do for you?",
+    "Ji, aapki awaaz aa rahi hai. Boliye.",
 )
 
 
