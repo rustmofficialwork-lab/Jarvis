@@ -1553,8 +1553,10 @@ def local_chat_completion(prompt: str, history: list[dict],
          + " Do not claim to have executed desktop tools that were not provided in this conversation."},
         {"role": "system", "content": language_hint},
     ]
-    if memories:
-        safe_memories = [str(item).strip()[:400] for item in memories if str(item).strip()]
+    plan_memories = getattr(brain_plan, "memories", None) if brain_plan is not None else None
+    selected_memories = plan_memories if plan_memories is not None else memories
+    if selected_memories:
+        safe_memories = [str(item).strip()[:400] for item in selected_memories if str(item).strip()]
         if safe_memories:
             messages.append({
                 "role": "system",
@@ -3173,7 +3175,7 @@ class JarvisDesktop:
             brain_engine = getattr(self, "brain_engine", None)
             if brain_engine is not None:
                 return brain_engine.prepare_model_plan(
-                    prompt, history, fixed_chars=fixed
+                    prompt, history, memory_items=memories, fixed_chars=fixed
                 )
             # Compatibility fallback for lightweight tests and legacy app adapters.
             return prepare_brain_plan(
