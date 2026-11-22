@@ -480,6 +480,31 @@ class WakewordSetupTests(unittest.TestCase):
             jarvis_desktop.prepare_openwakeword_assets(module, custom_path, Path(temporary) / "appdata")
         self.assertEqual(calls, [["__jarvis_custom__"]])
 
+    def test_openwakeword_retries_when_tflite_exists_but_onnx_partner_is_missing(self):
+        import tempfile
+        from types import SimpleNamespace
+
+        calls = []
+        with tempfile.TemporaryDirectory() as temporary:
+            def fake_download_models(model_names, target_directory):
+                calls.append(list(model_names))
+                root = Path(target_directory)
+                if len(calls) == 1:
+                    (root / "melspectrogram.tflite").write_bytes(b"mel-tflite")
+                    (root / "embedding_model.tflite").write_bytes(b"embedding-tflite")
+                    (root / "embedding_model.onnx").write_bytes(b"embedding-onnx")
+                else:
+                    (root / "melspectrogram.onnx").write_bytes(b"mel-onnx-restored")
+
+            module = SimpleNamespace(utils=SimpleNamespace(download_models=fake_download_models))
+            paths = jarvis_desktop.prepare_openwakeword_assets(
+                module, Path(temporary) / "jarvis_first_party.onnx", Path(temporary) / "appdata"
+            )
+
+            self.assertEqual(calls, [["__jarvis_custom__"], ["__jarvis_custom__"]])
+            self.assertEqual(Path(paths["melspec_model_path"]).read_bytes(), b"mel-onnx-restored")
+            self.assertEqual(Path(paths["embedding_model_path"]).read_bytes(), b"embedding-onnx")
+
     def test_zero_byte_openwakeword_runtime_asset_is_rejected(self):
         import tempfile
         from types import SimpleNamespace
