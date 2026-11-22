@@ -245,14 +245,28 @@ def install_downloaded_wakeword_model(
     return model_path
 
 def active_wakeword_model_path() -> Path:
-    """Prefer the project's custom-trained model; retain the licensed legacy model as fallback."""
-    if JARVIS_FIRST_PARTY_WAKEWORD_MODEL.is_file():
+    """Select first-party artifacts whenever either file exists; never hide a broken pair via fallback."""
+    first_party_sidecar = JARVIS_FIRST_PARTY_WAKEWORD_MODEL.with_name(
+        JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name + ".data"
+    )
+    if JARVIS_FIRST_PARTY_WAKEWORD_MODEL.exists() or first_party_sidecar.exists():
         return JARVIS_FIRST_PARTY_WAKEWORD_MODEL
     return JARVIS_WAKEWORD_MODEL
 
+
+def wakeword_model_files_ready(model_path: Path) -> bool:
+    """Require a complete, non-empty ONNX + external-data pair for the first-party model."""
+    model_path = Path(model_path)
+    if not model_path.is_file() or model_path.stat().st_size <= 0:
+        return False
+    if model_path.name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name:
+        sidecar = model_path.with_name(model_path.name + ".data")
+        return sidecar.is_file() and sidecar.stat().st_size > 0
+    return True
+
 def install_first_party_wakeword_model(source_path: Path,
                                        model_path: Path = JARVIS_FIRST_PARTY_WAKEWORD_MODEL) -> Path:
-    """Validate and install a trained ONNX model plus its optional external-data sidecar."""
+    """Validate and install a trained ONNX model and its required external-data sidecar."""
     import tempfile
 
     source = Path(source_path)
@@ -264,13 +278,18 @@ def install_first_party_wakeword_model(source_path: Path,
         raise ValueError("The custom wake-word model has an unexpected file size.")
 
     source_sidecar = source.with_name(source.name + ".data")
-    has_external_data = source_sidecar.is_file()
-    if has_external_data and source.name != destination.name:
+    if not source_sidecar.is_file():
+        raise ValueError(
+            "The first-party wake-word model requires both jarvis_first_party.onnx "
+            "and jarvis_first_party.onnx.data. The .data companion is missing."
+        )
+    has_external_data = True
+    if source.name != destination.name:
         raise ValueError(
             "This ONNX model uses external data. Keep its original filename "
             "and install it as jarvis_first_party.onnx with the matching .data file."
         )
-    if has_external_data and not 0 < source_sidecar.stat().st_size <= 100 * 1024 * 1024:
+    if not 0 < source_sidecar.stat().st_size <= 100 * 1024 * 1024:
         raise ValueError("The custom wake-word external-data file has an unexpected size.")
 
     try:
@@ -1775,7 +1794,7 @@ class JarvisDesktop:
         self.voice_setup_test_passed = False
         self.voice_setup_mic_var = tk.StringVar(value="1. Check Windows microphone access.")
         self.voice_setup_model_var = tk.StringVar(
-            value=("2. Wake-word model is installed." if active_wakeword_model_path().is_file()
+            value=("2. Wake-word model is installed." if wakeword_model_files_ready(active_wakeword_model_path())
                    else "2. Install the licensed Jarvis wake-word model.")
         )
         self.voice_setup_test_var = tk.StringVar(
@@ -1884,7 +1903,7 @@ class JarvisDesktop:
         ).start()
 
     def _start_voice_setup_model(self):
-        if active_wakeword_model_path().is_file():
+        if wakeword_model_files_ready(active_wakeword_model_path()):
             self.voice_setup_model_var.set("2. Wake-word model is installed and validated.")
             if self.voice_setup_mic_ready:
                 self.voice_setup_test_button.configure(state="normal")
@@ -1901,7 +1920,7 @@ class JarvisDesktop:
         if not self.voice_setup_mic_ready:
             self.voice_setup_status_var.set("Check microphone access before testing the wake word.")
             return
-        if not active_wakeword_model_path().is_file():
+        if not wakeword_model_files_ready(active_wakeword_model_path()):
             self.voice_setup_status_var.set("Install a wake-word model before testing.")
             return
         if getattr(self, "wakeword_test_running", False):
@@ -1992,7 +2011,7 @@ class JarvisDesktop:
         if not self.voice_setup_mic_ready:
             self.voice_setup_status_var.set("Complete the microphone check before finishing setup.")
             return
-        if not active_wakeword_model_path().is_file():
+        if not wakeword_model_files_ready(active_wakeword_model_path()):
             self.voice_setup_status_var.set("Wake-word model is missing; setup cannot finish.")
             return
         if not self.voice_setup_test_passed:
@@ -2018,7 +2037,7 @@ class JarvisDesktop:
         if microphone_consent_required(self.settings) or not self.settings.get("microphone_consent_granted"):
             self._set_status("Wake-word auto-start is paused until microphone permission is confirmed.")
             return
-        model_ready = active_wakeword_model_path().is_file()
+        model_ready = wakeword_model_files_ready(active_wakeword_model_path())
         owner_voice_ready = self._owner_voice_profile_ready()
         if not wakeword_auto_start_ready(
             self.settings,
@@ -2481,7 +2500,7 @@ class JarvisDesktop:
         )
         # The Python packages alone are insufficient: the custom single-word
         # Jarvis ONNX model is a required local asset for wake-word detection.
-        wakeword_model_ready = active_wakeword_model_path().is_file()
+        wakeword_model_ready = wakeword_model_files_ready(active_wakeword_model_path())
         voice_ready = voice_packages and wakeword_model_ready
         if not voice_packages:
             voice_detail = "INSTALL VOICE PACKAGES"
@@ -4461,7 +4480,7 @@ class JarvisDesktop:
                                 self.voice_setup_mic_var.set("1. Microphone check passed.")
                                 self.voice_setup_status_var.set("MICROPHONE READY — CHECK WAKE WORD")
                                 self.voice_setup_mic_button.configure(state="disabled", text="Microphone ready")
-                                if active_wakeword_model_path().is_file():
+                                if wakeword_model_files_ready(active_wakeword_model_path()):
                                     self.voice_setup_test_button.configure(state="normal")
                                     self.voice_setup_status_var.set("STEP 3 OF 4 — SAY JARVIS")
                             else:
