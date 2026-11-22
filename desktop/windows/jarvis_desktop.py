@@ -197,7 +197,10 @@ def prepare_openwakeword_assets(
     )
     melspec_path = models_dir / "melspectrogram.onnx"
     embedding_path = models_dir / "embedding_model.onnx"
-    missing = [path.name for path in (melspec_path, embedding_path) if not path.is_file()]
+    missing = [
+        path.name for path in (melspec_path, embedding_path)
+        if not path.is_file() or path.stat().st_size <= 0
+    ]
     if missing:
         raise RuntimeError(
             "The openWakeWord runtime assets could not be installed: " + ", ".join(missing)
@@ -3256,6 +3259,16 @@ class JarvisDesktop:
             if microphone_consent_required(self.settings) or not self.settings.get("microphone_consent_granted"):
                 self._set_status("Microphone permission was not granted. Voice listening is off.")
                 return
+        model_path = active_wakeword_model_path()
+        if not wakeword_model_files_ready(model_path):
+            if model_path.name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name:
+                self._set_status(
+                    "Wake-word unavailable: both jarvis_first_party.onnx and "
+                    "jarvis_first_party.onnx.data must exist and be non-empty."
+                )
+            else:
+                self._set_status("Wake-word unavailable: install the Jarvis ONNX model first.")
+            return
         self._ensure_offline_model(self.settings.get("language", "en-IN"))
         self.stop_event.clear()
         self._set_status("Starting local JARVIS wake-word detector…")
@@ -3294,7 +3307,13 @@ class JarvisDesktop:
 
             model_path = active_wakeword_model_path()
             model_path.parent.mkdir(parents=True, exist_ok=True)
-            if not model_path.is_file():
+            if not wakeword_model_files_ready(model_path):
+                if model_path.name == JARVIS_FIRST_PARTY_WAKEWORD_MODEL.name:
+                    self.events.put((
+                        "status",
+                        "Wake-word unavailable: both jarvis_first_party.onnx and "
+                        "jarvis_first_party.onnx.data must exist and be non-empty."
+                    ))
                 self.events.put(("wakeword_setup_required", str(model_path)))
                 return
 
