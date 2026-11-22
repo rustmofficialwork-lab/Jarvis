@@ -1319,9 +1319,14 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
         network_failure = False
         recognition_error = None
         for locale in locales:
+            if stop_event.is_set():
+                return None
             try:
-                return recognizer.recognize_google(audio, language=locale)
+                result = recognizer.recognize_google(audio, language=locale)
+                return None if stop_event.is_set() else result
             except Exception as online_error:
+                if stop_event.is_set():
+                    return None
                 is_network_error = (
                     request_error is not None and isinstance(online_error, request_error)
                 )
@@ -1341,8 +1346,12 @@ def listen_for_voice_command(recognizer, source, stop_event, language: str,
                 offline_locales.append(candidate)
         offline_error = None
         for offline_locale in offline_locales:
+            if stop_event.is_set():
+                return None
             try:
                 offline_text = transcribe_offline_vosk(audio, offline_locale)
+                if stop_event.is_set():
+                    return None
             except OfflineModelUnavailable as exc:
                 offline_error = exc
                 continue
