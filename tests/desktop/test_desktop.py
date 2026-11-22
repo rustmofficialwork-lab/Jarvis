@@ -403,6 +403,7 @@ class WakewordSetupTests(unittest.TestCase):
         self.assertIn("Starting hands-free Jarvis listening", statuses[-1])
 
     def test_auto_start_does_not_toggle_an_already_running_listener(self):
+        import tempfile
         from types import SimpleNamespace
 
         app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
