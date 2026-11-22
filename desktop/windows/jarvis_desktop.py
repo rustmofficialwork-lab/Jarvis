@@ -388,10 +388,24 @@ def wakeword_setup_test_passed(activations: int, required: int = WAKEWORD_SETUP_
     return count >= required
 
 
-MICROPHONE_CONSENT_VERSION = 2
+MICROPHONE_CONSENT_VERSION = 3
 def microphone_consent_required(settings: dict) -> bool:
     """Ask once for each consent version; legacy completion flags are not consent."""
     return settings.get("microphone_consent_version") != MICROPHONE_CONSENT_VERSION
+
+
+def wakeword_auto_start_ready(
+    settings: dict, *, model_ready: bool, owner_voice_ready: bool,
+    consent_required: bool,
+) -> bool:
+    """Auto-listen only after completed setup, explicit current consent, and local assets."""
+    return bool(
+        settings.get("voice_setup_completed") is True
+        and settings.get("microphone_consent_granted") is True
+        and not consent_required
+        and model_ready
+        and owner_voice_ready
+    )
 
 def record_microphone_consent(settings: dict, accepted: bool) -> None:
     """Persist the user's explicit choice without implying Windows granted access."""
@@ -404,11 +418,11 @@ def ask_microphone_consent(parent=None, platform_name=None, user32=None,
     platform_name = os.name if platform_name is None else platform_name
     title = "JARVIS microphone permission"
     message = (
-        "JARVIS would like permission to check microphone access for voice commands "
+        "JARVIS would like permission to use the microphone for voice commands "
         "and the optional “Jarvis” wake word.\n\n"
-        "The microphone is not continuously used during startup. Listening starts "
-        "only when you activate voice listening.\n\n"
-        "Allow JARVIS to check microphone access?"
+        "After you complete voice setup, JARVIS can listen for “Jarvis” while the app "
+        "is running. You can stop Voice Listening from the HUD at any time.\n\n"
+        "Allow JARVIS to use the microphone?"
     )
     if platform_name == "nt":
         import ctypes
@@ -1680,6 +1694,9 @@ class JarvisDesktop:
         self.root.after(1400, self._begin_first_launch_voice_setup)
         if TEMPORARY_STARTUP_MIC_TEST:
             self.root.after(2000, self._run_temporary_startup_microphone_test)
+        # A completed, explicitly consented voice setup enables hands-free wake listening
+        # on subsequent launches. The callback checks every prerequisite before opening audio.
+        self.root.after(5000, self._auto_start_wakeword_if_ready)
     def _first_launch_permission_setup(self):
         if not microphone_consent_required(self.settings):
             return
@@ -1691,11 +1708,11 @@ class JarvisDesktop:
             )
             accepted = messagebox.askyesno(
                 "JARVIS microphone permission",
-                "JARVIS would like permission to check microphone access for voice commands "
+                "JARVIS would like permission to use the microphone for voice commands "
                 "and the optional “Jarvis” wake word.\n\n"
-                "The microphone is not continuously used during startup. Listening starts "
-                "only when you activate voice listening.\n\n"
-                "Allow JARVIS to check microphone access?",
+                "After you complete voice setup, JARVIS can listen for “Jarvis” while the app "
+                "is running. You can stop Voice Listening from the HUD at any time.\n\n"
+                "Allow JARVIS to use the microphone?",
                 parent=self.root,
             )
         record_microphone_consent(self.settings, accepted)
@@ -1990,8 +2007,35 @@ class JarvisDesktop:
         except OSError as exc:
             self.voice_setup_status_var.set(f"Could not save setup state: {exc}")
             return
-        self._set_status("Voice setup completed. Activate Voice Listening when ready.")
+        self._set_status("Voice setup completed. Starting hands-free Jarvis listening…")
         self._close_voice_setup_wizard(window)
+        self.root.after(500, self._auto_start_wakeword_if_ready)
+
+    def _auto_start_wakeword_if_ready(self):
+        """Start hands-free wake listening after the user has completed and consented to setup."""
+        if self.settings.get("voice_setup_completed") is not True:
+            return
+        if microphone_consent_required(self.settings) or not self.settings.get("microphone_consent_granted"):
+            self._set_status("Wake-word auto-start is paused until microphone permission is confirmed.")
+            return
+        model_ready = active_wakeword_model_path().is_file()
+        owner_voice_ready = self._owner_voice_profile_ready()
+        if not wakeword_auto_start_ready(
+            self.settings,
+            model_ready=model_ready,
+            owner_voice_ready=owner_voice_ready,
+            consent_required=microphone_consent_required(self.settings),
+        ):
+            if not model_ready:
+                self._set_status("Wake-word auto-start unavailable: install the Jarvis ONNX model.")
+            elif not owner_voice_ready:
+                self._set_status("Wake-word auto-start unavailable: enroll the local owner voice.")
+            return
+        thread = getattr(self, "wake_thread", None)
+        if thread is not None and thread.is_alive():
+            return
+        self._set_status("Voice setup is complete. Starting hands-free Jarvis listening…")
+        self.toggle_listening()
 
     def _request_microphone_access(self):
         """Check the microphone only after the user has granted JARVIS consent."""
@@ -2015,7 +2059,7 @@ class JarvisDesktop:
 
     def _run_temporary_startup_microphone_test(self):
         """Capture and transcribe one short utterance locally, without the wake word."""
-        if not TEMPORARY_STARTUP_MIC_TEST:
+        if not TEMPORARY_STARTUP_MIC_TEST or self.settings.get("voice_setup_completed") is True:
             return
         if (
             microphone_consent_required(self.settings)
