@@ -2952,6 +2952,53 @@ class HybridAiTests(unittest.TestCase):
         self.assertEqual(local.call_args.args[0], "hello again")
 
 
+    def test_brain_engine_context_and_plan_reach_the_qwen_request(self):
+        from types import SimpleNamespace
+        import queue
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {"share_memory_with_ai": True}
+        app.history = [{"role": "user", "content": "previous turn"}]
+        app.events = queue.Queue()
+        plan = SimpleNamespace(grounding=[], options={"num_ctx": 4096}, history=SimpleNamespace(summary="", messages=[]), profile=SimpleNamespace(deliberate=False))
+        brain = SimpleNamespace(
+            context_for=lambda prompt, enabled, limit: ["JARVIS project memory"],
+            prepare_model_plan=lambda prompt, history, fixed_chars: plan,
+        )
+        app.brain_engine = brain
+
+        with (
+            patch.object(jarvis_desktop, "handle_online_command", return_value=None),
+            patch.object(jarvis_desktop, "local_chat_completion", return_value="Qwen response") as local,
+        ):
+            answer = app._get_online_reply("continue JARVIS project")
+
+        self.assertEqual(answer, "Qwen response")
+        self.assertEqual(local.call_args.args[2], ["JARVIS project memory"])
+        self.assertIs(local.call_args.kwargs["brain_plan"], plan)
+
+    def test_disabled_memory_sharing_never_passes_memory_to_qwen(self):
+        from types import SimpleNamespace
+        import queue
+
+        app = jarvis_desktop.JarvisDesktop.__new__(jarvis_desktop.JarvisDesktop)
+        app.settings = {"share_memory_with_ai": False}
+        app.history = []
+        app.events = queue.Queue()
+        brain = SimpleNamespace(
+            context_for=lambda prompt, enabled, limit: [] if not enabled else ["private memory"],
+            prepare_model_plan=lambda prompt, history, fixed_chars: None,
+        )
+        app.brain_engine = brain
+
+        with (
+            patch.object(jarvis_desktop, "handle_online_command", return_value=None),
+            patch.object(jarvis_desktop, "local_chat_completion", return_value="Qwen response") as local,
+        ):
+            app._get_online_reply("hello")
+
+        self.assertEqual(local.call_args.args[2], [])
+
     def test_live_web_commands_do_not_get_guessed_by_offline_model(self):
         from types import SimpleNamespace
         import queue
