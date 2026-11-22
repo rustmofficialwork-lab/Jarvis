@@ -192,11 +192,22 @@ class BrainEngine:
         else:
             # Keep lightweight adapters and older memory providers compatible.
             items = context_method(query=query)
-        return [
+        base = [
             str(item)[:MAX_FEEDBACK_LENGTH]
             for item in items
             if isinstance(item, str) and item.strip()
         ]
+        # Keep relevance ranking inside the coordinator rather than in the HUD layer.
+        try:
+            list_method = getattr(self.memory, "list", None)
+            if callable(list_method):
+                from smart_brain import rank_memories
+
+                ranked = rank_memories(query, list_method(), limit=limit)
+                return list(dict.fromkeys([*ranked, *base]))[:limit]
+        except Exception:
+            pass
+        return base
 
     def prepare_model_plan(
         self,
