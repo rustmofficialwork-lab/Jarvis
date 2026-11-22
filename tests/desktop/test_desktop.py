@@ -1942,7 +1942,22 @@ class ApplicationShutdownTests(unittest.TestCase):
         wake_confirmation = source.index("announce_wake_activation(self.speech_stop_event)")
         self.assertTrue(statements)
         self.assertLess(wake_confirmation, command_capture)
-        self.assertIn("if self.stop_event.is_set():\\n                        break\\n                    recognizer =", source)
+        lines = source.splitlines()
+        confirmation_line = next(
+            index for index, line in enumerate(lines)
+            if "announce_wake_activation(self.speech_stop_event)" in line
+        )
+        capture_line = next(
+            index for index, line in enumerate(lines)
+            if "recognizer = configure_voice_recognizer(sr.Recognizer())" in line
+        )
+        stop_guard_lines = [
+            index for index, line in enumerate(lines)
+            if line.strip() == "if self.stop_event.is_set():"
+            and confirmation_line < index < capture_line
+        ]
+        self.assertTrue(stop_guard_lines, "stop check must run after wake confirmation")
+        self.assertEqual(lines[stop_guard_lines[0] + 1].strip(), "break")
 
 class WakeRecorderCleanupTests(unittest.TestCase):
     def test_missing_wake_dependency_reports_error_and_stops_listener_cleanly(self):
@@ -2976,7 +2991,10 @@ class OllamaRuntimeIntegrationTests(unittest.TestCase):
             ):
                 found = jarvis_desktop._find_ollama_executable()
                 self.assertEqual(os.environ["OLLAMA_HOST"], "127.0.0.1:11435")
-                self.assertEqual(os.environ["OLLAMA_MODELS"], str(models))
+                self.assertEqual(
+                    Path(os.environ["OLLAMA_MODELS"]).resolve(),
+                    models.resolve(),
+                )
             self.assertEqual(found, str(ollama))
 
 
